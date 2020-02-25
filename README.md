@@ -6,7 +6,7 @@ To run the demo:
 
 ```shell
 git clone https://github.com/abathur/resholved.git
-cd resolved
+cd resholved
 nix-shell --run "./demo"
 ```
 
