@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import (fetchTarball "channel:nixos-19.09") {} }:
 
 let mine = with pkgs; rec {
 	py-yajl = python27Packages.buildPythonPackage rec {
