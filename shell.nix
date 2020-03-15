@@ -21,6 +21,7 @@ let
       pname = "oil";
       version = "undefined";
 
+      # src = builtins.fetchGit ../../../../work/oil;
       src = fetchFromGitHub {
         owner = "abathur";
         repo = "oil";
@@ -28,7 +29,15 @@ let
         sha256 = "0rx68y8r82sr8qmbr806iaz2pispn02f64k6xywxpj5lx05jynlz";
       };
 
-      buildInputs = [ oilPython re2c py-yajl makeWrapper ];
+      # src = fetchFromGitHub {
+      #   owner = "oilshell";
+      #   repo = "oil";
+      #   rev = "58f2372abd7df45221c0b74239cdc4442dbb8906";
+      #   sha256 = "15qmkhkj7cc1kb0c42vshddmd484yi5x2xh4826i033drf3iqryw";
+      #   fetchSubmodules = true;
+      # };
+
+      buildInputs = [ oilPython readline re2c cmark py-yajl makeWrapper ];
       # buildInputs = [ ];
       nativeBuildInputs = [ re2c file oilPython py-yajl ];
 
@@ -47,7 +56,18 @@ let
 
       # Patch shebangs so Nix can find all executables
       postPatch = ''
-        patchShebangs .
+        patchShebangs asdl build core frontend native oil_lang
+      '';
+      makeWrapperArgs =
+        [ "--set _OVM_RESOURCE_ROOT $out/${oilPython.sitePackages}" ];
+
+      postInstall = ''
+        makeWrapper $out/bin/oil.py $out/bin/oil --add-flags oil
+        makeWrapper $out/bin/oil.py $out/bin/osh --add-flags osh
+      '';
+
+      prePatch = ''
+        substituteInPlace ./doctools/cmark.py --replace "/usr/local/lib/libcmark.so" "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}"
       '';
 
       meta = {
@@ -58,6 +78,9 @@ let
           asl20 # Licence for Oil itself
         ];
       };
+
+      passthru = { shellPath = "/bin/osh"; };
+
     };
     runtimeDeps = [ pkgs.file pkgs.gettext ];
   };

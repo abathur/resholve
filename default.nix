@@ -55,11 +55,8 @@ let
 
     # Patch shebangs so Nix can find all executables
     postPatch = ''
-            patchShebangs .
-      		# substituteInPlace build/dev.sh --replace "native/libc_test.py" "# native/libc_test.py"
-      		# substituteInPlace build/codegen.sh --replace "re2c() { _deps/re2c-1.0.3/re2c" "# re2c() { _deps/re2c-1.0.3/re2c"
-
-      	'';
+      patchShebangs asdl build core frontend native oil_lang
+    '';
 
     makeWrapperArgs =
       [ "--set _OVM_RESOURCE_ROOT $out/${oilPython.sitePackages}" ];
