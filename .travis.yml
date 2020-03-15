@@ -17,7 +17,7 @@ install:
 script:
   - if [ -n "$CACHIX_SIGNING_KEY" ]; then cachix push abathur --watch-store; fi &
   #- nix-build
-  - nix-shell
+  - nix-shell --run "./demo"
   - sleep 5 # to allow cachix finish uploading
 
 env:
