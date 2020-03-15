@@ -109,6 +109,10 @@ def punshow():
     if args.allowed_executable_varsubs:
         allowed_executable_varsubs.update(args.allowed_executable_varsubs)
 
+    # FAIR WARNING: config envs below will probably change.
+    if "ALLOWED_VARSUBS" in os.environ:
+        allowed_executable_varsubs.update(os.environ["ALLOWED_VARSUBS"])
+
     # this is a lie; we'll look up against PATH without it--but it might be a common mis-use?
     assert (
         "SHELL_RUNTIME_DEPENDENCY_PATH" in os.environ
