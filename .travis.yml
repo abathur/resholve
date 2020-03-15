@@ -3,6 +3,13 @@ os:
   - linux
   - osx
 
+before_install:
+  - before_install:
+    # macOS needs this to run 'cachix use <user>'
+    - sudo mkdir -p /etc/nix
+    - echo "trusted-users = root $USER" | sudo tee -a /etc/nix/nix.conf
+    - sudo launchctl kickstart -k system/org.nixos.nix-daemon || true
+
 install:
   # cachix is a Nix build-cache; reduces run time
   - nix-env -iA cachix -f https://cachix.org/api/v1/install
