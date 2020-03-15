@@ -49,7 +49,7 @@ executables = dict()
 resolved_scripts = dict()
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.CRITICAL)
+logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.CRITICAL))
 # logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
 
 allowed_executable_varsubs = set()
@@ -92,6 +92,7 @@ def resolve_script(script_path):
         logger.info(
             "script %r is located within nix build dir; overwriting", script_path
         )
+        resolved.write_to(script_path)
     else:
         logger.info(
             "script %r not in Nix build dir; rewriting to: %s%s",
