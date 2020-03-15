@@ -55,6 +55,7 @@ logging.basicConfig(level=logging.CRITICAL)
 allowed_executable_varsubs = set()
 # allowed_executable_varsubs = {"HOME", "PWD"}
 
+
 parser = argparse.ArgumentParser(description="Resolve external dependencies.")
 parser.add_argument(
     "scripts",
@@ -227,6 +228,69 @@ class ResolutionError(error._ErrorWithLocation):
 # We need to extract more info after hitting some firstwords
 # This list is just for noticing if something is breaking expectations
 WATCH_FIRSTWORDS = {"sudo", "command", "eval", "exec", ".", "source", "alias"}
+KNOWN_BUILTINS = {
+    ".",
+    ":",
+    "[",
+    "alias",
+    "bg",
+    "bind",
+    "break",
+    "builtin",
+    "caller",
+    "cd",
+    "command",
+    "compgen",
+    "complete",
+    "compopt",
+    "continue",
+    "declare",
+    "dirs",
+    "disown",
+    "echo",
+    "enable",
+    "eval",
+    "exec",
+    "exit",
+    "export",
+    "false",
+    "fc",
+    "fg",
+    "getopts",
+    "hash",
+    "help",
+    "history",
+    "jobs",
+    "kill",
+    "let",
+    "local",
+    "logout",
+    "mapfile",
+    "popd",
+    "printf",
+    "pushd",
+    "pwd",
+    "read",
+    "readarray",
+    "readonly",
+    "return",
+    "set",
+    "shift",
+    "shopt",
+    "source",
+    "suspend",
+    "test",
+    "times",
+    "trap",
+    "true",
+    "type",
+    "typeset",
+    "ulimit",
+    "umask",
+    "unalias",
+    "unset",
+    "wait",
+}
 
 
 class ResolvedScript(object):
@@ -464,13 +528,23 @@ class ResolvedScript(object):
                 self.unresolved_commands.add(command_word)
 
     def record_word(self, word_ob, text):
+        global KNOWN_BUILTINS
         pos = word_.LeftMostSpanForWord(word_ob)
         self.word_obs[text] = word_ob
-        if (
-            consts.LookupSpecialBuiltin(text) == consts.NO_INDEX
-            and consts.LookupAssignBuiltin(text) == consts.NO_INDEX
-            and consts.LookupNormalBuiltin(text) == consts.NO_INDEX
-        ):
+        # TODO: this did look up builtins oil's way
+        # but the list of builtins there are probably
+        # oil's:
+        # if (
+        #     consts.LookupSpecialBuiltin(text) == consts.NO_INDEX
+        #     and consts.LookupAssignBuiltin(text) == consts.NO_INDEX
+        #     and consts.LookupNormalBuiltin(text) == consts.NO_INDEX
+        # ):
+        #
+        # The ~most-right way to do this would probably be to get the builtins from the target shell (at build-time? call-time?) but I'm not sure there's a portable way to do that?
+        # If there was, the Nix side could accept a shell (or shells?) argument, try to run that command in each, merge the lists, and supply t hem.
+        #
+        # For now, I'm just hard-coding a list of bash builtins (from compgen -b in GNU bash, version 5.0.9(1)-release (x86_64-apple-darwin17.7.0))
+        if text not in KNOWN_BUILTINS:
             logger.info("Recording command: %r", text)
             logger.debug("   position: %d, word object: %r", pos, word_ob)
             self.commands[text].append(pos)
