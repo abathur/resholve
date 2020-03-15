@@ -1,7 +1,7 @@
-{ pkgs ? import (fetchTarball "channel:nixos-19.09") {} }:
-
-let mine = with pkgs; rec {
-	py-yajl = python27Packages.buildPythonPackage rec {
+{ lib, fetchFromGitHub, stdenv, cmark, file, gettext, git,
+  makeWrapper, runCommand, python27, re2c, readline }:
+let
+	py-yajl = python27.pkgs.buildPythonPackage rec {
 		pname = "oil-pyyajl";
 		version = "unreleased";
 		src = fetchFromGitHub {
@@ -16,7 +16,7 @@ let mine = with pkgs; rec {
 
 	oilPython = python27.withPackages (ps: with ps; [ six typing ]);
 
-	oildev = python27Packages.buildPythonPackage rec {
+	oildev = python27.pkgs.buildPythonPackage rec {
 		pname = "oil";
 		version = "undefined";
 
@@ -29,7 +29,7 @@ let mine = with pkgs; rec {
 		};
 
 		# src = fetchFromGitHub {
-		#   owner = "oilshell";
+    #   owner = "oilshell";
 		#   repo = "oil";
 		#   rev = "58f2372abd7df45221c0b74239cdc4442dbb8906";
 		#   sha256 = "15qmkhkj7cc1kb0c42vshddmd484yi5x2xh4826i033drf3iqryw";
@@ -86,10 +86,21 @@ let mine = with pkgs; rec {
 		};
 
 	};
-	runtimeDeps = [ pkgs.file pkgs.gettext ];
-};
+	runtimeDeps = [ oildev file gettext ];
+in python27.pkgs.buildPythonApplication {
+  name = "resholved";
+  src = ./.;
 
-in pkgs.mkShell {
-	buildInputs = [ mine.oildev ] ++ mine.runtimeDeps;
-	SHELL_RUNTIME_DEPENDENCY_PATH = "${pkgs.lib.makeBinPath mine.runtimeDeps}";
+  format = "other";
+
+  propagatedBuildInputs = [
+    oildev
+  ];
+
+  installPhase = ''
+    mkdir -p $out/bin
+
+    mv resholver.py $out/bin/resholver
+    chmod +x $out/bin/resholver
+  '';
 }
