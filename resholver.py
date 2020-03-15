@@ -751,4 +751,4 @@ class ResolvedScript(object):
 
 
 if __name__ == "__main__":
-    punshow()
+    sys.exit(punshow())
