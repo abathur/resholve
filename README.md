@@ -10,7 +10,7 @@ cd resholved
 nix-shell --run "./demo"
 ```
 
-But, in any case, here's the output:
+But, in any case, here's the output (you can also see [a colored version in the Travis build logs](https://travis-ci.org/github/abathur/resholved/jobs/662618611#L3086):
 ```
 $ nix-shell --run "./demo"
 -- Resolving less_simple_success_a.sh ------------------------------------------
