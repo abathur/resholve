@@ -111,7 +111,7 @@ def punshow():
 
     # FAIR WARNING: config envs below will probably change.
     if "ALLOWED_VARSUBS" in os.environ:
-        allowed_executable_varsubs.update(os.environ["ALLOWED_VARSUBS"])
+        allowed_executable_varsubs.update(os.environ["ALLOWED_VARSUBS"].split())
 
     # this is a lie; we'll look up against PATH without it--but it might be a common mis-use?
     assert (
