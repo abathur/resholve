@@ -138,10 +138,10 @@ def punshow():
         return 2
     except ResolutionError as e:
         e.print_if_needed()
-        # return e.exit_status
+        return e.exit_status
     except error._ErrorWithLocation as e:
         ui.PrettyPrintError(e)
-        # return e.exit_status
+        return e.exit_status
     # except Exception as e:
     #     raise e
     # I was doing the below, but I'm not sure why I wouldn't want to surface a real error here for now; it seems like this will only make debugging harder
