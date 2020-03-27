@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> {} }:
 
 with pkgs; let
-  resholved = callPackage ./resholved.nix {};
+  resholved = callPackage ./default.nix {};
   heh = resholved.penis;
   buildResholvedPackage = callPackage ./mk-resholved-derivation.nix { inherit resholved; };
 

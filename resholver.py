@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 from __future__ import print_function
 
 import sys
 import os
 import argparse
+import fileinput
 import logging
 
 from collections import defaultdict
@@ -52,11 +53,14 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.CRITICAL))
 # logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
 
-allowed_executable_varsubs = set()
-# allowed_executable_varsubs = {"HOME", "PWD"}
+allowed_varsubs = set()
+# allowed_varsubs = {"HOME", "PWD"}
 
 
-parser = argparse.ArgumentParser(description="Resolve external dependencies.")
+parser = argparse.ArgumentParser(
+    description="Resolve external dependencies.",
+    epilog="<!> resholver also requires a PATH-format env, RESHOLVE_PATH, to resolve external commands and scripts from.",
+)
 parser.add_argument(
     "scripts",
     metavar="SCRIPT",
@@ -65,13 +69,23 @@ parser.add_argument(
     help="Script paths to resolve. Scripts in Nix build/store paths will be overwritten. Elsewhere, written to '<script>.resolved'. Pass script on <stdin> and redirect <stdout> if you need to control destination.",
 )
 
+
+def allow_tuple(value):
+    try:
+        context, name = value.split(":")
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("%r should be a scope:var pair" % value)
+    return (context, name)
+
+
 # TODO: not really happy with this exemption mechanism. I like that it is explicit, but it doesn't scale well, and it's confounded by having different "kinds" of things that might all need exemptions. Yes, they *could* all use one namespace, but we're more likely to wrongly exempt something we didn't mean to that way...
 parser.add_argument(
     "--allow",
-    dest="allowed_executable_varsubs",
+    dest="allowed_varsubs",
     action="append",
-    metavar="VAR",
-    help="allow dynamic statements consisting ONLY of a variable",
+    metavar="scope:var",
+    help="Allow dynamic statements consisting ONLY of a variable. For example, '--allow source:HOME' allows $HOME in arguments to the source command.",
+    type=allow_tuple,
 )
 
 # TODO: not immediately essential, but I'd like to make some util/debug commands that represent what this script knows about the script(s) it has parsed. Like, the functions, command invocations, files sourced, etc. I just don't know exactly which information that is, how granular/modular, what format (just a simple text dump? json? etc.)
@@ -88,19 +102,26 @@ def resolve_script(script_path):
         return resolved_scripts[script_path]
 
     resolved = resolved_scripts[script_path] = ResolvedScript(script_path)
-    if script_path.startswith(os.environ["NIX_BUILD_TOP"]):
+    if "NIX_BUILD_TOP" in os.environ and script_path.startswith(
+        os.environ["NIX_BUILD_TOP"]
+    ):
         logger.info(
-            "script %r is located within nix build dir; overwriting", script_path
+            "script %r located in nix build dir; will attempt to overwrite", script_path
         )
         resolved.write_to(script_path)
     else:
+
         logger.info(
-            "script %r not in Nix build dir; rewriting to: %s%s",
+            "script %r not in Nix build dir; will attempt to write to: %s%s",
             script_path,
             script_path,
             ".resolved",
         )
         resolved.write_to(script_path + ".resolved")
+        sys.stderr.write(
+            "Rewrote %r to %r\n" % (script_path, script_path + ".resolved")
+        )
+
     return resolved
 
 
@@ -108,20 +129,20 @@ def punshow():
     args = parser.parse_args()
     logger.debug("argparsed: %r", args)
 
-    if args.allowed_executable_varsubs:
-        allowed_executable_varsubs.update(args.allowed_executable_varsubs)
+    if args.allowed_varsubs:
+        allowed_varsubs.update(args.allowed_varsubs)
 
     # FAIR WARNING: config envs below will probably change.
-    if "ALLOWED_VARSUBS" in os.environ:
-        allowed_executable_varsubs.update(os.environ["ALLOWED_VARSUBS"].split())
+    if "RESHOLVE_ALLOW" in os.environ:
+        allowed_varsubs.update(
+            allow_tuple(x) for x in os.environ["RESHOLVE_ALLOW"].split()
+        )
 
     # this is a lie; we'll look up against PATH without it--but it might be a common mis-use?
-    assert (
-        "SHELL_RUNTIME_DEPENDENCY_PATH" in os.environ
-    ), "SHELL_RUNTIME_DEPENDENCY_PATH must be set"
+    assert "RESHOLVE_PATH" in os.environ, "RESHOLVE_PATH must be set"
 
     # adopt the runtime dependency path for resolving external executables
-    os.environ["PATH"] = os.environ["SHELL_RUNTIME_DEPENDENCY_PATH"]
+    os.environ["PATH"] = os.environ["RESHOLVE_PATH"]
 
     try:
         if len(args.scripts) == 0:
@@ -130,8 +151,22 @@ def punshow():
             resolved_scripts["<stdin>"] = resolved
             resolved.write_to()
 
-        for script in args.scripts:
-            resolved = resolve_script(os.path.abspath(script))
+        checked_scripts = list()
+        for script in map(os.path.abspath, args.scripts):
+            if os.path.exists(script):
+                checked_scripts.append(script)
+            else:
+                sys.stderr.write("Aborting due to missing file: %r\n" % script)
+                return 2
+
+        if len(set(checked_scripts)) != len(checked_scripts):
+            sys.stderr.write("Aborting due to duplicate script targets.\n")
+            sys.stderr.write("  Original: %r\n" % args.scripts)
+            sys.stderr.write("  Distinct: %r\n" % set(checked_scripts))
+            return 2
+
+        for script in checked_scripts:
+            resolved = resolve_script(script)
 
     except IOError as e:
         sys.stderr.write("whoooo buddy " + str(e))
@@ -142,6 +177,9 @@ def punshow():
     except error._ErrorWithLocation as e:
         ui.PrettyPrintError(e)
         return e.exit_status
+    except argparse.ArgumentTypeError as e:
+        sys.stderr.write("hooooe buddy " + str(e))
+        return 2
     # except Exception as e:
     #     raise e
     # I was doing the below, but I'm not sure why I wouldn't want to surface a real error here for now; it seems like this will only make debugging harder
@@ -328,6 +366,9 @@ class ResolvedScript(object):
             else:
                 arena.PushSource(source.Stdin())
 
+            self.allowed = set()
+            self.parse_directives(script)
+
             try:
                 node = main_loop.ParseWholeFile(
                     self._make_parser(parse_ctx, script, arena)
@@ -341,6 +382,7 @@ class ResolvedScript(object):
         # actually initialize
         self.arena = arena
         # TODO: not certain we don't want more, but minimize for now
+
         self.aliases = set()
         self.builtins = defaultdict(list)
         self.commands = defaultdict(list)
@@ -366,6 +408,21 @@ class ResolvedScript(object):
 
         # TODO: this is convenient for debug, but I think this should be a separate call later. I'll have it return self so that it can be chained for simplicity.
         # self.render(out=sys.stdout)  # TODO: out to a sane file location?
+
+    # TODO: this is a very early draft format; I suspect the real format will support more explicitly stating the context of the exception to avoid over-permitting. I don't recommend hand-adding these to a file, yet, though at some point that use-case should be supported. For now, the goal is to read/write these in order to respect old exemptions when we re-parse a file we've resolved previously (rather than making every consumer include exemptions for all sub-projects...)
+    def parse_directives(self, script):
+        """
+        read the tail of the file for directives;
+        abort as soon as we find a nonmatching line
+
+        # resholve: allow <identifier>
+        """
+        self.in_doc_directives = set()
+        for line in script:
+            if line.startswith("# resholved: allow"):
+                self.in_doc_directives.add(allow_tuple(line[18:].strip()))
+        script.seek(0)
+        self.allowed.update(self.in_doc_directives, allowed_varsubs)
 
     def write_to(self, path=None):
         f = open(path, "w") if path else sys.stdout
@@ -417,12 +474,38 @@ class ResolvedScript(object):
                     raise Exception(
                         "function {:} defined but not resolved?".format(command_word)
                     )
+                elif ("function", command_word) in self.allowed:
+                    continue  # allow exempted function
+                # TODO: see if you can dedupe this block with the one in resolve
+                elif command_word.startswith("/"):
+                    basecommand = os.path.basename(command_word)
+                    baseexecutable = lookup(basecommand)
+                    if command_word == baseexecutable:
+                        continue  # I guess this is ok; the path wouldn't change in any case
+                    elif ("resholved_inputs", command_word) in self.allowed:
+                        continue  # explicitly exempted
+                    else:
+                        raise ResolutionError(
+                            # TODO: write a test to prove this happens? I just saw a case that should fit this get raised as:
+                            #   /nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file resholver.py
+                            #   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                            # /Users/abathur/work/resholved/simple_success_a.sh.resolved:2: Can't resolve command '/nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file' to a known function or executable
+                            # TODO: or we could give them a way to remap it here I guess.
+                            # I'm just uncomfortable with the syntax paradigm that cleanly
+                            # and efficiently expresses a complex set of ignore allow
+                            # replace directives
+                            "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
+                            # the others are errors too, but we'll just flag the first
+                            span_id=self.commands[command_word][0],
+                            status=4,
+                            arena=self.arena,
+                        )
                 else:
                     raise ResolutionError(
                         "Can't resolve command %r to a known function or executable",
                         command_word,
                         word=self.word_obs[command_word],
-                        status=2,
+                        status=3,
                         arena=self.arena,
                     )
             for location in locations:
@@ -458,6 +541,24 @@ class ResolvedScript(object):
             cursor.SkipUntil(location + 1)
 
         cursor.PrintUntil(self.arena.LastSpanId())
+        # DOING: add comments, (maybe at the end of the file for simplicity?) that encode what we're ignoring in a way future runs can read them back off?
+        # - write real information here
+        # - make a routine near the beginning of the readin that is capable of writing it
+        # more theoretical: is this a mechanism that end-users can use to flag their scripts, or should the resolver guard this by hashing the file or something?
+
+        # we only want items that weren't already in the file
+
+        if len(self.in_doc_directives) < len(self.allowed):
+            if len(self.in_doc_directives) == 0:
+                cursor.f.write("\n### resholved directives (auto-generated)\n")
+            new_directives = self.allowed.difference(self.in_doc_directives)
+            cursor.f.writelines(
+                [
+                    "# resholved: allow {:}:{:}\n".format(context, name)
+                    for context, name in sorted(new_directives)
+                ]
+                + ["\n"]
+            )
         self.arena.PopSource()
         return self
 
@@ -499,10 +600,16 @@ class ResolvedScript(object):
                 if command_word == baseexecutable:
                     continue
                     # it's okay that it's here. We don't need to replace it.
+                elif ("resholved_inputs", command_word) in self.allowed:
+                    continue  # explicitly exempted
                 else:
                     # or it's probably a hard-coded path
                     # TODO: also need to try and suss out things like $HOME/executable/path
                     raise ResolutionError(
+                        # TODO: write a test to prove this happens? I just saw a case that should fit this get raised as:
+                        #   /nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file resholver.py
+                        #   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # /Users/abathur/work/resholved/simple_success_a.sh.resolved:2: Can't resolve command '/nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file' to a known function or executable
                         # TODO: or we could give them a way to remap it here I guess.
                         # I'm just uncomfortable with the syntax paradigm that cleanly
                         # and efficiently expresses a complex set of ignore allow
@@ -510,12 +617,14 @@ class ResolvedScript(object):
                         "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
                         # the others are errors too, but we'll just flag the first
                         span_id=self.commands[command_word][0],
+                        status=5,
                         arena=self.arena,
                     )
 
             executable = lookup(command_word)
             if executable:
                 self.resolved_commands[command_word] = executable
+                self.allowed.add(("resholved_inputs", executable))
 
             function = self.resolve_function(command_word)
             if function:
@@ -545,7 +654,7 @@ class ResolvedScript(object):
         # If there was, the Nix side could accept a shell (or shells?) argument, try to run that command in each, merge the lists, and supply t hem.
         #
         # For now, I'm just hard-coding a list of bash builtins (from compgen -b in GNU bash, version 5.0.9(1)-release (x86_64-apple-darwin17.7.0))
-        if text not in KNOWN_BUILTINS:
+        if text not in KNOWN_BUILTINS and ("builtin", text) not in self.allowed:
             logger.info("Recording command: %r", text)
             logger.debug("   position: %d, word object: %r", pos, word_ob)
             self.commands[text].append(pos)
@@ -641,7 +750,7 @@ class ResolvedScript(object):
                         # exceptions, but make them easy to add)
                         elif (
                             bad_token.id == Id.VSub_Name
-                            and bad_token.val in allowed_executable_varsubs
+                            and (word1, bad_token.val) in self.allowed
                         ):
                             return
                         # Letting $name-style subs through only if they're in
@@ -650,7 +759,7 @@ class ResolvedScript(object):
                         elif (
                             bad_token.id == Id.VSub_DollarName
                             # [1:] to leave off the $
-                            and bad_token.val[1:] in allowed_executable_varsubs
+                            and (word1, bad_token.val[1:]) in self.allowed
                         ):
                             return
                         else:
@@ -660,7 +769,7 @@ class ResolvedScript(object):
                                 w_ob1.parts[0].val,
                                 word=w_ob2,
                                 token=bad_token,
-                                status=2,
+                                status=6,
                                 arena=self.arena,
                             )
 
@@ -705,7 +814,7 @@ class ResolvedScript(object):
                             "Unable to resolve source target %r to a known file",
                             word2,
                             word=w_ob2,
-                            status=2,
+                            status=7,
                             arena=self.arena,
                         )
                 elif word1 == "alias":
@@ -718,6 +827,7 @@ class ResolvedScript(object):
         self.funcs_defined.add(node.name)
 
     def _Visit(self, node):
+        # TODO: may debug log here?
         cls = node.__class__
         if cls is command.Simple:
             self._visit_command_Simple(node)
