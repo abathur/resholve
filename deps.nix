@@ -1,21 +1,12 @@
-{
-  stdenv,
-  fetchFromGitHub,
-  fetchurl,
-  makeWrapper,
+{ stdenv, fetchFromGitHub, fetchurl, makeWrapper,
 
-  git,
+git,
 
-  # oil deps
-  readline,
-  re2c,
-  cmark,
-  python27,
-  file,
+# oil deps
+readline, re2c, cmark, python27, file,
 
-  # resholved test deps
-  python37,
-}:
+# resholved test deps
+python37, }:
 
 rec {
   py-yajl = python27.pkgs.buildPythonPackage rec {
@@ -52,7 +43,9 @@ rec {
     # error: build of '/nix/store/gka72kwls8fc9l9ilxblyvw54rh5cys7-resholved.drv' failed
     # For now my goal is just getting the code under test; I suspect someone with more python packaging experience will know what I "should" do.
     # oilPython = python27.withPackages (ps: with ps; [ six typing pytest pytest-shell ]);
-    buildInputs = with python27.pkgs; [ six typing pytest pytest-shell2 ] ++ [ python27 readline re2c cmark py-yajl makeWrapper ];
+    buildInputs = with python27.pkgs;
+      [ six typing pytest pytest-shell2 ]
+      ++ [ python27 readline re2c cmark py-yajl makeWrapper ];
 
     nativeBuildInputs = [ re2c file python27 py-yajl ];
 
@@ -95,13 +88,13 @@ rec {
   pytest-shell2 = python27.pkgs.buildPythonPackage {
     name = "pytest-shell-0.2.3";
     src = fetchurl {
-      url = "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
-      sha256 = "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
+      url =
+        "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
+      sha256 =
+        "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
     };
     buildInputs = [ ];
-    propagatedBuildInputs = [
-      python27.pkgs.pytest
-    ];
+    propagatedBuildInputs = [ python27.pkgs.pytest ];
     meta = {
       homepage = "https://hg.sr.ht/~danmur/pytest-shell";
       license = stdenv.lib.licenses.mit;
@@ -112,13 +105,13 @@ rec {
   pytest-shell3 = python37.pkgs.buildPythonPackage {
     name = "pytest-shell-0.2.3";
     src = fetchurl {
-      url = "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
-      sha256 = "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
+      url =
+        "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
+      sha256 =
+        "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
     };
     buildInputs = [ ];
-    propagatedBuildInputs = [
-      python37.pkgs.pytest
-    ];
+    propagatedBuildInputs = [ python37.pkgs.pytest ];
     meta = {
       homepage = "https://hg.sr.ht/~danmur/pytest-shell";
       license = stdenv.lib.licenses.mit;

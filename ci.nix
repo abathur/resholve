@@ -1,44 +1,53 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { } }:
 
-with pkgs; let
-  resholved = callPackage ./default.nix {};
+with pkgs;
+let
+  resholved = callPackage ./default.nix { };
   pytest-shell = python37.pkgs.buildPythonPackage {
     name = "pytest-shell-0.2.3";
     src = fetchurl {
-      url = "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
-      sha256 = "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
+      url =
+        "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
+      sha256 =
+        "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
     };
     buildInputs = [ ];
-    propagatedBuildInputs = [
-      python37.pkgs.pytest
-    ];
+    propagatedBuildInputs = [ python37.pkgs.pytest ];
     meta = {
       homepage = "https://hg.sr.ht/~danmur/pytest-shell";
       license = stdenv.lib.licenses.mit;
       description = "Pytest plugin for running shell commands/scripts.";
     };
   };
-  shunit2 = with pkgs.shunit2; resholved.buildResholvedPackage {
-    inherit name src version installPhase;
-    scripts = [ "shunit2" ];
-    inputs = [ coreutils gnused gnugrep findutils ];
-    patchPhase = ''
-      substituteInPlace shunit2 --replace "/usr/bin/od" "od"
-    '';
-    allow = {
-      eval = ["shunit_condition_" "_shunit_test_"];
-      # dynamically defined in shunit2:_shunit_mktempFunc
-      function = [ "oneTimeSetUp" "oneTimeTearDown" "setUp" "tearDown" "suite" "noexec"];
-      builtin = [ "setopt" ]; # zsh has it, not sure
+  shunit2 = with pkgs.shunit2;
+    resholved.buildResholvedPackage {
+      inherit name src version installPhase;
+      scripts = [ "shunit2" ];
+      inputs = [ coreutils gnused gnugrep findutils ];
+      patchPhase = ''
+        substituteInPlace shunit2 --replace "/usr/bin/od" "od"
+      '';
+      allow = {
+        eval = [ "shunit_condition_" "_shunit_test_" ];
+        # dynamically defined in shunit2:_shunit_mktempFunc
+        function = [
+          "oneTimeSetUp"
+          "oneTimeTearDown"
+          "setUp"
+          "tearDown"
+          "suite"
+          "noexec"
+        ];
+        builtin = [ "setopt" ]; # zsh has it, not sure
+      };
     };
-  };
   test_module1 = resholved.buildResholvedPackage {
     name = "testmod1";
     version = "unreleased";
 
     src = lib.cleanSource tests/nix/libressl/.;
 
-    scripts = ["libressl.sh"];
+    scripts = [ "libressl.sh" ];
     inputs = [ jq test_module2 libressl.bin ];
     allow = { };
 
@@ -53,7 +62,7 @@ with pkgs; let
 
     src = lib.cleanSource tests/nix/openssl/.;
 
-    scripts = ["openssl.sh"];
+    scripts = [ "openssl.sh" ];
     inputs = [ shunit2 openssl.bin ];
 
     installPhase = ''
@@ -67,7 +76,7 @@ with pkgs; let
 
     src = lib.cleanSource tests/nix/future_perfect_tense/.;
 
-    scripts = ["conjure.sh"];
+    scripts = [ "conjure.sh" ];
     inputs = [ test_module1 ];
     allow = { };
 
@@ -81,7 +90,9 @@ with pkgs; let
 
 in stdenv.mkDerivation {
   name = "resholved-ci";
-  src = builtins.filterSource (path: type: type != "directory" || baseNameOf path == "demo" || baseNameOf path == "tests") ./.;
+  src = builtins.filterSource (path: type:
+    type != "directory" || baseNameOf path == "demo" || baseNameOf path
+    == "tests") ./.;
   installPhase = ''
     mkdir $out
   '';
