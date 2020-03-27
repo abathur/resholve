@@ -78,21 +78,7 @@ with pkgs; let
   };
   testPy = python37.withPackages (ps: with ps; [ pytest pytest-shell ]);
   resolveTimeDeps = [ file gettext ];
-# in symlinkJoin {
-#   name = "GFY";
-#   paths = [ resholved testPy ];
-#   postBuild = ''
-#       PATH=$out/bin:$PATH
-#       echo $PATH
-#       ls -la
-#       type -pa resholver python python2 python3 pytest || true
-#       echo ${demo}
-#       ls -la ${demo}
-#       pushd ${demo}
-#       pytest
-#       # pytest tests
-#     '';
-# }
+
 in stdenv.mkDerivation {
   name = "resholved-ci";
   src = builtins.filterSource (path: type: type != "directory" || baseNameOf path == "demo" || baseNameOf path == "tests") ./.;
