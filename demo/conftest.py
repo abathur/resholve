@@ -24,7 +24,6 @@ def demo(bash, record_property):
             record_property(
                 "original", (s.send("cat " + script) + "\n").splitlines(True)
             )
-            # TODO: generic python? generic script?
             command = "resholver{:} < {:}".format(
                 " " + argstr if len(argstr) else argstr, script
             )

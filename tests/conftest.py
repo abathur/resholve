@@ -2,8 +2,9 @@ import pytest
 import os
 from distutils.spawn import find_executable
 
-# DEFAULT_KEEP = {"PATH", "PYTHONPATH", "PYTHONHASHSEED", "PYTHONNOUSERSITE"}
-
+# TODO: I had to fiddle with letting through just a little of the environment
+# I'm leaving everything intact here for now so that it's simple to relitigate
+# but it's probably fine to dump these after May 1, 2020
 DEFAULT_KEEP = {
     # "__CF_USER_TEXT_ENCODING",
     # "__darwinAllowLocalNetworking",
@@ -138,28 +139,6 @@ _our_bash_command = (
     _our_bash,
 )
 
-# @pytest.fixture(scope="session")
-# def env_with_deps():
-#     _base_env = {key: os.environ[key] for key in {"PATH","PYTHONHASHSEED","PYTHONNOUSERSITE","PYTHONPATH","RESHOLVE_PATH","TEMP","TEMPDIR","TMP","TMPDIR"}}
-#     _our_bash_command = (
-#         _our_env,
-#         "-i",
-#         " ".join(("{:}={:}".format(k, v) for k, v in _base_env.items())),
-#         _our_bash,
-#     )
-#     yield
-
-# @pytest.fixture(scope="session")
-# def env_without_deps():
-#     _base_env = {key: os.environ[key] for key in {"PATH","PYTHONHASHSEED","PYTHONNOUSERSITE","PYTHONPATH","TEMP","TEMPDIR","TMP","TMPDIR"}}
-#     _our_bash_command = (
-#         _our_env,
-#         "-i",
-#         " ".join(("{:}={:}".format(k, v) for k, v in _base_env.items())),
-#         _our_bash,
-#     )
-#     yield
-
 
 def pytest_report_header(config):
     return "RESHOLVE_PATH: " + os.environ["RESHOLVE_PATH"]
@@ -181,7 +160,6 @@ def shell(bash):
             env = _base_env
 
         with bash(envvars=env, cmd=_our_bash_command, pwd="tests") as s:
-            # raise Exception(s.send("echo $PATH"))
             s.auto_return_code_error = False
             return s.send(command).splitlines(), s.last_return_code
 
@@ -207,10 +185,8 @@ def resholver(shell):  # shell?
 def resholver_nah(bash):  # shell?
     def reporting_shell(script, argstr="", env=None):
         with bash(envvars=env or dict(), cmd="bash", pwd="tests") as s:
-            # raise Exception(s.send("echo $PATH"))
             s.auto_return_code_error = False
 
-            # TODO: generic python
             command = "resholver {:} < {:}".format(
                 " " + argstr if len(argstr) else argstr, script
             )

@@ -10,6 +10,15 @@ import logging
 from collections import defaultdict
 from distutils.spawn import find_executable
 
+# NOTE:
+#   All of the below are imports from oil. Try to keep careful notes here on
+#   what is being used from each Oil module. Oil is still changing very
+#   quickly, and it's easier to track upstream changes with a succinct set of
+#   notes.
+#
+#   TODO: get all of this packaged a little better so that all of these
+#   imports can be prefixed with oil.
+
 # just to support a rewritten variant of oil code (find_dynamic_token)
 from typing import cast
 
@@ -78,7 +87,6 @@ def allow_tuple(value):
     return (context, name)
 
 
-# TODO: not really happy with this exemption mechanism. I like that it is explicit, but it doesn't scale well, and it's confounded by having different "kinds" of things that might all need exemptions. Yes, they *could* all use one namespace, but we're more likely to wrongly exempt something we didn't mean to that way...
 parser.add_argument(
     "--allow",
     dest="allowed_varsubs",
@@ -87,8 +95,6 @@ parser.add_argument(
     help="Allow dynamic statements consisting ONLY of a variable. For example, '--allow source:HOME' allows $HOME in arguments to the source command.",
     type=allow_tuple,
 )
-
-# TODO: not immediately essential, but I'd like to make some util/debug commands that represent what this script knows about the script(s) it has parsed. Like, the functions, command invocations, files sourced, etc. I just don't know exactly which information that is, how granular/modular, what format (just a simple text dump? json? etc.)
 
 
 def lookup(word):
@@ -132,7 +138,7 @@ def punshow():
     if args.allowed_varsubs:
         allowed_varsubs.update(args.allowed_varsubs)
 
-    # FAIR WARNING: config envs below will probably change.
+    # FAIR WARNING: config envs below might change.
     if "RESHOLVE_ALLOW" in os.environ:
         allowed_varsubs.update(
             allow_tuple(x) for x in os.environ["RESHOLVE_ALLOW"].split()
@@ -147,7 +153,6 @@ def punshow():
     try:
         if len(args.scripts) == 0:
             resolved = ResolvedScript()
-            # TODO: before this is okay, you've gotta move everything else that prints to a log, stderr, or a dynamic logging function that can choose depending on mode.
             resolved_scripts["<stdin>"] = resolved
             resolved.write_to()
 
@@ -366,6 +371,7 @@ class ResolvedScript(object):
             else:
                 arena.PushSource(source.Stdin())
 
+            # set([ (scope, identifier), ... ])
             self.allowed = set()
             self.parse_directives(script)
 
@@ -381,7 +387,7 @@ class ResolvedScript(object):
 
         # actually initialize
         self.arena = arena
-        # TODO: not certain we don't want more, but minimize for now
+        # TODO: not certain we don't want more...
 
         self.aliases = set()
         self.builtins = defaultdict(list)
@@ -406,16 +412,12 @@ class ResolvedScript(object):
             e.print_if_needed()
             raise
 
-        # TODO: this is convenient for debug, but I think this should be a separate call later. I'll have it return self so that it can be chained for simplicity.
-        # self.render(out=sys.stdout)  # TODO: out to a sane file location?
-
-    # TODO: this is a very early draft format; I suspect the real format will support more explicitly stating the context of the exception to avoid over-permitting. I don't recommend hand-adding these to a file, yet, though at some point that use-case should be supported. For now, the goal is to read/write these in order to respect old exemptions when we re-parse a file we've resolved previously (rather than making every consumer include exemptions for all sub-projects...)
     def parse_directives(self, script):
         """
         read the tail of the file for directives;
         abort as soon as we find a nonmatching line
 
-        # resholve: allow <identifier>
+        # resholve: allow scope:<identifier>
         """
         self.in_doc_directives = set()
         for line in script:
@@ -438,7 +440,7 @@ class ResolvedScript(object):
         replacements = {}
 
         # TODO: think about whether it's "right" to prefix builtins. I was
-        # planning to do this because it reduces ambiiguity, increases
+        # planning to do this because it reduces ambiguity, increases
         # certainty, and I couldn't see a clear performance impact. But
         # patching them in bashup.events drops emits/s from ~13.9k to ~7.2k
 
@@ -490,10 +492,6 @@ class ResolvedScript(object):
                             #   /nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file resholver.py
                             #   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             # /Users/abathur/work/resholved/simple_success_a.sh.resolved:2: Can't resolve command '/nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file' to a known function or executable
-                            # TODO: or we could give them a way to remap it here I guess.
-                            # I'm just uncomfortable with the syntax paradigm that cleanly
-                            # and efficiently expresses a complex set of ignore allow
-                            # replace directives
                             "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
                             # the others are errors too, but we'll just flag the first
                             span_id=self.commands[command_word][0],
@@ -541,13 +539,10 @@ class ResolvedScript(object):
             cursor.SkipUntil(location + 1)
 
         cursor.PrintUntil(self.arena.LastSpanId())
-        # DOING: add comments, (maybe at the end of the file for simplicity?) that encode what we're ignoring in a way future runs can read them back off?
-        # - write real information here
-        # - make a routine near the beginning of the readin that is capable of writing it
-        # more theoretical: is this a mechanism that end-users can use to flag their scripts, or should the resolver guard this by hashing the file or something?
+        # add comments, (at the end of the file for simplicity) that encode what
+        # we're ignoring in a way future runs can read them back off
 
         # we only want items that weren't already in the file
-
         if len(self.in_doc_directives) < len(self.allowed):
             if len(self.in_doc_directives) == 0:
                 cursor.f.write("\n### resholved directives (auto-generated)\n")
@@ -594,7 +589,6 @@ class ResolvedScript(object):
         for command_word in self.commands.keys():
             if command_word.startswith("/"):
                 # path is already properly resolved (probably by us)
-
                 basecommand = os.path.basename(command_word)
                 baseexecutable = lookup(basecommand)
                 if command_word == baseexecutable:
@@ -604,16 +598,11 @@ class ResolvedScript(object):
                     continue  # explicitly exempted
                 else:
                     # or it's probably a hard-coded path
-                    # TODO: also need to try and suss out things like $HOME/executable/path
                     raise ResolutionError(
                         # TODO: write a test to prove this happens? I just saw a case that should fit this get raised as:
                         #   /nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file resholver.py
                         #   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # /Users/abathur/work/resholved/simple_success_a.sh.resolved:2: Can't resolve command '/nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file' to a known function or executable
-                        # TODO: or we could give them a way to remap it here I guess.
-                        # I'm just uncomfortable with the syntax paradigm that cleanly
-                        # and efficiently expresses a complex set of ignore allow
-                        # replace directives
                         "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
                         # the others are errors too, but we'll just flag the first
                         span_id=self.commands[command_word][0],
@@ -641,7 +630,9 @@ class ResolvedScript(object):
         global KNOWN_BUILTINS
         pos = word_.LeftMostSpanForWord(word_ob)
         self.word_obs[text] = word_ob
-        # TODO: this did look up builtins oil's way
+        # TODO:
+        #
+        # this did look up builtins oil's way
         # but the list of builtins there are probably
         # oil's:
         # if (
@@ -650,10 +641,17 @@ class ResolvedScript(object):
         #     and consts.LookupNormalBuiltin(text) == consts.NO_INDEX
         # ):
         #
-        # The ~most-right way to do this would probably be to get the builtins from the target shell (at build-time? call-time?) but I'm not sure there's a portable way to do that?
-        # If there was, the Nix side could accept a shell (or shells?) argument, try to run that command in each, merge the lists, and supply t hem.
+        # The ~most-right way to do this would probably be to get the builtins
+        # from the target shell (at build-time? call-time?) but I'm not sure there's
+        # a portable way to do it?
+        #
+        # If there was, the Nix side could accept a shell (or shells?) argument,
+        # try to run that command in each, merge the lists, and supply them.
         #
         # For now, I'm just hard-coding a list of bash builtins (from compgen -b in GNU bash, version 5.0.9(1)-release (x86_64-apple-darwin17.7.0))
+        #
+        # FWIW, if you're using this for some other shell and have a builtin not
+        # in this list, you can add an exemption with --allow builtin:<name>
         if text not in KNOWN_BUILTINS and ("builtin", text) not in self.allowed:
             logger.info("Recording command: %r", text)
             logger.debug("   position: %d, word object: %r", pos, word_ob)
@@ -708,7 +706,7 @@ class ResolvedScript(object):
         # "builtin builtin builtin builtin builtin command whoami" is perfectly valid.
         # The current code won't see the dep on an external command 'whoami'.
 
-        # TODO: Does it make sense to use the presence buildin/command etc
+        # TODO: Does it make sense to use the presence of builtin/command etc
         # as smells that trigger extra scrutinty? i.e., "builtin source" may
         # be a reasonable smell that the script or something it sources overrides
         # source?
@@ -722,7 +720,8 @@ class ResolvedScript(object):
                 for part in w_ob2.parts:
                     bad_token = find_dynamic_token(part)
                     if bad_token:
-                        # Letting $1-style subs through for now. There are
+                        # Letting $1-style subs through for now.
+                        #
                         # In practice, these could be paths we want to
                         # resolve, *or* be perfectly fine as is.
                         if bad_token.id == Id.VSub_Number:
