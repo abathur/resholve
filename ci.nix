@@ -21,7 +21,7 @@ let
   };
   shunit2 = with pkgs.shunit2;
     resholved.buildResholvedPackage {
-      inherit name src version installPhase;
+      inherit pname src version installPhase;
       scripts = [ "shunit2" ];
       inputs = [ coreutils gnused gnugrep findutils ];
       patchPhase = ''
@@ -42,7 +42,7 @@ let
       };
     };
   test_module1 = resholved.buildResholvedPackage {
-    name = "testmod1";
+    pname = "testmod1";
     version = "unreleased";
 
     src = lib.cleanSource tests/nix/libressl/.;
@@ -57,7 +57,7 @@ let
     '';
   };
   test_module2 = resholved.buildResholvedPackage {
-    name = "testmod2";
+    pname = "testmod2";
     version = "unreleased";
 
     src = lib.cleanSource tests/nix/openssl/.;
@@ -71,7 +71,7 @@ let
     '';
   };
   test_module3 = resholved.buildResholvedPackage {
-    name = "testmod3";
+    pname = "testmod3";
     version = "unreleased";
 
     src = lib.cleanSource tests/nix/future_perfect_tense/.;

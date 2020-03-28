@@ -3,7 +3,8 @@ let
   deps = callPackage ./deps.nix { };
   resolveTimeDeps = [ file gettext ];
 in python27.pkgs.buildPythonApplication {
-  name = "resholved";
+  pname = "resholved";
+  version = "unreleased";
   src = ./.;
 
   format = "other";

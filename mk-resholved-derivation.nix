@@ -1,13 +1,13 @@
 { stdenv, lib, resholved, }:
 
-{ name, src, version, scripts, inputs ? [ ], allow ? { }, passthru ? { }, ...
+{ pname, src, version, scripts, inputs ? [ ], allow ? { }, passthru ? { }, ...
 }@attrs:
 let
   inherit stdenv;
   self = (stdenv.mkDerivation ((removeAttrs attrs [ "script" "inputs" "allow" ])
     // {
-
-      #inherit name version src;
+      # wish I knew why I commented this out...
+      inherit pname version src;
       buildInputs = [ resholved ];
       propagatedBuildInputs = inputs;
       RESHOLVE_PATH = "${lib.makeBinPath inputs}";
