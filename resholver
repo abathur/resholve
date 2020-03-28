@@ -59,7 +59,7 @@ executables = dict()
 resolved_scripts = dict()
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.CRITICAL))
+logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
 # logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
 
 allowed_varsubs = set()
@@ -259,14 +259,34 @@ class ResolutionError(error._ErrorWithLocation):
     printed = False
     arena = None
 
-    def __init__(self, *arg, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.arena = kwargs.pop("arena")
-        error._ErrorWithLocation.__init__(self, *arg, **kwargs)
+        error._ErrorWithLocation.__init__(self, *args, **kwargs)
 
     def print_if_needed(self):
         if not self.printed:
             ui.PrettyPrintError(self, self.arena)
             self.printed = True
+
+
+class ResolutionWarning(error._ErrorWithLocation):
+    printed = False
+    arena = None
+    label = "WARNING: "
+
+    def __init__(self, msg, *args, **kwargs):
+        self.arena = kwargs.pop("arena")
+        error._ErrorWithLocation.__init__(self, self.label + msg, *args, **kwargs)
+        self.print_if_needed()
+
+    def print_if_needed(self):
+        if not self.printed:
+            ui.PrettyPrintError(self, self.arena)
+            self.printed = True
+
+
+class FeedbackWantedWarning(ResolutionWarning):
+    label = "FEEDBACK WANTED: "
 
 
 # We need to extract more info after hitting some firstwords
@@ -714,7 +734,23 @@ class ResolvedScript(object):
         # TODO: should builtin be here? Currently not because we don't want to replace them...
         if word1 in (".", "source", "sudo", "command", "eval", "exec", "alias"):
             logger.info("Visiting command: %s %s", word1, word2)
-            if not ok2:
+            if word1 == "eval" and w_ob2.parts[0].tag in (
+                word_part_e.SingleQuoted,
+                word_part_e.DoubleQuoted,
+            ):
+                if logger.isEnabledFor(logging.WARNING):
+                    try:
+                        raise FeedbackWantedWarning(
+                            "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholved/issues/2",
+                            w_ob1.parts[0].val,
+                            word=w_ob2,
+                            status=66,
+                            arena=self.arena,
+                        )
+                    except FeedbackWantedWarning:
+                        pass
+                return
+            elif not ok2:
                 logger.info("   Command is dynamic")
                 # DEBUG: print(node)
                 for part in w_ob2.parts:
