@@ -17,7 +17,7 @@ in python27.pkgs.buildPythonApplication {
   installPhase = ''
     mkdir -p $out/bin
 
-    install resholver.py $out/bin/resholver
+    install resholver $out/bin/
   '';
   doCheck = true;
   checkInputs = with python27.pkgs; [ pytest deps.pytest-shell2 ];

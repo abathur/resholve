@@ -9,4 +9,7 @@ let
 in pkgs.mkShell {
   buildInputs = [ deps.oildev ] ++ resolveTimeDeps ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
+  shellHook = ''
+    PATH="$PWD:$PATH"
+  '';
 }

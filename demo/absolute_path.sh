@@ -1,1 +1,1 @@
-/usr/bin/which resholver.py
+/usr/bin/which resholver

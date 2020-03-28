@@ -1,2 +1,2 @@
 # resolves file from inputs
-file resholver.py
+file resholver

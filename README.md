@@ -66,12 +66,12 @@ Output:
 ----------absolute_path.sh unresolved (status: 5)-----------
 
 Original:
->>> /usr/bin/which resholver.py
+>>> /usr/bin/which resholver
 
 Command: resholver < absolute_path.sh
 
 Output:
->>>   /usr/bin/which resholver.py
+>>>   /usr/bin/which resholver
 >>>   ^~~~~~~~~~~~~~
 >>> [ stdinNone ]:1: Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.
 
@@ -176,12 +176,12 @@ Diff:
 
 Original:
 >>> # no inputs provide which
->>> which resholver.py
+>>> which resholver
 
 Command: resholver < which_simple.sh
 
 Output:
->>>   which resholver.py
+>>>   which resholver
 >>>   ^~~~~
 >>> [ stdinNone ]:2: Can't resolve command 'which' to a known function or executable
 
@@ -210,8 +210,8 @@ Diff:
 >>> +++ resolved
 >>> @@ -1,2 +1,5 @@
 >>>  # resolves file from inputs
->>> -file resholver.py
->>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file resholver.py
+>>> -file resholver
+>>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file resholver
 >>> +
 >>> +### resholved directives (auto-generated)
 >>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
