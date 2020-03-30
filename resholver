@@ -115,6 +115,7 @@ def resolve_script(script_path):
             "script %r located in nix build dir; will attempt to overwrite", script_path
         )
         resolved.write_to(script_path)
+        sys.stderr.write("Overwrote %r\n" % (script_path))
     else:
 
         logger.info(
@@ -174,7 +175,7 @@ def punshow():
             resolved = resolve_script(script)
 
     except IOError as e:
-        sys.stderr.write("whoooo buddy " + str(e))
+        sys.stderr.write("Whoooo buddy " + str(e))
         return 2
     except ResolutionError as e:
         e.print_if_needed()
@@ -183,7 +184,7 @@ def punshow():
         ui.PrettyPrintError(e)
         return e.exit_status
     except argparse.ArgumentTypeError as e:
-        sys.stderr.write("hooooe buddy " + str(e))
+        sys.stderr.write("Hold up there, cowboy " + str(e))
         return 2
     # except Exception as e:
     #     raise e
@@ -430,7 +431,7 @@ class ResolvedScript(object):
             self.resolve_records()
         except ResolutionError as e:
             e.print_if_needed()
-            raise
+            raise e
 
     def parse_directives(self, script):
         """
@@ -449,10 +450,12 @@ class ResolvedScript(object):
     def write_to(self, path=None):
         f = open(path, "w") if path else sys.stdout
         try:
-            return self.render(to=f)
+            self.render(to=f)
         except ResolutionError as e:
             e.print_if_needed()
-            raise
+            raise e
+        finally:
+            f.close()
 
     def render(self, to=sys.stdout):
         cursor = osh2oil.Cursor(self.arena, to)
@@ -605,6 +608,7 @@ class ResolvedScript(object):
             resolved = self.__class__(res_source)
             resolved_scripts[res_source] = resolved
             self.parsed_source[res_source] = resolved
+            self.allowed.add(("resholved_inputs", res_source))
         # commands could be an external function or executable
         for command_word in self.commands.keys():
             if command_word.startswith("/"):
