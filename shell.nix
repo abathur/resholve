@@ -5,7 +5,7 @@ with pkgs;
 let
   deps = callPackage ./deps.nix { };
   resolveTimeDeps = [ file gettext ];
-  checkInputs = with python27.pkgs; [ six typing pytest deps.pytest-shell2 ];
+  checkInputs = with python27.pkgs; [ six typing pytest deps.pytest-shell2 pkgs.bats ];
 in pkgs.mkShell {
   buildInputs = [ deps.oildev ] ++ resolveTimeDeps ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";

@@ -1,4 +1,4 @@
-{ stdenv, callPackage, file, gettext, python27 }:
+{ stdenv, callPackage, file, gettext, python27, bats }:
 let
   deps = callPackage ./deps.nix { };
   resolveTimeDeps = [ file gettext ];
@@ -20,9 +20,10 @@ in python27.pkgs.buildPythonApplication {
     install resholver $out/bin/
   '';
   doCheck = true;
-  checkInputs = with python27.pkgs; [ pytest deps.pytest-shell2 ];
+  checkInputs = [ bats ];
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
   checkPhase = ''
-    PATH=$out/bin:$PATH pytest tests
+    PATH=$out/bin:$PATH
+    bats tests/cli.bats
   '';
 }
