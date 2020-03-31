@@ -1,12 +1,31 @@
 load helpers
 
-# python args: char, color, label=""
+_cols="${COLUMNS:-80}"
+
+# $1=char $2=color (code) $3=label
 rule() {
     if [[ -n $3 ]]; then
-        local msg="\033[0m\033[1;$2m $3 \033[0m"
-        printf -v _width "\033[0m\033[1;$2m%80s\033[0m" && echo -en "${_width// /${1--}}" && echo -e "\r\033[2C$msg"
+        # length of incoming message
+        let msglen=${#3}
+
+        # incoming message + 6 (4 for "-- [", 2 for " ]")
+        let inlaylen=msglen+6
+
+        # make a column-appropriate number of spaces
+        printf -v _width "%*s" "$_cols"
+
+        # replace space w/ char ($1)
+        _width="${_width// /${1}}"
+
+        # echo
+        # - the format open,
+        # - 2 chars from the separator
+        # - the message ($3)
+        # - the rest of the separator
+        # - format close
+        echo -en "\033[0m\033[1;$2m${_width:0:2}[ ${3} ]${_width:inlaylen}\033[0m\n\n"
     else
-        printf -v _width "\033[0m\033[1;$2m%80s\033[0m" && echo -en "${_width// /${1--}}\n"
+        printf -v _width "\033[0m\033[1;$2m%*s\033[0m" "$_cols" && echo -en "${_width// /${1--}}\n"
     fi
 }
 quote() {
