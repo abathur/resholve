@@ -3,22 +3,6 @@
 with pkgs;
 let
   resholved = callPackage ./default.nix { };
-  pytest-shell = python37.pkgs.buildPythonPackage {
-    name = "pytest-shell-0.2.3";
-    src = fetchurl {
-      url =
-        "https://files.pythonhosted.org/packages/ad/ae/7f4dfcab9b74e272674315f4b9141185d2a9072569fa334dd1facebb2234/pytest-shell-0.2.3.tar.gz";
-      sha256 =
-        "535178a527450371defbc00e542511300b6a8e3199abe537b31aae6eb3c94ded";
-    };
-    buildInputs = [ ];
-    propagatedBuildInputs = [ python37.pkgs.pytest ];
-    meta = {
-      homepage = "https://hg.sr.ht/~danmur/pytest-shell";
-      license = stdenv.lib.licenses.mit;
-      description = "Pytest plugin for running shell commands/scripts.";
-    };
-  };
   shunit2 = with pkgs.shunit2;
     resholved.buildResholvedPackage {
       inherit pname src version installPhase;
@@ -85,7 +69,6 @@ let
       install conjure.sh $out/bin/conjure.sh
     '';
   };
-  testPy = python37.withPackages (ps: with ps; [ pytest pytest-shell ]);
   resolveTimeDeps = [ file gettext ];
 
 in stdenv.mkDerivation {
@@ -99,12 +82,13 @@ in stdenv.mkDerivation {
   doCheck = true;
   buildInputs = [ resholved.resholved bat ];
   propagatedBuildInputs = [ test_module3 ];
-  checkInputs = [ testPy ];
+  checkInputs = [ bats ];
 
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
   checkPhase = ''
     printf "\033[33m============================= resholver demo ===================================\033[0m\n"
-    pytest demo
+    RESHOLVE_DEMO=1 bats -t tests/demo.bats
+
     printf "\033[33m============================= resholver Nix demo ===============================\033[0m\n"
     env -i $(type -p conjure.sh)
     bat --paging=never --color=always $(type -p conjure.sh openssl.sh libressl.sh)
