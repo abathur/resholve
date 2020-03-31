@@ -35,13 +35,14 @@ To run this demo yourself:
 nix-shell --run "./demo"
 ```
 
-I've included a copy of the output below, but you can also see colored versions via [asciinema](https://asciinema.org/a/A0ZRMIQ7m4YpfziuhF4QHWSGH) or [in the CI build log](https://travis-ci.org/github/abathur/resholved/jobs/667731225#L4140):
+I've included a copy of the output below, but you can also see a colored version [in the CI build log](https://travis-ci.org/github/abathur/resholved/jobs/669433171#L3844):
 
 ```
 $ nix-shell --run "./demo"
 1..11
 
--- resholver < which_simple.sh (exit: 3) ---------------------------------------
+--[ resholver < which_simple.sh (exit: 3) ]-------------------------------------
+
 Original:
 >>> # no inputs provide which
 >>> which resholver
@@ -54,7 +55,8 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 1 'which' needs to be in RESHOLVE_PATH
 
--- resholver < command_in_function.sh (exit: 3) --------------------------------
+--[ resholver < command_in_function.sh (exit: 3) ]------------------------------
+
 Original:
 >>> source file_simple.sh
 >>> file() {
@@ -70,7 +72,8 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH
 
--- resholver < absolute_path.sh (exit: 5) --------------------------------------
+--[ resholver < absolute_path.sh (exit: 5) ]------------------------------------
+
 Original:
 >>> /usr/bin/which resholver
 
@@ -82,7 +85,8 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 3 Absolute executable paths need exemptions
 
--- resholver < source_var_pwd.sh (exit: 6) -------------------------------------
+--[ resholver < source_var_pwd.sh (exit: 6) ]-----------------------------------
+
 Original:
 >>> # fails because $PWD requires a dynamic parse
 >>> # (I can resolve from a dictionary but haven't
@@ -98,7 +102,8 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 4 Source, among others, needs an exemption for arguments containing variables
 
--- resholver < file_simple.sh (exit: 0) ----------------------------------------
+--[ resholver < file_simple.sh (exit: 0) ]--------------------------------------
+
 Diff:
 >>> --- original
 >>> +++ resolved
@@ -113,7 +118,8 @@ Diff:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 5 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH
 
--- resholver < file_in_function.sh (exit: 0) -----------------------------------
+--[ resholver < file_in_function.sh (exit: 0) ]---------------------------------
+
 Diff:
 >>> --- original
 >>> +++ resolved
@@ -132,7 +138,8 @@ Diff:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 6 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH
 
--- resholver < file_home_source_pwd.sh (exit: 6) -------------------------------
+--[ resholver < file_home_source_pwd.sh (exit: 6) ]-----------------------------
+
 Original:
 >>> # $HOME not blocking here; vars currently only checked in:
 >>> #   alias command eval exec source|. sudo
@@ -148,7 +155,8 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 7 Only some commands ('source' but NOT 'file', here) are checked for variable arguments.
 
--- resholver --allow source:PWD < file_home_source_pwd.sh (exit: 0) ------------
+--[ resholver --allow source:PWD < file_home_source_pwd.sh (exit: 0) ]----------
+
 Diff:
 >>> --- original
 >>> +++ resolved
@@ -167,7 +175,8 @@ Diff:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 8 Add an exemption with --allow <scope>:<name>
 
--- RESHOLVE_ALLOW="source:PWD" resholver < file_home_source_pwd.sh (exit: 0) ---
+--[ RESHOLVE_ALLOW="source:PWD" resholver < file_home_source_pwd.sh (exit: 0) ]-
+
 Diff:
 >>> --- original
 >>> +++ resolved
@@ -186,7 +195,8 @@ Diff:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 9 Add an exemption with RESHOLVE_ALLOW=source:PWD
 
--- resholver < source_missing_target.sh (exit: 7) ------------------------------
+--[ resholver < source_missing_target.sh (exit: 7) ]----------------------------
+
 Original:
 >>> # fails to resolve this (from inputs, or relative to directory)
 >>> source doesnt_exist.sh
@@ -199,7 +209,8 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 10 'source' targets also need to be in RESHOLVE_PATH
 
--- resholver < source_present_target.sh (exit: 0) ------------------------------
+--[ resholver < source_present_target.sh (exit: 0) ]----------------------------
+
 Diff:
 >>> --- original
 >>> +++ resolved
