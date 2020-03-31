@@ -87,7 +87,7 @@ in stdenv.mkDerivation {
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
   checkPhase = ''
     printf "\033[33m============================= resholver demo ===================================\033[0m\n"
-    RESHOLVE_DEMO=1 bats -t tests/demo.bats
+    ./demo
 
     printf "\033[33m============================= resholver Nix demo ===============================\033[0m\n"
     env -i $(type -p conjure.sh)

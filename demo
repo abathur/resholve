@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+RESHOLVE_DEMO=1 bats -t tests/demo.bats
