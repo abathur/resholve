@@ -1,3 +1,19 @@
+# This suite focuses on exercising basic usage of the resholver command, including
+# - positional parameters
+# - flags
+# - environment variables
+# - stdin/out
+#
+# It also demonstrates which invocations are equivalent.
+#
+# Conceptually, there's a lot of overlap between this task and what's done in demo.bats.
+# But they're separated out for now so that we can run the demo differently to better
+# capture its output and present it as an illustration of what resholved is for. In the
+# longer run, better formal documentation may make it possible to merge cases covered
+# by the demo into this file. In any case, if you add something to the demo--make sure
+# it is also covered here. But not the inverse--the demo doesn't need to cover the same
+# exact ground as thoroughly as this suite.
+
 load helpers
 
 # setup(){

@@ -1,3 +1,7 @@
+# Unsure about the name of this suite, but the intent is to collect tests
+# that try to stake out/exercise specific behavior that demonstrate and
+# codify where the boundaries of what resholved knows how to handle are.
+
 load helpers
 
 @test "verify warnings are thrown for quoted evals" {

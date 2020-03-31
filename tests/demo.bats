@@ -1,4 +1,14 @@
-
+# This suite is used to generate a quick, pragmatic introduction to what resholved does
+# and how to invoke it.
+#
+# This could probably be a screencast or more formal documentation but at least early
+# on, making this behavior testable and adding it to the normal test CI runs will help
+# ensure that the contract the demo provides as starter documentation stays valid, and
+# that it's easy to notice when the demo needs to be updated.
+#
+# In the longer run, this may go away if formal documentation can do a better job of
+# communicating what it communicates, and everything it tests explicitly/implicitly is
+# well-tested elsewhere.
 load demo
 
 @test "'which' needs to be in RESHOLVE_PATH" {
