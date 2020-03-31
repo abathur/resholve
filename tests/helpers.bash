@@ -84,6 +84,8 @@ line() {
 # expectations in fd passed as arg 1
 require() {
     mapfile _cases
+    mapfile _expectations < "$1"
+
     # TODO: I'd like to print numbers by these in the TAP output, but contrary to the docs they're leaking into the pretty-print output. Worth trying after the next bats version bump.
     # casenum=0
     for case in "${_cases[@]}"; do
@@ -92,11 +94,23 @@ require() {
         # echo "#  ${BATS_TEST_NUMBER}-${casenum}: ${case%$'\n'}" >&3
         printf "status: %s\n" $status
         printf "output:\n%s" "$output"
-        if ! source "$1"; then
 
-            eval "$case"
-            false
-        fi
+        echo "expectations:"
+        echo "${_expectations[@]}"
+        for expected in "${_expectations[@]}"; do
+            echo "expected=${expected%$'\n'}"
+            eval "$expected"
+        done
+
+        # TODO: this is probably a little faster
+        # but it was only respecting the last line
+        # and my efforts to shim in errexit weren't
+        # working for some reason and it's hard to debug down under bats.
+        # if ! source "$1"; then
+
+        #     # eval "$case"
+        #     false
+        # fi
 
     done
 }
