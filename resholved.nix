@@ -24,6 +24,6 @@ in python27.pkgs.buildPythonApplication {
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
   checkPhase = ''
     PATH=$out/bin:$PATH
-    bats tests/cli.bats
+    bats tests
   '';
 }

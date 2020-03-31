@@ -23,30 +23,38 @@ cd resholved
 ```
 
 ### resholved demo
-This demo runs a handful of test files (all of which you can see in [demo/](demo/)) to illustrate what happens when resholved successfully resolves dependencies, and what happens when it doesn't.
+This demo runs a handful of commands on a set of test `.sh` scripts (you can see the files in [tests/](tests/), though not all files there are used in the demo) to illustrate what happens when resholved successfully resolves dependencies, and what happens when it doesn't.
 
-- When a case is "unresolved", the top line will say so, and indicate the exit status. The body of the case report will quote the original file, the command it ran, and the feedback that the command gave about why it couldn't resolve the script.
-- When a case is "resolved", the top line will say so and indicate status 0. The body of the case report will show the command it ran, and then show a diff of the input script, and the resolved output.
+- The top separator line shows what command was run and its exit status.
+- A status > 0 indicates the script couldn't be resolved. The body of the case report quotes the original file, and any feedback the command gives about why it can't resolve the script.
+- A status == 0 indicates the script was resolved. The body of the case report shows a diff of the input script, and the resolved output.
 
 To run this demo yourself:
 
 ```shell
-nix-shell --run "pytest demo"
+nix-shell --run "./demo"
 ```
 
 I've included a copy of the output below, but you can also see colored versions via [asciinema](https://asciinema.org/a/A0ZRMIQ7m4YpfziuhF4QHWSGH) or [in the CI build log](https://travis-ci.org/github/abathur/resholved/jobs/667731225#L4140):
 
 ```
-$ nix-shell --run "pytest demo"
-=================== test session starts ===================
-platform darwin -- Python 2.7.16, pytest-4.6.5, py-1.8.0, pluggy-0.12.0
-RESHOLVE_PATH: /nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin:/nix/store/8wn0zg0jx82kqh7aymnd860mkqvkib3s-gettext-0.19.8.1/bin
-rootdir: /Users/abathur/work/resholved, inifile: pytest.ini
-plugins: shell-0.2.3
-collected 11 items
-demo/test_demo.py 
--------command_in_function.sh unresolved (status: 3)--------
+$ nix-shell --run "./demo"
+1..11
 
+-- resholver < which_simple.sh (exit: 3) ---------------------------------------
+Original:
+>>> # no inputs provide which
+>>> which resholver
+
+Output:
+>>>   which resholver
+>>>   ^~~~~
+>>> [ stdinNone ]:2: Can't resolve command 'which' to a known function or executable
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 1 'which' needs to be in RESHOLVE_PATH
+
+-- resholver < command_in_function.sh (exit: 3) --------------------------------
 Original:
 >>> source file_simple.sh
 >>> file() {
@@ -54,31 +62,27 @@ Original:
 >>>     command which "$@"
 >>> }
 
-Command: resholver < command_in_function.sh
-
 Output:
 >>>       command which "$@"
 >>>               ^~~~~
 >>> [ stdinNone ]:4: Can't resolve command 'which' to a known function or executable
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH
 
-----------absolute_path.sh unresolved (status: 5)-----------
-
+-- resholver < absolute_path.sh (exit: 5) --------------------------------------
 Original:
 >>> /usr/bin/which resholver
-
-Command: resholver < absolute_path.sh
 
 Output:
 >>>   /usr/bin/which resholver
 >>>   ^~~~~~~~~~~~~~
 >>> [ stdinNone ]:1: Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 3 Absolute executable paths need exemptions
 
-----------source_var_pwd.sh unresolved (status: 6)----------
-
+-- resholver < source_var_pwd.sh (exit: 6) -------------------------------------
 Original:
 >>> # fails because $PWD requires a dynamic parse
 >>> # (I can resolve from a dictionary but haven't
@@ -86,125 +90,15 @@ Original:
 >>> # and isn't exempted with --allow source:PWD
 >>> source $PWD/file_simple.sh
 
-Command: resholver < source_var_pwd.sh
-
 Output:
 >>>   source $PWD/file_simple.sh
 >>>          ^~~~
 >>> [ stdinNone ]:5: Can't resolve 'source' with an argument that can't be statically parsed
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 4 Source, among others, needs an exemption for arguments containing variables
 
-----------file_in_function.sh resolved (status: 0)----------
-Command: resholver < file_in_function.sh
-
-Diff:
->>> --- original
->>> +++ resolved
->>> @@ -1,5 +1,8 @@
->>>  source which_simple.sh
->>>  which() {
->>>      # resolves file here too
->>> -    file "$@"
->>> +    /nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file "$@"
->>>  }
->>> +
->>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
--------file_home_source_pwd.sh unresolved (status: 6)-------
-
-Original:
->>> # $HOME not blocking here; vars currently only checked in:
->>> #   alias command eval exec source|. sudo
->>> file $HOME/file_simple.sh
->>> # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
->>> source $PWD/file_simple.sh
-
-Command: resholver < file_home_source_pwd.sh
-
-Output:
->>>   source $PWD/file_simple.sh
->>>          ^~~~
->>> [ stdinNone ]:5: Can't resolve 'source' with an argument that can't be statically parsed
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
---------file_home_source_pwd.sh resolved (status: 0)--------
-Command: resholver --allow source:PWD < file_home_source_pwd.sh
-
-Diff:
->>> --- original
->>> +++ resolved
->>> @@ -1,5 +1,9 @@
->>>  # $HOME not blocking here; vars currently only checked in:
->>>  #   alias command eval exec source|. sudo
->>> -file $HOME/file_simple.sh
->>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file $HOME/file_simple.sh
->>>  # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
->>>  source $PWD/file_simple.sh
->>> +
->>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
->>> +# resholved: allow source:PWD
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
---------file_home_source_pwd.sh resolved (status: 0)--------
-Command: resholver < file_home_source_pwd.sh
-
-Diff:
->>> --- original
->>> +++ resolved
->>> @@ -1,5 +1,9 @@
->>>  # $HOME not blocking here; vars currently only checked in:
->>>  #   alias command eval exec source|. sudo
->>> -file $HOME/file_simple.sh
->>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file $HOME/file_simple.sh
->>>  # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
->>>  source $PWD/file_simple.sh
->>> +
->>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
->>> +# resholved: allow source:PWD
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
------------which_simple.sh unresolved (status: 3)-----------
-
-Original:
->>> # no inputs provide which
->>> which resholver
-
-Command: resholver < which_simple.sh
-
-Output:
->>>   which resholver
->>>   ^~~~~
->>> [ stdinNone ]:2: Can't resolve command 'which' to a known function or executable
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-------source_missing_target.sh unresolved (status: 7)-------
-
-Original:
->>> # fails to resolve this (from inputs, or relative to directory)
->>> source doesnt_exist.sh
-
-Command: resholver < source_missing_target.sh
-
-Output:
->>>   source doesnt_exist.sh
->>>          ^~~~~~~~~~~~~~~
->>> [ stdinNone ]:2: Unable to resolve source target 'doesnt_exist.sh' to a known file
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-------------file_simple.sh resolved (status: 0)-------------
-Command: resholver < file_simple.sh
-
+-- resholver < file_simple.sh (exit: 0) ----------------------------------------
 Diff:
 >>> --- original
 >>> +++ resolved
@@ -216,20 +110,109 @@ Diff:
 >>> +### resholved directives (auto-generated)
 >>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 5 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH
 
--------source_present_target.sh resolved (status: 0)--------
-Command: resholver < source_present_target.sh
-
+-- resholver < file_in_function.sh (exit: 0) -----------------------------------
 Diff:
 >>> --- original
 >>> +++ resolved
->>> @@ -1,2 +1,2 @@
+>>> @@ -1,5 +1,9 @@
+>>>  source which_simple.sh
+>>>  which() {
+>>>      # resolves file here too
+>>> -    file "$@"
+>>> +    /nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file "$@"
+>>>  }
+>>> +
+>>> +### resholved directives (auto-generated)
+>>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow resholved_inputs:which_simple.sh
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 6 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH
+
+-- resholver < file_home_source_pwd.sh (exit: 6) -------------------------------
+Original:
+>>> # $HOME not blocking here; vars currently only checked in:
+>>> #   alias command eval exec source|. sudo
+>>> file $HOME/file_simple.sh
+>>> # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
+>>> source $PWD/file_simple.sh
+
+Output:
+>>>   source $PWD/file_simple.sh
+>>>          ^~~~
+>>> [ stdinNone ]:5: Can't resolve 'source' with an argument that can't be statically parsed
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 7 Only some commands ('source' but NOT 'file', here) are checked for variable arguments.
+
+-- resholver --allow source:PWD < file_home_source_pwd.sh (exit: 0) ------------
+Diff:
+>>> --- original
+>>> +++ resolved
+>>> @@ -1,5 +1,9 @@
+>>>  # $HOME not blocking here; vars currently only checked in:
+>>>  #   alias command eval exec source|. sudo
+>>> -file $HOME/file_simple.sh
+>>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file $HOME/file_simple.sh
+>>>  # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
+>>>  source $PWD/file_simple.sh
+>>> +
+>>> +### resholved directives (auto-generated)
+>>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow source:PWD
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 8 Add an exemption with --allow <scope>:<name>
+
+-- RESHOLVE_ALLOW="source:PWD" resholver < file_home_source_pwd.sh (exit: 0) ---
+Diff:
+>>> --- original
+>>> +++ resolved
+>>> @@ -1,5 +1,9 @@
+>>>  # $HOME not blocking here; vars currently only checked in:
+>>>  #   alias command eval exec source|. sudo
+>>> -file $HOME/file_simple.sh
+>>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file $HOME/file_simple.sh
+>>>  # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
+>>>  source $PWD/file_simple.sh
+>>> +
+>>> +### resholved directives (auto-generated)
+>>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow source:PWD
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 9 Add an exemption with RESHOLVE_ALLOW=source:PWD
+
+-- resholver < source_missing_target.sh (exit: 7) ------------------------------
+Original:
+>>> # fails to resolve this (from inputs, or relative to directory)
+>>> source doesnt_exist.sh
+
+Output:
+>>>   source doesnt_exist.sh
+>>>          ^~~~~~~~~~~~~~~
+>>> [ stdinNone ]:2: Unable to resolve source target 'doesnt_exist.sh' to a known file
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 10 'source' targets also need to be in RESHOLVE_PATH
+
+-- resholver < source_present_target.sh (exit: 0) ------------------------------
+Diff:
+>>> --- original
+>>> +++ resolved
+>>> @@ -1,2 +1,5 @@
 >>>  # resolves gettext from inputs
 >>> -source gettext.sh
 >>> +source /nix/store/8wn0zg0jx82kqh7aymnd860mkqvkib3s-gettext-0.19.8.1/bin/gettext.sh
+>>> +
+>>> +### resholved directives (auto-generated)
+>>> +# resholved: allow resholved_inputs:/nix/store/8wn0zg0jx82kqh7aymnd860mkqvkib3s-gettext-0.19.8.1/bin/gettext.sh
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 11 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH
 ```
 
 ### Nix demo
@@ -275,7 +258,7 @@ Ran 3 tests.
 OK
 ```
 
-I've made a [gist](https://gist.github.com/abathur/937877b1321f443400e0779314f2e02c) with this output, the resolved shell scripts, and the Nix code for each module. You can also see this output in the [CI logs](https://travis-ci.org/github/abathur/resholved/jobs/667731225#L4329) (though it doesn't include the resolved shunit2, since it's fairly long).
+I've made a [gist](https://gist.github.com/abathur/937877b1321f443400e0779314f2e02c) with this output, the resolved shell scripts, and the Nix code for each module. You can also see this output in the [CI logs](https://travis-ci.org/github/abathur/resholved/jobs/667731225#L4329) (though I leave out the resolved shunit2, since it's fairly long).
 
 This test is currently tied into the CI run (which includes the unit tests and both demos), so the best way to run it is:
 
