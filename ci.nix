@@ -73,7 +73,7 @@ let
 in stdenv.mkDerivation {
   name = "resholved-ci";
   src = builtins.filterSource (path: type:
-    type != "directory" || baseNameOf path == "demo" || baseNameOf path
+    type != "directory" || baseNameOf path
     == "tests") ./.;
   installPhase = ''
     mkdir $out
