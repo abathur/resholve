@@ -521,6 +521,8 @@ class ResolvedScript(object):
                             status=4,
                             arena=self.arena,
                         )
+                elif ("unresholved_inputs", command_word) in self.allowed:
+                    continue  # explicitly exempted
                 else:
                     raise ResolutionError(
                         "Can't resolve command %r to a known function or executable",
