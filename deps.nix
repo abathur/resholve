@@ -62,7 +62,7 @@ rec {
 
     # Patch shebangs so Nix can find all executables
     postPatch = ''
-      patchShebangs asdl build core frontend native oil_lang
+      patchShebangs asdl build core doctools frontend native oil_lang
     '';
 
     _NIX_SHELL_LIBCMARK = "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}";
