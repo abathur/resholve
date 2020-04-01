@@ -9,14 +9,10 @@ in python27.pkgs.buildPythonApplication {
 
   format = "other";
 
-  buildInputs = [ python27 ];
-  # TODO: this smells
-  pythonPath = with python27.pkgs; [ six typing ];
   propagatedBuildInputs = [ deps.oildev ];
 
   installPhase = ''
     mkdir -p $out/bin
-
     install resholver $out/bin/
   '';
   doCheck = true;

@@ -1,12 +1,10 @@
-{ stdenv, fetchFromGitHub, fetchurl, makeWrapper,
+{ stdenv, fetchFromGitHub, makeWrapper,
 
 git,
 
 # oil deps
 readline, re2c, cmark, python27, file,
-
-# resholved test deps
-python37, }:
+}:
 
 rec {
   py-yajl = python27.pkgs.buildPythonPackage rec {
@@ -19,6 +17,7 @@ rec {
       sha256 = "17hcgb7r7cy8r1pwbdh8di0nvykdswlqj73c85k6z8m0filj3hbh";
       fetchSubmodules = true;
     };
+    # just for submodule IIRC
     nativeBuildInputs = [ git ];
   };
 
@@ -39,25 +38,18 @@ rec {
       sha256 = "0bpg6jq3nnx23hrxs4jg03vgkcxdbqgc36qjq3hhzrwlc0bgysw3";
     };
 
-    buildInputs = with python27.pkgs;
-      [ six typing ]
-      ++ [ python27 readline re2c cmark py-yajl makeWrapper ];
+    buildInputs = [ readline cmark py-yajl makeWrapper ];
 
-    nativeBuildInputs = [ re2c file python27 py-yajl ];
-
-    pythonPath = with python27.pkgs; [ six typing ];
+    nativeBuildInputs = [ re2c file ];
 
     # runtime deps
-    propagatedBuildInputs = [ re2c py-yajl ];
+    propagatedBuildInputs = with python27.pkgs; [ python27 six typing ];
 
     doCheck = true;
     dontStrip = true;
 
     preBuild = ''
-      echo $buildPhase
-      set -x
       build/dev.sh all
-      set +x
     '';
 
     # Patch shebangs so Nix can find all executables

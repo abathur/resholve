@@ -62,7 +62,6 @@ let
 
     scripts = [ "conjure.sh" ];
     inputs = [ test_module1 ];
-    allow = { };
 
     installPhase = ''
       mkdir -p $out/bin

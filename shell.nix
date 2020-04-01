@@ -5,9 +5,9 @@ with pkgs;
 let
   deps = callPackage ./deps.nix { };
   resolveTimeDeps = [ file gettext ];
-  checkInputs = with python27.pkgs; [ six typing pkgs.bats ];
+  checkInputs = [ pkgs.bats ];
 in pkgs.mkShell {
-  buildInputs = [ deps.oildev ] ++ resolveTimeDeps ++ checkInputs;
+  buildInputs = [ deps.oildev ] ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
   shellHook = ''
     PATH="$PWD:$PATH"
