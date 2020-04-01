@@ -22,15 +22,21 @@ rec {
     nativeBuildInputs = [ git ];
   };
 
+  # resholved's primary dependency is this developer build of the oil shell.
   oildev = python27.pkgs.buildPythonPackage rec {
     pname = "oil";
     version = "undefined";
 
+    # I've gotten most of the changes we need upstreamed at this point, but I've still got a few they've resisted. For the near term, I've given up trying.
+    # - add setup.py
+    # - add MANIFEST.in,
+    # - change build/codegen.sh's shebang to /usr/bin/env bash
+    # - comment out the 'yajl' function call in _minimal() of build/dev.sh
     src = fetchFromGitHub {
       owner = "abathur";
       repo = "oil";
-      rev = "259e582598689cb5077c44819f3234dda79c34fa";
-      sha256 = "0rx68y8r82sr8qmbr806iaz2pispn02f64k6xywxpj5lx05jynlz";
+      rev = "548205595d3d5f968cad5843f997adaf6969753b";
+      sha256 = "11pn454iqrq2zkmnihwmsav9yj3vjaj8nljh43zjk28sw46incwi";
     };
 
     buildInputs = with python27.pkgs;
@@ -59,9 +65,7 @@ rec {
       patchShebangs asdl build core frontend native oil_lang
     '';
 
-    prePatch = ''
-      substituteInPlace ./doctools/cmark.py --replace "/usr/local/lib/libcmark.so" "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}"
-    '';
+    _NIX_SHELL_LIBCMARK = "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}";
 
     meta = {
       description = "A new unix shell";
