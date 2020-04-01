@@ -35,8 +35,8 @@ rec {
     src = fetchFromGitHub {
       owner = "abathur";
       repo = "oil";
-      rev = "548205595d3d5f968cad5843f997adaf6969753b";
-      sha256 = "11pn454iqrq2zkmnihwmsav9yj3vjaj8nljh43zjk28sw46incwi";
+      rev = "0f8b51518690db74470da041eb5fd104d1c90e23";
+      sha256 = "0bpg6jq3nnx23hrxs4jg03vgkcxdbqgc36qjq3hhzrwlc0bgysw3";
     };
 
     buildInputs = with python27.pkgs;
