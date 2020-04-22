@@ -22,4 +22,14 @@ in python27.pkgs.buildPythonApplication {
     PATH=$out/bin:$PATH
     bats tests
   '';
+
+  meta = {
+    description = "Resolve external shell-script dependencies";
+    homepage = "https://github.com/abathur/resholved";
+    license = with stdenv.lib.licenses; [
+      mit
+    ];
+    maintainers = with maintainers; [ abathur ];
+    platforms = platforms.all;
+  };
 }
