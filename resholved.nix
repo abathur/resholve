@@ -11,6 +11,7 @@ in python27.pkgs.buildPythonApplication {
 
   propagatedBuildInputs = [ deps.oildev ];
 
+  # TODO: try install -Dt $out/bin $src/yadm
   installPhase = ''
     mkdir -p $out/bin
     install resholver $out/bin/
@@ -29,7 +30,7 @@ in python27.pkgs.buildPythonApplication {
     license = with stdenv.lib.licenses; [
       mit
     ];
-    maintainers = with maintainers; [ abathur ];
-    platforms = platforms.all;
+    maintainers = with stdenv.maintainers; [ abathur ];
+    platforms = stdenv.platforms.all;
   };
 }
