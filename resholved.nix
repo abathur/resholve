@@ -30,7 +30,7 @@ in python27.pkgs.buildPythonApplication {
     license = with stdenv.lib.licenses; [
       mit
     ];
-    maintainers = with stdenv.maintainers; [ abathur ];
-    platforms = stdenv.platforms.all;
+    maintainers = with stdenv.lib.maintainers; [ abathur ];
+    platforms = stdenv.lib.platforms.all;
   };
 }
