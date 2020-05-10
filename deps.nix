@@ -1,9 +1,13 @@
 { stdenv, fetchFromGitHub, makeWrapper,
 
+# re2c deps
+autoreconfHook,
+
+# py-yajl deps
 git,
 
 # oil deps
-readline, re2c, cmark, python27, file, glibcLocales,
+readline, cmark, python27, file, glibcLocales,
 
 oilPatches ? []
 }:
@@ -19,6 +23,23 @@ Notes on specific dependencies:
 */
 
 rec {
+  # had to add this as well; 1.3 causes a break here; sticking
+  # to oil's official 1.0.3 dep for now.
+  re2c = stdenv.mkDerivation rec {
+    pname = "re2c";
+    version = "1.0.3";
+    sourceRoot = "${src.name}/re2c";
+    src = fetchFromGitHub {
+      owner  = "skvadrik";
+      repo   = "re2c";
+      rev    = version;
+      sha256 = "0grx7nl9fwcn880v5ssjljhcb9c5p2a6xpwil7zxpmv0rwnr3yqi";
+    };
+    nativeBuildInputs = [ autoreconfHook ];
+    preCheck = ''
+      patchShebangs run_tests.sh
+    '';
+  };
   py-yajl = python27.pkgs.buildPythonPackage rec {
     pname = "oil-pyyajl";
     version = "unreleased";
