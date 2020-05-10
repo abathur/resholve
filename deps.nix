@@ -6,6 +6,16 @@ git,
 readline, re2c, cmark, python27, file, glibcLocales
 }:
 
+/*
+Notes on specific dependencies:
+- if/when python2.7 is removed from nixpkgs, this may need to figure
+  out how to build oil's vendored python2
+- I'm not sure if glibcLocales is worth the addition here. It's to fix
+  a libc test oil runs. My oil fork just disabled the libc tests, but
+  I haven't quite decided if that's the right long-term call, so I
+  didn't add a patch for it here yet.
+*/
+
 rec {
   py-yajl = python27.pkgs.buildPythonPackage rec {
     pname = "oil-pyyajl";
@@ -31,11 +41,24 @@ rec {
       repo = "oil";
       rev = "ea80cdad7ae1152a25bd2a30b87fe3c2ad32394a";
       sha256 = "0pxn0f8qbdman4gppx93zwml7s5byqfw560n079v68qjgzh2brq2";
+
+      /*
+      This feels a little dumb; I assume it's wrongish. I was hoping
+      to be able to filter the source down to knock out parts of the
+      source that I'm not using, but I get errors just trying to get
+      *anything* working with the approaches commented out below.
+
+      On IRC eadwu[m] suggested dropping them in extraPostFetch.
+
+      It's not critical to drop most of these; the primary target is
+      the vendored fork of Python-2.7.13, which is ~ 55M and over 3200
+      files, dozens of which get interpreter script patches in fixup.
+      */
       extraPostFetch = ''
         #find . -maxdepth 1 -type d | sort
         rm -rf Python-2.7.13 benchmarks metrics py-yajl rfc gold web testdata services demo devtools cpp
         # find . -maxdepth 1 -type d | sort
-      ''; # breakers: doc, pgen2
+      ''; # breakers: doc, pgen2, vendor
     };
 
     # src = stdenv.lib.cleanSourceWith {
@@ -90,6 +113,7 @@ rec {
 
     _NIX_SHELL_LIBCMARK = "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}";
 
+    # See earlier note on glibcLocales
     LOCALE_ARCHIVE = stdenv.lib.optionalString (stdenv.buildPlatform.libc == "glibc") "${glibcLocales}/lib/locale/locale-archive";
 
     meta = {
