@@ -1,12 +1,24 @@
 { stdenv, callPackage, file, gettext, python27, bats }:
 let
-  deps = callPackage ./deps.nix { };
+  rSrc = ./.;
+  deps = callPackage ./deps.nix {
+    /*
+    Resholved needs to patch Oil, but trying to avoid adding
+    them all *to* nixpkgs, since they aren't specific to
+    nix/nixpkgs.
+    */
+    oilPatches = [
+      "${rSrc}/0001-add_setup_py.patch"
+      "${rSrc}/0002-add_MANIFEST_in.patch"
+      "${rSrc}/0003-fix_codegen_shebang.patch"
+      "${rSrc}/0004-disable-internal-py-yajl-for-nix-built.patch"
+    ];
+  };
   resolveTimeDeps = [ file gettext ];
 in python27.pkgs.buildPythonApplication {
   pname = "resholved";
   version = "unreleased";
-  src = ./.;
-
+  src = rSrc;
   format = "other";
 
   propagatedBuildInputs = [ deps.oildev ];

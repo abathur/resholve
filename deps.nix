@@ -3,7 +3,9 @@
 git,
 
 # oil deps
-readline, re2c, cmark, python27, file, glibcLocales
+readline, re2c, cmark, python27, file, glibcLocales,
+
+oilPatches ? []
 }:
 
 /*
@@ -83,14 +85,10 @@ rec {
     SOURCE_DATE_EPOCH=315532800;
 
 
-    # These aren't, strictly speaking, nix/nixpkgs specific, but I've had hell
-    # upstreaming them.
-    patches = [
-      ./0001-add_setup_py.patch
-      ./0002-add_MANIFEST_in.patch
-      ./0003-fix_codegen_shebang.patch
-      ./0004-disable-internal-py-yajl-for-nix-built.patch
-    ];
+    # These aren't, strictly speaking, nix/nixpkgs specific, but I've
+    # had hell upstreaming them. Pulling from resholved source and
+    # passing in from resholved.nix
+    patches = oilPatches;
 
     buildInputs = [ readline cmark py-yajl makeWrapper ];
 
