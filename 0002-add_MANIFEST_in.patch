@@ -1,0 +1,20 @@
+From 485021b1e35c716abaa6c9d85ce501275156a278 Mon Sep 17 00:00:00 2001
+From: "Travis A. Everett" <travis.a.everett@gmail.com>
+Date: Tue, 31 Mar 2020 17:24:40 -0500
+Subject: [PATCH] add barebones setup.py and MANIFEST.in
+
+---
+ MANIFEST.in | 2 +
+ 1 file changed, 2 insertion(+)
+ create mode 100644 MANIFEST.in
+
+diff --git a/MANIFEST.in b/MANIFEST.in
+new file mode 100644
+index 00000000..175ee07e
+--- /dev/null
++++ b/MANIFEST.in
+@@ -0,0 +1,1 @@
++include _devbuild/gen/*.marshal
+--
+2.25.1
+

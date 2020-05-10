@@ -1,0 +1,22 @@
+From 56194385331001cce0aa84a5c2a04d5c1608460c Mon Sep 17 00:00:00 2001
+From: "Travis A. Everett" <travis.a.everett@gmail.com>
+Date: Tue, 31 Mar 2020 18:36:00 -0500
+Subject: [PATCH] patch shebang
+
+---
+ build/codegen.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/build/codegen.sh b/build/codegen.sh
+index 45995841..2198d79f 100755
+--- a/build/codegen.sh
++++ b/build/codegen.sh
+@@ -1,4 +1,4 @@
+-#!/bin/bash
++#!/usr/bin/env bash
+ #
+ # For textual code generation.
+ #
+--
+2.25.1
+

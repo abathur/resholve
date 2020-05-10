@@ -3,7 +3,7 @@
 git,
 
 # oil deps
-readline, re2c, cmark, python27, file,
+readline, re2c, cmark, python27, file, glibcLocales
 }:
 
 rec {
@@ -26,17 +26,48 @@ rec {
     pname = "oil";
     version = "undefined";
 
-    # I've gotten most of the changes we need upstreamed at this point, but I've still got a few they've resisted. For the near term, I've given up trying.
-    # - add setup.py
-    # - add MANIFEST.in,
-    # - change build/codegen.sh's shebang to /usr/bin/env bash
-    # - comment out the 'yajl' function call in _minimal() of build/dev.sh
     src = fetchFromGitHub {
-      owner = "abathur";
+      owner = "oilshell";
       repo = "oil";
-      rev = "0f8b51518690db74470da041eb5fd104d1c90e23";
-      sha256 = "0bpg6jq3nnx23hrxs4jg03vgkcxdbqgc36qjq3hhzrwlc0bgysw3";
+      rev = "ea80cdad7ae1152a25bd2a30b87fe3c2ad32394a";
+      sha256 = "0pxn0f8qbdman4gppx93zwml7s5byqfw560n079v68qjgzh2brq2";
+      extraPostFetch = ''
+        #find . -maxdepth 1 -type d | sort
+        rm -rf Python-2.7.13 benchmarks metrics py-yajl rfc gold web testdata services demo devtools cpp
+        # find . -maxdepth 1 -type d | sort
+      ''; # breakers: doc, pgen2
     };
+
+    # src = stdenv.lib.cleanSourceWith {
+    #   src = fetchFromGitHub {
+    #     owner = "oilshell";
+    #     repo = "oil";
+    #     rev = "ea80cdad7ae1152a25bd2a30b87fe3c2ad32394a";
+    #     sha256 = "0pxn0f8qbdman4gppx93zwml7s5byqfw560n079v68qjgzh2brq2";
+    #   };
+    #   filter = stdenv.lib.cleanSourceFilter;
+    # };
+
+    # src = stdenv.lib.sourceByRegex (fetchFromGitHub {
+    #   owner = "oilshell";
+    #   repo = "oil";
+    #   rev = "ea80cdad7ae1152a25bd2a30b87fe3c2ad32394a";
+    #   sha256 = "0pxn0f8qbdman4gppx93zwml7s5byqfw560n079v68qjgzh2brq2";
+    # }) [".*"];
+
+    # TODO: not sure why I'm having to set this for nix-build...
+    #       can anyone tell if I'm doing something wrong?
+    SOURCE_DATE_EPOCH=315532800;
+
+
+    # These aren't, strictly speaking, nix/nixpkgs specific, but I've had hell
+    # upstreaming them.
+    patches = [
+      ./0001-add_setup_py.patch
+      ./0002-add_MANIFEST_in.patch
+      ./0003-fix_codegen_shebang.patch
+      ./0004-disable-internal-py-yajl-for-nix-built.patch
+    ];
 
     buildInputs = [ readline cmark py-yajl makeWrapper ];
 
@@ -58,6 +89,8 @@ rec {
     '';
 
     _NIX_SHELL_LIBCMARK = "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}";
+
+    LOCALE_ARCHIVE = stdenv.lib.optionalString (stdenv.buildPlatform.libc == "glibc") "${glibcLocales}/lib/locale/locale-archive";
 
     meta = {
       description = "A new unix shell";

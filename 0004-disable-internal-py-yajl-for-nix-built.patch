@@ -1,0 +1,25 @@
+From 548205595d3d5f968cad5843f997adaf6969753b Mon Sep 17 00:00:00 2001
+From: "Travis A. Everett" <travis.a.everett@gmail.com>
+Date: Tue, 31 Mar 2020 18:37:35 -0500
+Subject: [PATCH] disable internal py-yajl for nix-built
+
+---
+ build/dev.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/build/dev.sh b/build/dev.sh
+index baadc975..89a5ea3d 100755
+--- a/build/dev.sh
++++ b/build/dev.sh
+@@ -279,7 +279,7 @@ _minimal() {
+   posix_
+
+   # Require submodule
+-  yajl
++  # yajl
+ }
+
+ minimal() {
+--
+2.25.1
+

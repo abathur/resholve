@@ -95,6 +95,7 @@ require() {
         printf "status: %s\n" $status
         printf "output:\n%s" "$output"
 
+        echo ""
         echo "expectations:"
         echo "${_expectations[@]}"
         for expected in "${_expectations[@]}"; do
