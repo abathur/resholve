@@ -1,15 +1,15 @@
-# broken cutdown attempt
+/*
+This shell is for using resholved--it builds and loads
+resholved itself, not just resholved's dependencies.
+*/
 { pkgs ? import <nixpkgs> { } }:
 
 with pkgs;
 let
-  deps = callPackage ./deps.nix { };
+  resholved = callPackage ./default.nix { doCheck=false; };
   resolveTimeDeps = [ file gettext ];
   checkInputs = [ pkgs.bats ];
 in pkgs.mkShell {
-  buildInputs = [ deps.oildev ] ++ checkInputs;
+  buildInputs = [ resholved.resholved ] ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
-  shellHook = ''
-    PATH="$PWD:$PATH"
-  '';
 }

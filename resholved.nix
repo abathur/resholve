@@ -1,4 +1,8 @@
-{ stdenv, callPackage, file, gettext, python27, bats }:
+{
+  stdenv, callPackage, file, gettext, python27, bats,
+
+  doCheck ? true
+}:
 let
   rSrc = ./.;
   deps = callPackage ./deps.nix {
@@ -28,7 +32,7 @@ in python27.pkgs.buildPythonApplication {
     mkdir -p $out/bin
     install resholver $out/bin/
   '';
-  doCheck = true;
+  inherit doCheck;
   checkInputs = [ bats ];
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
   checkPhase = ''
