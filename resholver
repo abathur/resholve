@@ -800,10 +800,44 @@ class ResolvedScript(object):
         w_ob1 = node.words[0]
         ok1, word1, _ = word_.StaticEval(w_ob1)
         if not ok1:
-            logger.debug(
-                "Couldn't statically evaluate 1st word object of command: %r", w_ob1
-            )
-            return
+            for part in w_ob1.parts:
+                bad_token = find_dynamic_token(part)
+                if bad_token:
+                    # number subs are probably okayish?
+                    if bad_token.id == Id.VSub_Number:
+                        return
+                    # # this is how we'd exempt braced subs by name
+                    # elif (
+                    #     bad_token.id == Id.VSub_Name
+                    #     # TODO: not sure about this "variable_as_command" name
+                    #     and ("variable_as_command", bad_token.val) in self.allowed
+                    # ):
+                    #     return
+                    # # this is how we'd exempt unbraced subs by name
+                    # elif (
+                    #     bad_token.id == Id.VSub_DollarName
+                    #     # [1:] to leave off the $
+                    #     and ("variable_as_command", bad_token.val[1:]) in self.allowed
+                    # ):
+                    #     return
+                    else:
+                        if logger.isEnabledFor(logging.WARNING):
+                            try:
+                                raise FeedbackWantedWarning(
+                                    "Letting dynamic command (first-word variable) through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholved/issues/3",
+                                    word=w_ob1,
+                                    token=bad_token,
+                                    status=77,
+                                    arena=self.arena,
+                                )
+                            except FeedbackWantedWarning:
+                                pass
+                        return
+            else:
+                logger.debug(
+                    "Couldn't statically evaluate 1st word object of command: %r", w_ob1
+                )
+                return
         else:
             self.record_word(w_ob1, word1)
 
