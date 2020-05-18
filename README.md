@@ -1,7 +1,7 @@
 # resholved - Resolve references to external dependencies in shell scripts
 
-This WIP Python script generates a copy of a shell script with external dependencies
-resolved to absolute paths. (It accomplishes this by leveragnig the [Oil](https://github.com/oilshell/oil) shell's parser).
+resholved [WIP] generates a copy of a shell script with external dependencies
+resolved to absolute paths. (It accomplishes this by leveraging the [Oil](https://github.com/oilshell/oil) shell's parser).
 
 Here's a rundown of where things stand:
 
@@ -276,3 +276,13 @@ This test is currently tied into the CI run (which includes the unit tests and b
 ```shell
 nix-build ci.nix
 ```
+
+## Known Gaps & Edge Cases
+
+Don't expect this to be exhaustive any time soon--but I'll try to acknowledge gaps and edge cases that resholved can't handle as I discover them. Please open an issue if you find a new one (but--do look for an existing issue first)
+
+The main areas I'm currently aware of:
+
+- resholved makes no attempt to perform deep/recursive analysis on commands that run other commands. Plainly, resholved *does* try to verify that "blah" in `command blah` resolves to a real command--but it won't resolve it if you do something cute like `command command command blah`. 
+- resholved doesn't have robust handling of variables that get executed like commands (this includes things like `eval $variable` and `"$run_as_command"` and `$GIT_COMMAND status`). There's some room for improvement here, but I also want to manage expectations--my goal is for resholved to handle low-hanging fruit.
+    - there's a first-level complication about seeing-through the variables themselves, here--and then a second-level issue with seeing-through double-quoted strings
