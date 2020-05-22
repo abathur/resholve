@@ -6,10 +6,10 @@ let
   inherit stdenv;
   self = (stdenv.mkDerivation ((removeAttrs attrs [ "script" "inputs" "allow" ])
     // {
-      # wish I knew why I commented this out...
       inherit pname version src;
       buildInputs = [ resholved ];
-      propagatedBuildInputs = inputs;
+      # tentatively disabled because gc probably knows things I don't :)
+      # propagatedBuildInputs = inputs;
       RESHOLVE_PATH = "${lib.makeBinPath inputs}";
       RESHOLVE_ALLOW = toString
         (lib.mapAttrsToList (name: value: map (y: name + ":" + y) value) allow);
