@@ -37,6 +37,7 @@ in python27.pkgs.buildPythonApplication {
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
   checkPhase = ''
     PATH=$out/bin:$PATH
+    patchShebangs .
     ./test.sh
   '';
 
