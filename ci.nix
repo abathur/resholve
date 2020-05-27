@@ -84,6 +84,10 @@ in stdenv.mkDerivation {
   checkInputs = [ bats ];
 
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
+
+  preCheck = ''
+    patchShebangs test.sh
+  '';
   checkPhase = ''
     printf "\033[33m============================= resholver demo ===================================\033[0m\n"
     ./demo
