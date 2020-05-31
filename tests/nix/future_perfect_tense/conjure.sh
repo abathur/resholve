@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 test_future_perfection() {
     echo "nothing up my sleeve"
+
     {
         set -x
         type jq openssl
         set +x
-    } && true
+    }
+    return 0
 }
 
 test_openssl() {

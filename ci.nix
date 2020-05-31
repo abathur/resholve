@@ -3,11 +3,17 @@
 with pkgs;
 let
   resholved = callPackage ./default.nix { };
+  # hopefully temporary override; see https://github.com/NixOS/nixpkgs/issues/89055
+  find_some_utils = pkgs.findutils.overrideAttrs (oldAttrs: rec {
+    prePatch = ''
+      substituteInPlace xargs/xargs.c --replace 'char default_cmd[] = "echo";' 'char default_cmd[] = "${coreutils}/bin/echo";'
+    '';
+  });
   shunit2 = with pkgs.shunit2;
     resholved.buildResholvedPackage {
       inherit pname src version installPhase;
       scripts = [ "shunit2" ];
-      inputs = [ coreutils gnused gnugrep findutils ];
+      inputs = [ coreutils gnused gnugrep find_some_utils ];
       patchPhase = ''
         substituteInPlace shunit2 --replace "/usr/bin/od" "od"
       '';
@@ -63,6 +69,7 @@ let
     scripts = [ "conjure.sh" ];
     inputs = [ test_module1 ];
 
+    # TODO: try install -Dt $out/bin $src/yadm
     installPhase = ''
       mkdir -p $out/bin
       install conjure.sh $out/bin/conjure.sh
@@ -91,7 +98,7 @@ in stdenv.mkDerivation {
     ./demo
 
     printf "\033[33m============================= resholver Nix demo ===============================\033[0m\n"
-    env -i $(type -p conjure.sh)
+    env -i PATH=${coreutils}/bin $(type -p conjure.sh)
     bat --paging=never --color=always $(type -p conjure.sh openssl.sh libressl.sh)
   '';
 }
