@@ -15,11 +15,9 @@ let
         (lib.mapAttrsToList (name: value: map (y: name + ":" + y) value) allow);
       #LOGLEVEL="INFO";
       buildPhase = ''
-        set -x
         runHook preBuild
         resholver ${toString (flags ++ scripts)}
         runHook postBuild
-        set +x
       '';
     }));
 in lib.extendDerivation true passthru self
