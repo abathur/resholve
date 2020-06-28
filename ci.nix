@@ -75,7 +75,7 @@ let
       install conjure.sh $out/bin/conjure.sh
     '';
   };
-  resolveTimeDeps = [ file gettext ];
+  resolveTimeDeps = [ file findutils gettext ];
 
 in stdenv.mkDerivation {
   name = "resholved-ci";

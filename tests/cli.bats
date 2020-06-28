@@ -16,15 +16,6 @@
 
 load helpers
 
-# setup(){
-#   TEST_TMP="$(mktemp -d)"
-#   cp tests/*.{bats,bash,sh} "$TEST_TMP"/
-#   pushd "$TEST_TMP"
-# }
-# teardown(){
-#   popd
-#   echo "would rm $TEST_TMP"
-# }
 
 @test "invoking resholver without RESHOLVE_PATH prints an error" {
   unset RESHOLVE_PATH
@@ -85,7 +76,7 @@ CASES
 
   require <({
     status 2
-    line 0 contains "Aborting due to duplicate script targets."
+    line 1 equals "Aborting due to duplicate script targets."
   })
 } <<CASES
 resholver file_simple.sh source_present_target.sh source_present_target.sh
@@ -95,7 +86,7 @@ CASES
 
   require <({
     status 6
-    line -1 contains "Can't resolve 'source' with an argument that can't be statically parsed"
+    line -1 contains "Can't resolve 'source' with a dynamic argument"
   })
 } <<CASES
 resholver source_var_pwd.sh
@@ -118,7 +109,7 @@ CASES
 
   require <({
     status 6
-    line -1 contains "Can't resolve 'source' with an argument that can't be statically parsed"
+    line -1 contains "Can't resolve 'source' with a dynamic argument"
   })
 } <<CASES
 resholver --allow command:PWD < source_var_pwd.sh
@@ -158,4 +149,25 @@ RESHOLVE_ALLOW='source:PWD source:HOME' resholver < source_home_pwd.sh
 RESHOLVE_ALLOW='source:PWD' resholver --allow source:HOME < source_home_pwd.sh
 RESHOLVE_ALLOW='source:PWD' resholver < source_home_pwd_annotated_incomplete.sh
 resholver --allow source:PWD < source_home_pwd_annotated_incomplete.sh
+CASES
+
+@test "Don't resolve aliases without --resolve-aliases" {
+  require <({
+    status 0
+    line 3 !contains "/nix/store"
+    line 4 !contains 'find="/nix/store'
+    line 4 !contains 'find2="/nix/store'
+    line 6 !contains "/nix/store"
+    line 8 !contains "/nix/store"
+    line 9 contains "/nix/store"
+    line 10 !contains "/nix/store"
+    line 11 contains "/nix/store"
+    line 12 equals "### resholved directives (auto-generated)"
+    # can't assert the ends; these get sorted
+    # and the hash makes unstable :(
+    line 13 begins "# resholved: allow resholved_inputs:/nix/store/"
+    line 14 begins "# resholved: allow resholved_inputs:/nix/store/"
+  })
+} <<CASES
+resholver < alias_riddle.sh
 CASES

@@ -1,5 +1,5 @@
 {
-  stdenv, callPackage, file, gettext, python27, bats,
+  stdenv, callPackage, file, findutils, gettext, python27, bats,
 
   doCheck ? true
 }:
@@ -18,7 +18,7 @@ let
       "${rSrc}/0004-disable-internal-py-yajl-for-nix-built.patch"
     ];
   };
-  resolveTimeDeps = [ file gettext ];
+  resolveTimeDeps = [ file findutils gettext ];
 in python27.pkgs.buildPythonApplication {
   pname = "resholved";
   version = "unreleased";

@@ -84,3 +84,24 @@ CASES
 } <<CASES
 resholver < source_present_target.sh
 CASES
+
+@test "Has (naive) context-specific resolution rules" {
+  demo "alias_riddle.sh" <({
+    status 0
+    line 3 !contains "/nix/store"
+    line 4 contains 'find="/nix/store'
+    line 4 contains 'find2="/nix/store'
+    line 6 !contains "/nix/store"
+    line 8 !contains "/nix/store"
+    line 9 contains "/nix/store"
+    line 10 !contains "/nix/store"
+    line 11 contains "/nix/store"
+    line 12 equals "### resholved directives (auto-generated)"
+    # can't assert the ends; these get sorted
+    # and the hash makes unstable :(
+    line 13 begins "# resholved: allow resholved_inputs:/nix/store/"
+    line 14 begins "# resholved: allow resholved_inputs:/nix/store/"
+  })
+} <<CASES
+resholver --resolve-aliases < alias_riddle.sh
+CASES

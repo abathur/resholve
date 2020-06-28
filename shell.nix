@@ -7,7 +7,7 @@ resholved itself, not just resholved's dependencies.
 with pkgs;
 let
   resholved = callPackage ./default.nix { doCheck=false; };
-  resolveTimeDeps = [ file gettext ];
+  resolveTimeDeps = [ file findutils gettext ];
   checkInputs = [ pkgs.bats ];
 in pkgs.mkShell {
   buildInputs = [ resholved.resholved ] ++ checkInputs;

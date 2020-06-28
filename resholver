@@ -150,7 +150,7 @@ from oil._devbuild.gen.syntax_asdl import (
     word_part_e,  # ArithSub, AssocArrayLiteral, BracedVarSub, CommandSub, DoubleQuoted, EscapedLiteral, ExtGlob, Literal, ShArrayLiteral, SimpleVarSub, SingleQuoted, Splice, TildeSub
     command,  # ShFunction, Simple
     double_quoted,  # directly for cast()
-    Token,  # directly for cast()
+    Token,  # directly for cast(), also for alias parsing
 )
 
 from oil.tools import osh2oil  # Cursor
@@ -159,7 +159,6 @@ from oil.tools import osh2oil  # Cursor
 executables = dict()
 resolved_scripts = dict()
 allowed_varsubs = set()
-# allowed_varsubs = {"HOME", "PWD"}
 
 
 parser = argparse.ArgumentParser(
@@ -188,8 +187,15 @@ parser.add_argument(
     dest="allowed_varsubs",
     action="append",
     metavar="scope:var",
-    help="Allow dynamic statements consisting ONLY of a variable. For example, '--allow source:HOME' allows $HOME in arguments to the source command.",
+    help="Allow some violations (such as dynamic statements consisting ONLY of a variable). For example, '--allow source:HOME' allows $HOME in arguments to the source command. (List of options here is TODO and pending a QC round the option names/APIs.)",
     type=allow_tuple,
+)
+
+parser.add_argument(
+    "--resolve-aliases",
+    action="store_true",
+    dest="resolve_aliases",
+    help="Resolve commands inside an alias to absolute paths when possible.",
 )
 
 
@@ -204,7 +210,13 @@ def resolve_script(script_path):
         return resolved_scripts[script_path]
 
     resolved = resolved_scripts[script_path] = ResolvedScript(script_path)
-    if "NIX_BUILD_TOP" in os.environ and script_path.startswith(
+    return resolved
+
+
+def write_resolved_script(script_path, resolved):
+    if not script_path:
+        resolved.write_to()
+    elif "NIX_BUILD_TOP" in os.environ and script_path.startswith(
         os.environ["NIX_BUILD_TOP"]
     ):
         logger.info(
@@ -213,7 +225,6 @@ def resolve_script(script_path):
         resolved.write_to(script_path)
         sys.stderr.write("Overwrote %r\n" % (script_path))
     else:
-
         logger.info(
             "script %r not in Nix build dir; will attempt to write to: %s%s",
             script_path,
@@ -225,11 +236,11 @@ def resolve_script(script_path):
             "Rewrote %r to %r\n" % (script_path, script_path + ".resolved")
         )
 
-    return resolved
-
 
 def punshow():
     args = parser.parse_args()
+    # if it makes sense at some point, vars(args) yields a dict of these
+    # that can be passed as kwargs or something...
     logger.debug("argparsed: %r", args)
 
     if args.allowed_varsubs:
@@ -247,11 +258,15 @@ def punshow():
     # adopt the runtime dependency path for resolving external executables
     os.environ["PATH"] = os.environ["RESHOLVE_PATH"]
 
+    if not args.resolve_aliases:
+        RecordCommandlike.disable_alias_replacement()
+
     try:
+        to_write = set()
         if len(args.scripts) == 0:
-            resolved = ResolvedScript()
-            resolved_scripts["<stdin>"] = resolved
-            resolved.write_to()
+            # None == <stdin>
+            resolved_scripts[None] = ResolvedScript()
+            to_write.add(None)
 
         checked_scripts = list()
         for script in map(os.path.abspath, args.scripts):
@@ -261,6 +276,8 @@ def punshow():
                 sys.stderr.write("Aborting due to missing file: %r\n" % script)
                 return 2
 
+        # TODO: this should probably explain why it's a problem
+        # or what to do about it, or something?
         if len(set(checked_scripts)) != len(checked_scripts):
             sys.stderr.write("Aborting due to duplicate script targets.\n")
             sys.stderr.write("  Original: %r\n" % args.scripts)
@@ -268,7 +285,14 @@ def punshow():
             return 2
 
         for script in checked_scripts:
-            resolved = resolve_script(script)
+            resolve_script(script)
+            to_write.add(script)
+
+        # cmdlikes are cross-source; try to resolve a single time
+        resolve_cmdlikes()
+
+        for script_path in to_write:
+            write_resolved_script(script_path, resolved_scripts[script_path])
 
     except IOError as e:
         sys.stderr.write("Whoooo buddy " + str(e))
@@ -298,8 +322,8 @@ def find_dynamic_token(part):
     # type: (word_part_t) -> token|bool
     """Recursive search for dynamic token.
 
-    This is patterned on word_._EvalWordPart, but with
-    ~inverted boolean logic: it returns the token object
+    This is patterned on oil's word_._EvalWordPart, but with
+    roughly inverted boolean logic: it returns the token object
     if one is found, otherwise False.
     """
     UP_part = part
@@ -352,13 +376,17 @@ class FalseListFake(object):
 NO_OPTIONS = FalseListFake()
 
 
-class ResolutionError(error._ErrorWithLocation):
+class ExceptionWithContext(error._ErrorWithLocation):
+    pass
+
+
+class ResolutionError(ExceptionWithContext):
     printed = False
     arena = None
 
     def __init__(self, *args, **kwargs):
-        self.arena = kwargs.pop("arena")
-        error._ErrorWithLocation.__init__(self, *args, **kwargs)
+        self.arena = kwargs.pop("arena", None)
+        ExceptionWithContext.__init__(self, *args, **kwargs)
 
     def print_if_needed(self):
         if not self.printed:
@@ -366,7 +394,7 @@ class ResolutionError(error._ErrorWithLocation):
             self.printed = True
 
 
-class ResolutionWarning(error._ErrorWithLocation):
+class ResolutionWarning(ExceptionWithContext):
     printed = False
     arena = None
     label = "WARNING: "
@@ -382,84 +410,525 @@ class ResolutionWarning(error._ErrorWithLocation):
             self.printed = True
 
 
-class FeedbackWantedWarning(ResolutionWarning):
-    label = "FEEDBACK WANTED: "
+EMIT_FEEDBACK_REQUESTS = False
+if logger.isEnabledFor(logging.WARNING):
+    EMIT_FEEDBACK_REQUESTS = True
+
+    class FeedbackWantedWarning(ResolutionWarning):
+        label = "FEEDBACK WANTED: "
 
 
-# We need to extract more info after hitting some firstwords
-# This list is just for noticing if something is breaking expectations
-WATCH_FIRSTWORDS = {"sudo", "command", "eval", "exec", ".", "source", "alias"}
-KNOWN_BUILTINS = {
-    ".",
-    ":",
-    "[",
-    "alias",
-    "bg",
-    "bind",
-    "break",
-    "builtin",
-    "caller",
-    "cd",
-    "command",
-    "compgen",
-    "complete",
-    "compopt",
-    "continue",
-    "declare",
-    "dirs",
-    "disown",
-    "echo",
-    "enable",
-    "eval",
-    "exec",
-    "exit",
-    "export",
-    "false",
-    "fc",
-    "fg",
-    "getopts",
-    "hash",
-    "help",
-    "history",
-    "jobs",
-    "kill",
-    "let",
-    "local",
-    "logout",
-    "mapfile",
-    "popd",
-    "printf",
-    "pushd",
-    "pwd",
-    "read",
-    "readarray",
-    "readonly",
-    "return",
-    "set",
-    "shift",
-    "shopt",
-    "source",
-    "suspend",
-    "test",
-    "times",
-    "trap",
-    "true",
-    "type",
-    "typeset",
-    "ulimit",
-    "umask",
-    "unalias",
-    "unset",
-    "wait",
-}
+class SingleKeyDefaultDict(dict):
+    def __init__(self, factory):
+        self.factory = factory
+
+    def __missing__(self, key):
+        return self.setdefault(key, self.factory(key))
 
 
-class ResolvedScript(object):
-    # basically:
-    # - march through each command's first word
-    # - separate builtins, functions, and commands
-    # - record the position(s) of each builtin and command for easier replacing?
-    # - resolve commands
+class MultiKeyDefaultDict(dict):
+    def __init__(self, factory):
+        self.factory = factory
+
+    def __missing__(self, key):
+        return self.setdefault(key, self.factory(*key))
+
+
+"""
+It's probably worth discussing the big picture before the next section. It may
+be a little arcane, but it's in the service of minimizing repeated work.
+
+When resholved process a script, it runs it through Oil's OSH parser and then
+visits the corresponding AST looking for "command-like" words (those used as
+if they are a command) to queue them for resolution. On encounter, we can't,
+rule out the possibility that it's an alias defined 3 scripts down a source
+chain without parsing everything before we start resolving--so we queue.
+
+On each encounter, the visitor calls a context-specific record_ method from
+the RecordCommandlike mixin to. Each of these methods corresponds to a known
+command resolution order--a sequence of the types of command this command-like
+would resolve to. (Resolution rules differ across different contexts, like
+inside an alias, and following certain commands). This call:
+
+- Maps the position of the command-like to the AST word object (for reporting)
+  self.word_objects[position] = word_object
+
+- Checks defaultdict cmdlikes[word_string] for the CommandLike instance that
+  corresponds to this word. This instance will accumulate information like
+  which scripts it appears in, whether it's defined as a function or alias,
+  and most importantly the distinct resolution orders where it was found.
+
+- Maps the command-like's position to a Solution instance (obtained from the
+  CommandLike) that is distinct for each encountered resolution order:
+  self.solutions[position] = Solution
+
+  If the visitor encounters the same commandlike 5 separate times but with the
+  same resolution order, the solutions dictionary will map *all 5* positions
+  to the same object.
+
+Once the visitor has finished, we call CommandLike.resolve() on all known
+CommandLike objects. Each CommandLike will "solve" for the distinct contexts
+it was found in, and add the appropriate resolution to the corresponding
+Solution object. This process records whether each Solution should be a no-op,
+raise an exception, or result in a replacement.
+
+Next, we render the resolved script by looping over each of these solutions.
+"""
+
+
+class Solution(object):
+    """
+    Mutable placeholder objects to pair with commandlike encounters.
+
+    We can't solve the commandlike until we're done parsing, but we
+    know enough context at encounter time to deduplicate solutions.
+    Calling code will save a reference to the context-appropriate
+    solution object for each encounter, and a single solution pass
+    later can identify the correct replacement for each one.
+    """
+
+    replacement = None
+    exception = None
+
+    @property
+    def solved(self):
+        return self.replacement is not None or self.exception is not None
+
+    def no_change(self):
+        self.replacement = False
+
+    def replace_name_with(self, name, replacement, external=False):
+        self.replacement = (name, replacement)
+
+    def replace_in(self, current):
+        return current.replace(*self.replacement)
+
+    def causes_exception(self, exception):
+        self.exception = exception
+
+
+class OrderedCommandResolver(object):
+    KNOWN_BUILTINS = {
+        ".",
+        ":",
+        "[",
+        "alias",
+        "bg",
+        "bind",
+        "break",
+        "builtin",
+        "caller",
+        "cd",
+        "command",
+        "compgen",
+        "complete",
+        "compopt",
+        "continue",
+        "declare",
+        "dirs",
+        "disown",
+        "echo",
+        "enable",
+        "eval",
+        "exec",
+        "exit",
+        "export",
+        "false",
+        "fc",
+        "fg",
+        "getopts",
+        "hash",
+        "help",
+        "history",
+        "jobs",
+        "kill",
+        "let",
+        "local",
+        "logout",
+        "mapfile",
+        "popd",
+        "printf",
+        "pushd",
+        "pwd",
+        "read",
+        "readarray",
+        "readonly",
+        "return",
+        "set",
+        "shift",
+        "shopt",
+        "source",
+        "suspend",
+        "test",
+        "times",
+        "trap",
+        "true",
+        "type",
+        "typeset",
+        "ulimit",
+        "umask",
+        "unalias",
+        "unset",
+        "wait",
+    }
+
+    @property
+    def name(self):
+        return self.cmd.name
+
+    def _true(self):
+        return True
+
+    def _false(self):
+        return False
+
+    def _unexpected_absolute_path(self):
+        raise ResolutionError(
+            "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
+            # the others are errors too, but we'll just flag the first
+            status=5,
+        )
+
+    def generate_external_resolver(self, relevant):
+        if ("unresholved_inputs", self.name) in relevant:
+            return self._true
+
+        if self.name.startswith("/"):
+            """
+            TODO: this work used to be done in resolve_records, where
+            it also did one other check. I'm pretty sure it's obsolete
+            now, but I'm documenting it here just in case. Probably OK
+            to remove this any time after Aug 1 2020.
+
+            It did something like:
+                # path is already properly resolved (probably by us)
+                basecommand = os.path.basename(command_word)
+                baseexecutable = lookup(basecommand)
+                if command_word == baseexecutable:
+                    continue
+            """
+            if ("resholved_inputs", self.name) in relevant:
+                return self._true
+            else:
+                return self._unexpected_absolute_path
+
+        return self.resolve_external
+
+    def __init__(self, commandlike, relevant):
+        self.cmd = commandlike
+        # "cro" is "command resolution order"; open to renames
+        # alias > keyword > special builtin > function > builtin > external
+        #                  (POSIX mode only)
+        # neither special builtins nor POSIX mode have special handling atm
+        # just saving space for them in case...
+        self.cro = (
+            self.resolve_alias,
+            self.resolve_keyword,
+            self.resolve_special_builtin,
+            self._true
+            if ("function", self.name) in relevant
+            else self.resolve_function,
+            self._true if ("builtin", self.name) in relevant else self.resolve_builtin,
+            self.generate_external_resolver(relevant),
+        )
+
+    @property
+    def full(self):
+        # alias > keyword > special builtin > function > builtin > external
+        return self.cro
+
+    @property
+    def alias(self):
+        return self.cro[3:]  # function > builtin > external
+
+    @property
+    def builtin(self):
+        return self.cro[4:5]  # builtin
+
+    @property
+    def command(self):
+        return self.cro[4:]  # builtin > external
+
+    @property
+    def external(self):
+        return self.cro[5:]  # external
+
+    """
+    CommandLike.resolve() will call below methods for each distinct
+    CRO encountered, and stop on the first that returns truthy.
+
+    So they have the same basic rules:
+    - return True if this is a valid resolution without change
+    - return False if not (or None if unimplemented/irrelevant)
+    - return a string to indicate a valid resolution with replacement
+    - raise an exception to indicate a problem *(see resolve_external
+      for a quirk about raising exceptions here)
+
+    TODO: in theory these can be cached, but I'm not sure it'll be
+    meaningful. The expensive part, lookup(), is already cached.
+    """
+
+    def resolve_alias(self):
+        return self.cmd.alias
+
+    def resolve_keyword(self):
+        """
+        leaving kw unimplemented for now; I think oil's parser
+        should shield resholved from needing to worry about it
+
+        this may become relevant if we try to handle non-bash
+        shells with different keywords
+        """
+        pass
+
+    def resolve_special_builtin(self):
+        """
+        leaving special builtin unimplemented for now; it's a
+        posix-mode concept I'm hoping to avoid supporting.
+        only time it really matters is if a function obscures
+        a "special" builtin in posix mode
+
+        See the file 'POSIX_mode_notes'
+        """
+        pass
+
+    def resolve_function(self):
+        return self.cmd.function
+
+    def resolve_builtin(self):
+        """
+        TODO: code this is based on once looked up builtins oil's way
+        but the list of builtins there are probably oil's:
+        if (
+            consts.LookupSpecialBuiltin(text) == consts.NO_INDEX
+            and consts.LookupAssignBuiltin(text) == consts.NO_INDEX
+            and consts.LookupNormalBuiltin(text) == consts.NO_INDEX
+        ):
+
+        I'm not sure to what extent I want to support non-bash shells,
+        but if there's a push to do so it may help to post this on SO
+        or make little help-wanted issues.
+
+        The ~most-right way to do this would be to get the builtins
+        from the target shell (at build-time? call-time?) but I'm not
+        aware of a portable way to do it.
+
+        If one's identified, the Nix side could accept a shell (or
+        shells?) argument, run that command in each, merge the lists,
+        and supply them via env.
+
+        For now, I'm just hard-coding a list of bash builtins from
+        `compgen -b` run in GNU bash,
+        version 5.0.9(1)-release (x86_64-apple-darwin17.7.0)
+
+        NOTE: if you're using resholved for some other shell and have
+        a builtin not in this list, you can add an exemption with
+        --allow builtin:<name>
+        """
+        return True if self.name in self.KNOWN_BUILTINS else False
+
+    def resolve_external(self):
+        executable = lookup(self.name)
+        if not executable:
+            # Types of ExceptionWithContext need other values in order
+            # to pretty-print the error location that just aren't
+            # readily available at this place using the current logic.
+            #
+            # Instead, we just mark the status, and code higher up the
+            # stack will catch this error, inject the correct arena and
+            # location information for us, and then re-raise the error.
+            raise ResolutionError(
+                "Can't resolve command %r to a known function or executable",
+                self.name,
+                status=3,
+            )
+        else:
+            return executable
+
+
+class CommandLike(object):
+    """
+    Represents each distinct command-like "word" we encounter.
+    """
+
+    name = function = alias = None
+
+    def __init__(self, name):
+        self.name = name
+        self.known_sources = dict()
+        self.known_exemptions = list()
+        self.order_to_source = defaultdict(set)
+        self.order_to_solution = defaultdict(Solution)
+        self.cros = MultiKeyDefaultDict(OrderedCommandResolver)
+
+    def scaffold_new_source(self, source):
+        # only exemptions that match this commandlike's name
+        # tuple only really for hashability...
+        relevant = tuple({x for x in source.allowed if x[1] == self.name})
+
+        if relevant in self.known_exemptions:
+            # new source, but no novel exemptions
+            index = self.known_exemptions.index(relevant)
+
+            # use existing content-identical set to
+            # approximate a "set of sets"
+            self.known_sources[source] = self.known_exemptions[index]
+        else:
+            # new source with novel exemptions
+            self.known_sources[source] = relevant
+            self.known_exemptions.append(relevant)
+
+        return self.cros[(self, relevant)]
+
+    def request_solution(self, source, order):
+        self.order_to_source[order].add(source)
+        return self.order_to_solution[order]
+
+    def find_cro(self, source):
+        if source not in self.known_sources:
+            return self.scaffold_new_source(source)
+        return self.cros[(self, self.known_sources[source])]
+
+    def request_full_solution(self, source):
+        return self.request_solution(source, self.find_cro(source).full)
+
+    def request_alias_solution(self, source):
+        return self.request_solution(source, self.find_cro(source).alias)
+
+    def request_builtin_solution(self, source):
+        return self.request_solution(source, self.find_cro(source).builtin)
+
+    def request_command_solution(self, source):
+        return self.request_solution(source, self.find_cro(source).command)
+
+    def request_external_solution(self, source):
+        return self.request_solution(source, self.find_cro(source).external)
+
+    def resolve(self):
+        # find solutions for observed types
+        for distinct_cro, solution in self.order_to_solution.items():
+
+            # run each function, break early on exception/true/string
+            for func in distinct_cro:
+                try:
+                    # TODO: could cache these, but not sure it'll make much diff
+                    test = func()
+                except ExceptionWithContext as e:
+                    solution.causes_exception(e)
+                    break
+
+                if test == True:
+                    solution.no_change()
+                    break
+                elif test:
+                    # external is the only case that can currently return more than just t/f
+                    # DIDDING: if I could walk the distinct_cro back to a list of sources that contained it, I could go ahead and mark that these sources need to add this to allowed.
+                    solution.replace_name_with(self.name, test)
+                    for source in self.order_to_source[distinct_cro]:
+                        source.allowed.add(("resholved_inputs", test))
+                    break
+
+            # TODO: rm if not seen for a while? Not sure how long... --Jun 27, 2020
+            if not solution.solved:
+                raise Exception(
+                    "Can't resolve command %r to a known function or executable? I think this is obsolete now that resolve_external raises a similar error, but I won't hastily remove it..."
+                    % self.name
+                )
+
+
+cmdlikes = SingleKeyDefaultDict(CommandLike)
+
+
+def resolve_cmdlikes():
+    logger.info("Resolving command-likes")
+    for cmdlike in cmdlikes.values():
+        cmdlike.resolve()
+
+
+# TODO: refactor down some of this duplication (here and elsewhere)
+# keeping it painfully explicit for now to make it easier to
+# think/search between different cases here
+class RecordCommandlike(object):
+    solutions = word_objects = None
+
+    def __init__(self):
+        self.solutions = dict()
+        self.word_objects = dict()
+
+    @classmethod
+    def disable_alias_replacement(cls):
+        cls.record_alias_cmd = cls._disabled_recorder
+
+    def _disabled_recorder(self, *args, **kwargs):
+        pass
+
+    def get_word_position(self, word_object, position=None):
+        pos = position or word_.LeftMostSpanForWord(word_object)
+        self.word_objects[pos] = word_object
+        return pos
+
+    def record_general_cmd(self, word_object, word_text, position=None):
+        """Record command found in general namespace."""
+        # This is where we have to act
+        pos = self.get_word_position(word_object, position)
+        self.solutions[pos] = cmdlikes[word_text].request_full_solution(self)
+
+    def record_alias_cmd(self, word_object, word_text, position=None):
+        """Record command found in alias definition namespace."""
+        pos = self.get_word_position(word_object, position)
+        self.solutions[pos] = cmdlikes[word_text].request_alias_solution(self)
+
+    def record_builtin_cmd(self, word_object, word_text, position=None):
+        """Record command argument to `builtin` builtin :)"""
+        pos = self.get_word_position(word_object, position)
+        self.solutions[pos] = cmdlikes[word_text].request_builtin_solution(self)
+
+    def record_command_cmd(self, word_object, word_text, position=None):
+        """Record command argument to `command` builtin."""
+        pos = self.get_word_position(word_object, position)
+        self.solutions[pos] = cmdlikes[word_text].request_command_solution(self)
+
+    def record_external_cmd(self, word_object, word_text, position=None):
+        """Record command argument to `command` builtin."""
+        pos = self.get_word_position(word_object, position)
+        self.solutions[pos] = cmdlikes[word_text].request_external_solution(self)
+
+    def record_external_source(
+        self, word_object, word_text, replace_with=None, position=None
+    ):
+        """
+        Record file argument to `source` builtin.
+
+        CAUTION:
+        This has the same basic effect as the others, but it uses
+        slightly different logic. In short, the others are for queueing late
+        resolution of each command-like. We *could* do that here--but we have
+        to parse each source *before* we can late-resolve everything else
+        correctly.
+
+        So, in this one case, the caller is passing in the solution at call
+        time. We still record the solutions, but instead of creating a
+        CommandLike, we add it to resolved_source so that it's easy to parse
+        each in a later step.
+        """
+        pos = self.get_word_position(word_object, position)
+        sol = self.solutions[pos] = Solution()
+        if replace_with:
+            sol.replace_name_with(word_text, replace_with)
+            self.resolved_source.add(replace_with)
+        else:
+            sol.no_change()
+            self.resolved_source.add(word_text)
+
+
+class ResolvedScript(RecordCommandlike):
+    """
+    Represent each individual script that we resolve.
+    """
+
+    # We need to extract more info after hitting some firstwords
+    # This list is just for noticing if something is breaking expectations
+    WATCH_FIRSTWORDS = {"sudo", "command", "eval", "exec", ".", "source", "alias"}
 
     @staticmethod
     def _make_parser(parse_ctx, script, arena):
@@ -503,28 +972,15 @@ class ResolvedScript(object):
         assert node is not None
 
         # actually initialize
+        RecordCommandlike.__init__(self)
         self.arena = arena
-        # TODO: not certain we don't want more...
 
-        self.aliases = set()
-        self.builtins = defaultdict(list)
-        self.commands = defaultdict(list)
-        self.sources = defaultdict(list)
-        self.funcs_defined = set()
-        self.resolved_commands = dict()
-        self.resolved_functions = dict()
-        self.resolved_aliases = dict()
-        self.resolved_source = dict()
-        self.parsed_source = dict()
-        self.unresolved_commands = set()
-        # unresolved functions doesn't make sense because we can't disambiguate an unresolved function from an unresolved external command...
-        self.unresolved_source = set()
-        self.word_obs = dict()
+        self.resolved_source = set()  # ResolvedSource objects
 
         # "resolve"
         try:
             self.Visit(node)
-            self.resolve_records()
+            self.resolve_sources()
         except ResolutionError as e:
             e.print_if_needed()
             raise e
@@ -543,6 +999,20 @@ class ResolvedScript(object):
         script.seek(0)
         self.allowed.update(self.in_doc_directives, allowed_varsubs)
 
+    def write_directives(self, cursor):
+        # we only want items that weren't already in the file
+        if len(self.in_doc_directives) < len(self.allowed):
+            if len(self.in_doc_directives) == 0:
+                cursor.f.write("\n### resholved directives (auto-generated)\n")
+            new_directives = self.allowed.difference(self.in_doc_directives)
+            cursor.f.writelines(
+                [
+                    "# resholved: allow {:}:{:}\n".format(context, name)
+                    for context, name in sorted(new_directives)
+                ]
+                + ["\n"]
+            )
+
     def write_to(self, path=None):
         f = open(path, "w") if path else sys.stdout
         try:
@@ -556,242 +1026,48 @@ class ResolvedScript(object):
     def render(self, to=sys.stdout):
         cursor = osh2oil.Cursor(self.arena, to)
 
-        replacements = {}
+        replacements = sorted(self.solutions.keys())
+        if len(replacements):
+            logger.info("Making replacements")
+            logger.debug("  The replacements are: %r", self.solutions)
+            logger.debug("  They'll be made in this order: %r", replacements)
 
-        # TODO: think about whether it's "right" to prefix builtins. I was
-        # planning to do this because it reduces ambiguity, increases
-        # certainty, and I couldn't see a clear performance impact. But
-        # patching them in bashup.events drops emits/s from ~13.9k to ~7.2k
+        for location in replacements:
+            solution = self.solutions[location]
 
-        # for builtin, locations in self.builtins.items():
-        #     for location in locations:
-        #         replacements[location] = "builtin " + builtin
+            e = solution.exception
+            if solution.replacement:
+                cursor.PrintUntil(location)
 
-        for label, locations in self.sources.items():
-            for location in locations:
-                # the builtin replacement turned this into "builtin source"
-                # this just patches the target
-                replacements[location] = self.resolved_source[label]
+                span = self.arena.GetLineSpan(location)
 
-        for command_word, locations in self.commands.items():
-            target = None
-            if command_word in self.resolved_commands:
-                target = self.resolved_commands[command_word]
-            else:
-                if command_word in self.aliases:
-                    logger.debug(
-                        "Skipping %s alias: %s",
-                        "resolved"
-                        if command_word in self.resolved_aliases
-                        else "unresolved",
-                        command_word,
-                    )
-                    continue
-                elif command_word in self.resolved_functions:
-                    logger.debug("Skipping resolved functon: %s", command_word)
-                    continue
-                elif command_word in self.funcs_defined:
-                    # we might not match a resolved function if it hasn't been looked up yet? I hope this doesn't happen, but if it did I guess we could force a lookup at this time.
-                    raise Exception(
-                        "function {:} defined but not resolved?".format(command_word)
-                    )
-                elif ("function", command_word) in self.allowed:
-                    continue  # allow exempted function
-                # TODO: see if you can dedupe this block with the one in resolve
-                elif command_word.startswith("/"):
-                    basecommand = os.path.basename(command_word)
-                    baseexecutable = lookup(basecommand)
-                    if command_word == baseexecutable:
-                        continue  # I guess this is ok; the path wouldn't change in any case
-                    elif ("resholved_inputs", command_word) in self.allowed:
-                        continue  # explicitly exempted
-                    else:
-                        raise ResolutionError(
-                            # TODO: write a test to prove this happens? I just saw a case that should fit this get raised as:
-                            #   /nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file resholver.py
-                            #   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                            # /Users/abathur/work/resholved/simple_success_a.sh.resolved:2: Can't resolve command '/nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file' to a known function or executable
-                            "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
-                            # the others are errors too, but we'll just flag the first
-                            span_id=self.commands[command_word][0],
-                            status=4,
-                            arena=self.arena,
-                        )
-                elif ("unresholved_inputs", command_word) in self.allowed:
-                    continue  # explicitly exempted
-                else:
-                    raise ResolutionError(
-                        "Can't resolve command %r to a known function or executable",
-                        command_word,
-                        word=self.word_obs[command_word],
-                        status=3,
-                        arena=self.arena,
-                    )
-            for location in locations:
-                # TODO: think about whether it's 'right' to prefix commands.
-                # ('command' or 'builtin command')
-                # I was planning to do this to reduce ambiguity and initial
-                # testing convinced me it was also faster, but revisiting it
-                # per the builtin note above and it looks like the usual
-                # exec time is something like:
-                # bare (hashed) < absolute < bare(unhashed), and in all cases
-                # prefixing the builtin added around ~1ms.
-                #
-                # Another reason to prefix would be to better support some
-                # additional file parsing/modification/analysis (i.e.,
-                # it's going to be hard for any tool without a full parser
-                # to distinguish full command-paths written here from other
-                # absolute paths.)
-                #
-                # I'm not sure there's a great way to triage the concerns, so
-                # I'm inclined to prefer performance for now, and fall back on
-                # prefixing if we find an actual reason to do it.
-                replacements[location] = target
+                line = self.arena.GetLine(span.line_id)
+                current = line[span.col : span.col + span.length]
+                to.write(solution.replace_in(current))
 
-        order = sorted(replacements.keys())
-
-        logger.info("Making replacements")
-        logger.debug("The replacements are: %r", replacements)
-        logger.debug("They'll be made in this order: %r", order)
-
-        for location in order:
-            cursor.PrintUntil(location)
-            to.write(replacements[location])
-            cursor.SkipUntil(location + 1)
+                # we already wrote this one; leapfrog
+                cursor.SkipUntil(location + 1)
+            elif e:
+                e.word = self.word_objects[location]
+                e.span_id = location
+                e.arena = self.arena
+                raise e
 
         cursor.PrintUntil(self.arena.LastSpanId())
-        # add comments, (at the end of the file for simplicity) that encode what
-        # we're ignoring in a way future runs can read them back off
 
-        # we only want items that weren't already in the file
-        if len(self.in_doc_directives) < len(self.allowed):
-            if len(self.in_doc_directives) == 0:
-                cursor.f.write("\n### resholved directives (auto-generated)\n")
-            new_directives = self.allowed.difference(self.in_doc_directives)
-            cursor.f.writelines(
-                [
-                    "# resholved: allow {:}:{:}\n".format(context, name)
-                    for context, name in sorted(new_directives)
-                ]
-                + ["\n"]
-            )
+        self.write_directives(cursor)
         self.arena.PopSource()
         return self
 
-    def resolve_function(self, name):
-        if name in self.funcs_defined:
-            return self  # TODO: figure out proper return
-        else:
-            for res_source in self.parsed_source.values():
-                resolved = res_source.resolve_function(name)
-                if resolved:
-                    return resolved
-        return None
-
-    def resolve_alias(self, name):
-        if name in self.aliases:
-            return self  # TODO: figure out proper return
-        else:
-            for res_source in self.parsed_source.values():
-                resolved = res_source.resolve_alias(name)
-                if resolved:
-                    return resolved
-        return None
-
-    def resolve_records(self):
+    def resolve_sources(self):
         global resolved_scripts
-        logger.info("Resolving records")
-        for res_source in self.resolved_source.values():
-            logger.info("Parsing sourced script %r", res_source)
-            resolved = self.__class__(res_source)
-            resolved_scripts[res_source] = resolved
-            self.parsed_source[res_source] = resolved
+        logger.info("Resolving sources")
+        for res_source in self.resolved_source:
+            if res_source not in resolved_scripts:
+                logger.info("Parsing sourced script %r", res_source)
+                resolved = self.__class__(res_source)
+                resolved_scripts[res_source] = resolved
             self.allowed.add(("resholved_inputs", res_source))
-        # commands could be an external function or executable
-        for command_word in self.commands.keys():
-            if command_word.startswith("/"):
-                # path is already properly resolved (probably by us)
-                basecommand = os.path.basename(command_word)
-                baseexecutable = lookup(basecommand)
-                if command_word == baseexecutable:
-                    continue
-                    # it's okay that it's here. We don't need to replace it.
-                elif ("resholved_inputs", command_word) in self.allowed:
-                    continue  # explicitly exempted
-                else:
-                    # or it's probably a hard-coded path
-                    raise ResolutionError(
-                        # TODO: write a test to prove this happens? I just saw a case that should fit this get raised as:
-                        #   /nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file resholver.py
-                        #   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        # /Users/abathur/work/resholved/simple_success_a.sh.resolved:2: Can't resolve command '/nix/store/kna3n3yj48mvf5bhxvc1bqm6rrjqv2xw-file-5.37/bin/file' to a known function or executable
-                        "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
-                        # the others are errors too, but we'll just flag the first
-                        span_id=self.commands[command_word][0],
-                        status=5,
-                        arena=self.arena,
-                    )
-
-            executable = lookup(command_word)
-            if executable:
-                self.resolved_commands[command_word] = executable
-                self.allowed.add(("resholved_inputs", executable))
-
-            function = self.resolve_function(command_word)
-            if function:
-                self.resolved_functions[command_word] = function
-
-            alias = self.resolve_alias(command_word)
-            if alias:
-                self.resolved_aliases[command_word] = alias
-
-            if not function and not executable:
-                self.unresolved_commands.add(command_word)
-
-    def record_word(self, word_ob, text):
-        global KNOWN_BUILTINS
-        pos = word_.LeftMostSpanForWord(word_ob)
-        self.word_obs[text] = word_ob
-        # TODO:
-        #
-        # this did look up builtins oil's way
-        # but the list of builtins there are probably
-        # oil's:
-        # if (
-        #     consts.LookupSpecialBuiltin(text) == consts.NO_INDEX
-        #     and consts.LookupAssignBuiltin(text) == consts.NO_INDEX
-        #     and consts.LookupNormalBuiltin(text) == consts.NO_INDEX
-        # ):
-        #
-        # The ~most-right way to do this would probably be to get the builtins
-        # from the target shell (at build-time? call-time?) but I'm not sure there's
-        # a portable way to do it?
-        #
-        # If there was, the Nix side could accept a shell (or shells?) argument,
-        # try to run that command in each, merge the lists, and supply them.
-        #
-        # For now, I'm just hard-coding a list of bash builtins (from compgen -b in GNU bash, version 5.0.9(1)-release (x86_64-apple-darwin17.7.0))
-        #
-        # FWIW, if you're using this for some other shell and have a builtin not
-        # in this list, you can add an exemption with --allow builtin:<name>
-        if text not in KNOWN_BUILTINS and ("builtin", text) not in self.allowed:
-            logger.info("Recording command: %r", text)
-            logger.debug("   position: %d, word object: %r", pos, word_ob)
-            self.commands[text].append(pos)
-        else:
-            # TODO: no immediate use since I'm no longer patching builtins
-            # but there may still be utility in recording builtins a script
-            # depends on. This would support spotting function/alias
-            # clashes and such.
-            self.builtins[text].append(pos)
-
-    def record_source(self, word_ob, text, target):
-        pos = word_.LeftMostSpanForWord(word_ob)
-        logger.info("Recording source: %r -> %r", text, target)
-        logger.debug("   position: %d, word object: %r", pos, word_ob)
-        self.word_obs[text] = word_ob
-        self.sources[text].append(pos)
-        self.resolved_source[text] = target
 
     def _visit_command_Simple(self, node):
         if not node.words:
@@ -821,7 +1097,8 @@ class ResolvedScript(object):
                     # ):
                     #     return
                     else:
-                        if logger.isEnabledFor(logging.WARNING):
+                        # Only spend time when enabled
+                        if EMIT_FEEDBACK_REQUESTS:
                             try:
                                 raise FeedbackWantedWarning(
                                     "Letting dynamic command (first-word variable) through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholved/issues/3",
@@ -839,16 +1116,16 @@ class ResolvedScript(object):
                 )
                 return
         else:
-            self.record_word(w_ob1, word1)
+            self.record_general_cmd(w_ob1, word1)
 
-        # If there's a second word, let's go ahead and pop it off.
+        # If there's a second word, let's go ahead and prepare it.
         # We don't know we need it, but enough cases do that it's easier.
         if len(node.words) > 1:
             w_ob2 = node.words[1]
             ok2, word2, _ = word_.StaticEval(w_ob2)
             # we don't care if it succeeded, yet
         else:
-            if word1 in WATCH_FIRSTWORDS:
+            if word1 in self.WATCH_FIRSTWORDS:
                 # just a chance to bail out on a broken script
                 # may not be worth the code...
                 raise Exception(
@@ -874,7 +1151,7 @@ class ResolvedScript(object):
                 word_part_e.SingleQuoted,
                 word_part_e.DoubleQuoted,
             ):
-                if logger.isEnabledFor(logging.WARNING):
+                if EMIT_FEEDBACK_REQUESTS:
                     try:
                         raise FeedbackWantedWarning(
                             "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholved/issues/2",
@@ -887,7 +1164,10 @@ class ResolvedScript(object):
                         pass
                 return
             elif not ok2:
-                logger.info("   Command is dynamic")
+                logger.info("   Command is dynamic, %r", node)
+                if word1 == "alias":
+                    logger.debug("dynamic alias :( %r", node)
+                    cmdlikes[word1].alias = True
                 # DEBUG: print(node)
                 for part in w_ob2.parts:
                     bad_token = find_dynamic_token(part)
@@ -907,6 +1187,11 @@ class ResolvedScript(object):
                             # and walk it all the way back out to the string
                             # passed into the original function call to treat
                             # *that* as the token to resolve.
+                            logger.debug(
+                                "allowing dynamic command with numeric varsub %r:%r",
+                                word1,
+                                bad_token.val,
+                            )
                             return
                         # TODO: practice below mostly considers part vars like
                         # $HOME/blah or $PREFIX/blah, but there are other
@@ -923,6 +1208,11 @@ class ResolvedScript(object):
                             bad_token.id == Id.VSub_Name
                             and (word1, bad_token.val) in self.allowed
                         ):
+                            logger.debug(
+                                "allowing dynamic command with exempted named ${varsub} %r:%r",
+                                word1,
+                                bad_token.val,
+                            )
                             return
                         # Letting $name-style subs through only if they're in
                         # a list of allowed names. (goal: require conscious
@@ -932,11 +1222,15 @@ class ResolvedScript(object):
                             # [1:] to leave off the $
                             and (word1, bad_token.val[1:]) in self.allowed
                         ):
+                            logger.debug(
+                                "allowing dynamic command with exempted named $varsub %r:%r",
+                                word1,
+                                bad_token.val[1:],
+                            )
                             return
                         else:
                             raise ResolutionError(
-                                # TODO: crap phrasing
-                                "Can't resolve %r with an argument that can't be statically parsed",
+                                "Can't resolve %r with a dynamic argument",
                                 w_ob1.parts[0].val,
                                 word=w_ob2,
                                 token=bad_token,
@@ -952,8 +1246,12 @@ class ResolvedScript(object):
             else:
                 logger.info("   Command is static")
                 # No magic
-                if word1 in ("sudo", "command", "eval", "exec"):
-                    self.record_word(w_ob2, word2)
+                if word1 in ("command", "eval"):
+                    # TODO: not absolutely certain about resolution order here
+                    self.record_command_cmd(w_ob2, word2)
+                elif word1 in ("sudo", "exec"):
+                    # TODO: not absolutely certain about resolution order here
+                    self.record_external_cmd(w_ob2, word2)
                 elif word1 in (".", "source"):
                     # CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
                     target = lookup(word2)
@@ -968,19 +1266,20 @@ class ResolvedScript(object):
                         #     word=w_ob2,
                         #     status=2,
                         # )
-                        self.record_source(w_ob2, word2, target)
-                    # it seems to resolve relative filenames for files in the current
-                    # directory, no matter what path is set to...
+                        self.record_external_source(w_ob2, word2)
+                    # lookup() seems to resolve relative filenames for files in the
+                    # current directory, no matter what path is set to...
                     elif target == word2:
                         # TODO: I guess these all need to get prefxed with $out?
-                        self.record_source(w_ob2, word2, target)
+                        self.record_external_source(w_ob2, word2)
                     # it resolved to a new location
                     elif target:
-                        self.record_source(w_ob2, word2, target)
+                        self.record_external_source(w_ob2, word2, replace_with=target)
                     # It didn't resolve, or it was an invalid absolute path
                     else:
-                        # self.unresolved_source.add(target)
-                        # I was recording this, but maybe we should just raise an exception
+                        # in theory I could pass this exception to the new
+                        # self.record_external_source, but this would mean we can't
+                        # fail as soon. Failing soon seems better, no?
                         raise ResolutionError(
                             "Unable to resolve source target %r to a known file",
                             word2,
@@ -988,14 +1287,103 @@ class ResolvedScript(object):
                             status=7,
                             arena=self.arena,
                         )
+                # TODO: there may a generalized handler for "varlikes" here, which
+                # oil defines as <id>=<stuff> but I'll say is more like:
+                # [<alias|declare|local|set>] [<<id>=<val>>...]
                 elif word1 == "alias":
-                    # try to handle all observed alias representations
-                    alias = word2.strip("\"='").split("=")[0]
-                    self.aliases.add(alias)
-                    # TODO: not sure this is the right thing to store here. Could be a set? Could save the expansion?
+                    # TODO: past time to extract some of these subtrees
+                    # into function so we can just call self.visit_alias(node)
+                    # or whatever. But do it in a single refactor--not now.
+                    #
+                    # aliases seem simple at a blush, but the defs
+                    # can also be very complex...
+                    # alias a=b a="b" a='b' "a=b" 'a=b' a=$b a="$b" a='$b' "a=$b" 'a=$b' 'a=echo $b', etc.
+                    #
+                    # code is ~v2 of trying to handle aliases.
+                    # - v1: try to spot alias identifiers to add to
+                    #   allowed unresolved "commands"
+                    #   # TODO: make sure the code's check order is aliases > functions > externals
+                    # - v2: try to extract alias/expansion pairs to
+                    #   - allow unresolved commands
+                    #   - make users triage externals in low-hanging-fruit
+                    #     alias definitions (resolve? ignore?)
+                    #   - TODO: do anything else with high-hanging fruit?
+                    logger.debug("alias node: %r", node)
+
+                    for w_ob in node.words[1:]:
+                        w_ok, w_text, _ = word_.StaticEval(w_ob)
+                        # TODO: for reasons I don't quite understand yet strings w/
+                        # varsubs pass static eval here; may have to unwrap them first?
+                        logger.debug(
+                            "alias (ok? %r) split %r",
+                            w_ok,
+                            w_text.strip("\"='").split("="),
+                        )
+                        if w_ok:
+                            # not dynamic
+                            # example values from tests/aliases.sh:
+                            # 'a', 'echo'
+                            # 'b', 'ls'
+                            # 'c', 'echo blah'
+                            # 'c1', 'echo blah'
+                            # 'd', 'echo $SOURCE_DATE_EPOCH'
+                            # 'd1', 'echo $SOURCE_DATE_EPOCH'
+                            # 'e', 'a'
+                            # 'f', 'b'
+                            # 'g', 'have_fun'
+                            # 'h', 'delay_definition'
+                            alias, definition = w_text.strip("\"='").split("=")
+                            # TODO: maybe below deserves an explicit API
+                            cmdlikes[alias].alias = True
+                            commandlike = definition.split()[0]
+
+                            pos = None
+
+                            # Finding pos is a little tricky, so annotating the logic
+                            # if the alias word has 2 parts, and the 2nd part is a token
+                            #     pos = the 2nd part's span_id
+                            # else
+                            #     *so far* it seems like pos is always
+                            #     the spid of the last part's first token OR part
+                            if (
+                                w_ob.parts
+                                and len(w_ob.parts) == 2
+                                and w_ob.parts[1]
+                                and isinstance(w_ob.parts[1], Token)
+                            ):
+                                logger.debug(
+                                    "in any case, %r has a span_id of %r",
+                                    w_ob.parts[1],
+                                    w_ob.parts[1].span_id,
+                                )
+                                pos = w_ob.parts[1].span_id
+                            else:
+                                trg = w_ob.parts[-1]
+                                logger.debug(
+                                    "it should be the second spid of the last part; %r has a span_id of %r",
+                                    trg,
+                                    trg.tokens[0].span_id
+                                    if hasattr(trg, "tokens")
+                                    else trg.parts[0].span_id,
+                                )
+                                pos = (
+                                    trg.tokens[0].span_id
+                                    if hasattr(trg, "tokens")
+                                    else trg.parts[0].span_id
+                                )
+
+                            self.record_alias_cmd(w_ob, commandlike, pos)
+                        else:
+                            raise ResolutionError(
+                                "As far as I can tell, this just won't happen %r :]",
+                                word2,
+                                word=w_ob2,
+                                status=8,
+                                arena=self.arena,
+                            )
 
     def _visit_command_ShFunction(self, node):
-        self.funcs_defined.add(node.name)
+        cmdlikes[node.name].function = True
 
     def _Visit(self, node):
         # TODO: may debug log here?

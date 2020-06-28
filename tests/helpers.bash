@@ -22,7 +22,6 @@ _expect_status() {
 # CAUTION: one gotcha; blank lines not included; you have to
 # adjust down for each one
 _expect_line() {
-    declare -p lines
     if [[ $1 -lt 0 ]]; then
         let lineno=$1
     else
@@ -31,8 +30,6 @@ _expect_line() {
     fi
 
     local line=${lines[$lineno]} kind=$2
-    local -p
-    declare -p lines
     case $kind in
         equals)
             if [[ $line == "$3" ]]; then
