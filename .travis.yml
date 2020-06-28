@@ -1,7 +1,0 @@
-language: nix
-os:
-  - osx
-  - linux
-
-script:
-  - nix-build ci.nix
