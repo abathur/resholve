@@ -9,9 +9,9 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 @test "verify warnings are thrown for quoted evals" {
   require <({
     status 0
-    line 2 contains "eval_quoted.sh:3: $quoted_eval"
-    line 5 contains "eval_quoted.sh:6: $quoted_eval"
-    line 8 contains "eval_quoted.sh:11: $quoted_eval"
+    line 3 contains "eval_quoted.sh:3: $quoted_eval"
+    line 6 contains "eval_quoted.sh:6: $quoted_eval"
+    line 9 contains "eval_quoted.sh:11: $quoted_eval"
   })
 } <<CASES
 resholver eval_quoted.sh
@@ -22,40 +22,40 @@ var_as_command="FEEDBACK WANTED: Letting dynamic command (first-word variable) t
 @test "verify warnings are thrown for variable-as-command" {
   require <({
     status 0
-    line 2 contains "variable_as_command.sh:7: $var_as_command"
-    line 5 contains "variable_as_command.sh:8: $var_as_command"
-    line 8 contains "variable_as_command.sh:9: $var_as_command"
-    line 11 contains "variable_as_command.sh:10: $var_as_command"
-    line 14 contains "variable_as_command.sh:11: $var_as_command"
+    line 3 contains "variable_as_command.sh:7: $var_as_command"
+    line 6 contains "variable_as_command.sh:8: $var_as_command"
+    line 9 contains "variable_as_command.sh:9: $var_as_command"
+    line 12 contains "variable_as_command.sh:10: $var_as_command"
+    line 15 contains "variable_as_command.sh:11: $var_as_command"
 
-    line 17 contains "variable_as_command.sh:17: $var_as_command"
-    line 20 contains "variable_as_command.sh:18: $var_as_command"
-    line 23 contains "variable_as_command.sh:19: $var_as_command"
+    line 18 contains "variable_as_command.sh:17: $var_as_command"
+    line 21 contains "variable_as_command.sh:18: $var_as_command"
+    line 24 contains "variable_as_command.sh:19: $var_as_command"
 
-    line 26 contains "variable_as_command.sh:23: $var_as_command"
-    line 29 contains "variable_as_command.sh:24: $var_as_command"
-    line 32 contains "variable_as_command.sh:25: $var_as_command"
-    line 35 contains "variable_as_command.sh:26: $var_as_command"
-    line 38 contains "variable_as_command.sh:27: $var_as_command"
+    line 27 contains "variable_as_command.sh:23: $var_as_command"
+    line 30 contains "variable_as_command.sh:24: $var_as_command"
+    line 33 contains "variable_as_command.sh:25: $var_as_command"
+    line 36 contains "variable_as_command.sh:26: $var_as_command"
+    line 39 contains "variable_as_command.sh:27: $var_as_command"
 
-    line 41 contains "variable_as_command.sh:33: $var_as_command"
-    line 44 contains "variable_as_command.sh:34: $var_as_command"
-    line 47 contains "variable_as_command.sh:35: $var_as_command"
-    line 50 contains "variable_as_command.sh:36: $var_as_command"
-    line 53 contains "variable_as_command.sh:37: $var_as_command"
+    line 42 contains "variable_as_command.sh:33: $var_as_command"
+    line 45 contains "variable_as_command.sh:34: $var_as_command"
+    line 48 contains "variable_as_command.sh:35: $var_as_command"
+    line 51 contains "variable_as_command.sh:36: $var_as_command"
+    line 54 contains "variable_as_command.sh:37: $var_as_command"
 
-    line 56 contains "variable_as_command.sh:43: $var_as_command"
-    line 59 contains "variable_as_command.sh:44: $var_as_command"
-    line 62 contains "variable_as_command.sh:45: $var_as_command"
+    line 57 contains "variable_as_command.sh:43: $var_as_command"
+    line 60 contains "variable_as_command.sh:44: $var_as_command"
+    line 63 contains "variable_as_command.sh:45: $var_as_command"
 
-    line 65 contains "variable_as_command.sh:49: $var_as_command"
-    line 68 contains "variable_as_command.sh:50: $var_as_command"
-    line 71 contains "variable_as_command.sh:51: $var_as_command"
+    line 66 contains "variable_as_command.sh:49: $var_as_command"
+    line 69 contains "variable_as_command.sh:50: $var_as_command"
+    line 72 contains "variable_as_command.sh:51: $var_as_command"
 
-    line 74 contains "variable_as_command.sh:69: $var_as_command"
-    line 77 contains "variable_as_command.sh:70: $var_as_command"
-    line 80 contains "variable_as_command.sh:71: $var_as_command"
-    line 83 contains "variable_as_command.sh:72: $var_as_command"
+    line 75 contains "variable_as_command.sh:69: $var_as_command"
+    line 78 contains "variable_as_command.sh:70: $var_as_command"
+    line 81 contains "variable_as_command.sh:71: $var_as_command"
+    line 84 contains "variable_as_command.sh:72: $var_as_command"
 
   })
 } <<CASES

@@ -18,15 +18,27 @@ _expect_status() {
     fi
 }
 
-# line (-)<num> equals|contains|begins|ends "value"
+# line (-)<num> equals|contains|begins|ends|!equals|!contains|!begins|!ends "value"
+# CAUTION: one gotcha; blank lines not included; you have to
+# adjust down for each one
 _expect_line() {
-    lineno=$1 line=${lines[$1]} kind=$2
+    declare -p lines
+    if [[ $1 -lt 0 ]]; then
+        let lineno=$1
+    else
+        # adjust to 0-index
+        let lineno=$1-1 || true # 1-0 causes let to return 1
+    fi
+
+    local line=${lines[$lineno]} kind=$2
+    local -p
+    declare -p lines
     case $kind in
         equals)
             if [[ $line == "$3" ]]; then
                 return 0
             else
-                echo "  expected line $lineno:"
+                echo "  expected line $1:"
                 echo "     '$3'"
                 echo "  actual:"
                 echo "     '$line'"
@@ -37,7 +49,7 @@ _expect_line() {
             if [[ $line == *"$3"* ]]; then
                 return 0
             else
-                echo "  expected line $lineno:"
+                echo "  expected line $1:"
                 echo "     '$3'"
                 echo "  actual:"
                 echo "     '$line'"
@@ -48,7 +60,7 @@ _expect_line() {
             if [[ $line == "$3"* ]]; then
                 return 0
             else
-                echo "  expected line $lineno to begin with:"
+                echo "  expected line $1 to begin with:"
                 echo "     '$3'"
                 echo "  actual line:"
                 echo "     '$line'"
@@ -59,7 +71,51 @@ _expect_line() {
             if [[ $line == *"$3" ]]; then
                 return 0
             else
-                echo "  expected line $lineno to end with:"
+                echo "  expected line $1 to end with:"
+                echo "     '$3'"
+                echo "  actual line:"
+                echo "     '$line'"
+                return 1
+            fi
+            ;;
+        !equals)
+            if [[ $line != "$3" ]]; then
+                return 0
+            else
+                echo "  expected line $1:"
+                echo "     '$3'"
+                echo "  actual:"
+                echo "     '$line'"
+                return 1
+            fi
+            ;;
+        !contains)
+            if [[ $line != *"$3"* ]]; then
+                return 0
+            else
+                echo "  expected line $1:"
+                echo "     '$3'"
+                echo "  actual:"
+                echo "     '$line'"
+                return 1
+            fi
+            ;;
+        !begins)
+            if [[ $line != "$3"* ]]; then
+                return 0
+            else
+                echo "  expected line $1 to begin with:"
+                echo "     '$3'"
+                echo "  actual line:"
+                echo "     '$line'"
+                return 1
+            fi
+            ;;
+        !ends)
+            if [[ $line != *"$3" ]]; then
+                return 0
+            else
+                echo "  expected line $1 to end with:"
                 echo "     '$3'"
                 echo "  actual line:"
                 echo "     '$line'"
