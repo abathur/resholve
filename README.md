@@ -1,11 +1,14 @@
 # resholved - Resolve references to external dependencies in shell scripts
 
+![Test](https://github.com/abathur/resholved/workflows/Test/badge.svg)
+
 resholved [WIP] generates a copy of a shell script with external dependencies
 resolved to absolute paths. (It accomplishes this by leveraging the [Oil](https://github.com/oilshell/oil) shell's parser).
 
 Here's a rundown of where things stand:
 
-- This is functional, but I intend to seek out some bike-shedding over how things are named, so the APIs may change. From this point, I'll try to make sure I summarize those.
+- It is functional (and working for a living), but I intend to seek out some bike-shedding over how things are named, so the APIs may change. From this point, I'll try to make sure I summarize those in the [changelog](CHANGELOG.md).
+- I don't anticipate declaring an initial release until I feel like the option API/names are more stable/systematic.
 - Learning is self-serve for now. You can see how to use the Nix integration in [ci.nix](ci.nix). General script usage is hopefully clear enough from the tests and demo.
 - My short-term goal is to support packaging shell projects for the [Nix package manager](https://nixos.org/nix/) (and hopefully getting this support into Nixpkgs). As such, the current build process depends on Nix.
 - The script itself isn't Nix-specific--it can resolve dependencies from whatever paths you specify. *If you're interested in using resholved without Nix, I'll appreciate contributions that build out traditional Python build support.*
@@ -35,11 +38,11 @@ To run this demo yourself:
 nix-shell --run "./demo"
 ```
 
-I've included a copy of the output below, but you can also see a colored version [in the CI build log](https://travis-ci.org/github/abathur/resholved/jobs/669433171#L3844):
+The demo output is colored for easier reading, but I've included an example of the output below as well:
 
 ```
 $ nix-shell --run "./demo"
-1..11
+1..12
 
 --[ resholver < which_simple.sh (exit: 3) ]-------------------------------------
 
@@ -97,7 +100,7 @@ Original:
 Output:
 >>>   source $PWD/file_simple.sh
 >>>          ^~~~
->>> [ stdinNone ]:5: Can't resolve 'source' with an argument that can't be statically parsed
+>>> [ stdinNone ]:5: Can't resolve 'source' with a dynamic argument
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 4 Source, among others, needs an exemption for arguments containing variables
@@ -110,10 +113,10 @@ Diff:
 >>> @@ -1,2 +1,5 @@
 >>>  # resolves file from inputs
 >>> -file resholver
->>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file resholver
+>>> +/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file resholver
 >>> +
 >>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow resholved_inputs:/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 5 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH
@@ -128,11 +131,11 @@ Diff:
 >>>  which() {
 >>>      # resolves file here too
 >>> -    file "$@"
->>> +    /nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file "$@"
+>>> +    /nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file "$@"
 >>>  }
 >>> +
 >>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow resholved_inputs:/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file
 >>> +# resholved: allow resholved_inputs:which_simple.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -150,7 +153,7 @@ Original:
 Output:
 >>>   source $PWD/file_simple.sh
 >>>          ^~~~
->>> [ stdinNone ]:5: Can't resolve 'source' with an argument that can't be statically parsed
+>>> [ stdinNone ]:5: Can't resolve 'source' with a dynamic argument
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 7 Only some commands ('source' but NOT 'file', here) are checked for variable arguments.
@@ -164,12 +167,12 @@ Diff:
 >>>  # $HOME not blocking here; vars currently only checked in:
 >>>  #   alias command eval exec source|. sudo
 >>> -file $HOME/file_simple.sh
->>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file $HOME/file_simple.sh
+>>> +/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file $HOME/file_simple.sh
 >>>  # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
 >>>  source $PWD/file_simple.sh
 >>> +
 >>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow resholved_inputs:/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file
 >>> +# resholved: allow source:PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -184,12 +187,12 @@ Diff:
 >>>  # $HOME not blocking here; vars currently only checked in:
 >>>  #   alias command eval exec source|. sudo
 >>> -file $HOME/file_simple.sh
->>> +/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file $HOME/file_simple.sh
+>>> +/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file $HOME/file_simple.sh
 >>>  # PWD needs exemption: --allow source:PWD or ALLOWED_VARSUBS='source:PWD'
 >>>  source $PWD/file_simple.sh
 >>> +
 >>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/ckaibpafaixfdnnf6d47qps7wd0107rl-file-5.37/bin/file
+>>> +# resholved: allow resholved_inputs:/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file
 >>> +# resholved: allow source:PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -217,13 +220,44 @@ Diff:
 >>> @@ -1,2 +1,5 @@
 >>>  # resolves gettext from inputs
 >>> -source gettext.sh
->>> +source /nix/store/8wn0zg0jx82kqh7aymnd860mkqvkib3s-gettext-0.19.8.1/bin/gettext.sh
+>>> +source /nix/store/7y6vn8wr00zwkcnv830qjkra37gvd11p-gettext-0.20.1/bin/gettext.sh
 >>> +
 >>> +### resholved directives (auto-generated)
->>> +# resholved: allow resholved_inputs:/nix/store/8wn0zg0jx82kqh7aymnd860mkqvkib3s-gettext-0.19.8.1/bin/gettext.sh
+>>> +# resholved: allow resholved_inputs:/nix/store/7y6vn8wr00zwkcnv830qjkra37gvd11p-gettext-0.20.1/bin/gettext.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 11 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH
+
+--[ resholver --resolve-aliases < alias_riddle.sh (exit: 0) ]-------------------
+
+Diff:
+>>> --- original
+>>> +++ resolved
+>>> @@ -1,14 +1,18 @@
+>>>  # don't try to run me; I'll probably crash or hang or something
+>>>  # I'm just a succinct test for complex resolution logic...
+>>>  alias file="file -n" # the function
+>>> -alias find="find -H" find2="find -P" # external!
+>>> +alias find="/nix/store/w4vj07i9cq1g9vg9y0l44ijy80k9hlwz-findutils-4.7.0/bin/find -H" find2="/nix/store/w4vj07i9cq1g9vg9y0l44ijy80k9hlwz-findutils-4.7.0/bin/find -P" # external!
+>>>  
+>>>  function file(){
+>>>     file -n # the alias :P
+>>>  }
+>>>  
+>>>  file # I'm the alias
+>>> -command file # external
+>>> +command /nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file # external
+>>>  
+>>>  find # alias
+>>> -command find # external
+>>> +command /nix/store/w4vj07i9cq1g9vg9y0l44ijy80k9hlwz-findutils-4.7.0/bin/find # external
+>>> +
+>>> +### resholved directives (auto-generated)
+>>> +# resholved: allow resholved_inputs:/nix/store/w4vj07i9cq1g9vg9y0l44ijy80k9hlwz-findutils-4.7.0/bin/find
+>>> +# resholved: allow resholved_inputs:/nix/store/zp3m4d9mgri3knc7k59r3hvf93d0j69f-file-5.38/bin/file
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ok 12 Has (naive) context-specific resolution rules
 ```
 
 ### Nix demo
@@ -269,7 +303,7 @@ Ran 3 tests.
 OK
 ```
 
-I've made a [gist](https://gist.github.com/abathur/937877b1321f443400e0779314f2e02c) with this output, the resolved shell scripts, and the Nix code for each module. You can also see this output in the [CI logs](https://travis-ci.org/github/abathur/resholved/jobs/667731225#L4329) (though I leave out the resolved shunit2, since it's fairly long).
+I've made a [gist](https://gist.github.com/abathur/937877b1321f443400e0779314f2e02c) with this output, the resolved shell scripts, and the Nix code for each module. You can also see this output in the [CI logs](https://github.com/abathur/resholved/runs/816065777?check_suite_focus=true#step:5:5732) (though I leave out the resolved shunit2, since it's fairly long).
 
 This test is currently tied into the CI run (which includes the unit tests and both demos), so the best way to run it is:
 
@@ -286,3 +320,9 @@ The main areas I'm currently aware of:
 - resholved makes no attempt to perform deep/recursive analysis on commands that run other commands. Plainly, resholved *does* try to verify that "blah" in `command blah` resolves to a real command--but it won't resolve it if you do something cute like `command command command blah`. 
 - resholved doesn't have robust handling of variables that get executed like commands (this includes things like `eval $variable` and `"$run_as_command"` and `$GIT_COMMAND status`). There's some room for improvement here, but I also want to manage expectations--my goal is for resholved to handle low-hanging fruit.
     - there's a first-level complication about seeing-through the variables themselves, here--and then a second-level issue with seeing-through double-quoted strings
+- fc -s has interesting behavior that makes it hard to account for
+    - if I run `ls /tmp` and then `echo blah` and then `fc -s 'ls'`, it'll re-run that previous ls command
+        - if resholved rewrites ls to an absolute path, the fc -s command won't work as expected unless we also expand the ls inside the fc command
+    - if I run `ls /tmp` and then `fc -s tmp=sbin`, it'll run `ls /sbin`; if I then run `fc -s ls=stat`, it runs `stat /sbin`
+        - accounting for and triaging this will be very hard; there are no strict semantics here; we can substitute arbitrary text which could be executable names or arguments or even just parts of them; we'd have to be very explicitly parsing things out, or maybe extracting them into a mock test and running it, to know what to do
+    - For now this is unaddressed. It probably makes the most sense to just raise a warning about not handling fc and link to a doc or issue about it, but I'm inclined to put this off until someone asks about it.
