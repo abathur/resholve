@@ -51,7 +51,9 @@ let
     version = "unreleased";
 
     src = lib.cleanSource tests/nix/openssl/.;
-
+    # no aliases here, so this has no impact--just using it
+    # to illustrate the Nix API, and have a test that'll break
+    flags = [ "--resolve-aliases" ];
     scripts = [ "openssl.sh" ];
     inputs = [ shunit2 openssl.bin ];
 

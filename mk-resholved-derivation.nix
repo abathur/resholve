@@ -1,10 +1,10 @@
 { stdenv, lib, resholved, }:
 
-{ pname, src, version, scripts, inputs ? [ ], allow ? { }, passthru ? { }, ...
+{ pname, src, version, scripts, inputs ? [ ], allow ? { }, flags ? [ ], passthru ? { }, ...
 }@attrs:
 let
   inherit stdenv;
-  self = (stdenv.mkDerivation ((removeAttrs attrs [ "script" "inputs" "allow" ])
+  self = (stdenv.mkDerivation ((removeAttrs attrs [ "script" "inputs" "allow" "flags" ])
     // {
       inherit pname version src;
       buildInputs = [ resholved ];
@@ -15,9 +15,11 @@ let
         (lib.mapAttrsToList (name: value: map (y: name + ":" + y) value) allow);
       #LOGLEVEL="INFO";
       buildPhase = ''
+        set -x
         runHook preBuild
-        resholver ${toString scripts}
+        resholver ${toString (flags ++ scripts)}
         runHook postBuild
+        set +x
       '';
     }));
 in lib.extendDerivation true passthru self
