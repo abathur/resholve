@@ -198,6 +198,19 @@ parser.add_argument(
     help="Resolve commands inside an alias to absolute paths when possible.",
 )
 
+parser.add_argument(
+    "--insert-before-script",
+    action="store",
+    dest="insert_before",
+    help="Insert the argument before the first code line of the script.",
+)
+parser.add_argument(
+    "--insert-after-script",
+    action="store",
+    dest="insert_after",
+    help="Insert the argument after the last code line of the script.",
+)
+
 
 def lookup(word):
     if word not in executables:
@@ -205,11 +218,14 @@ def lookup(word):
     return executables[word]
 
 
-def resolve_script(script_path):
+# TODO: refactor to deduplicate this before/after stuff
+def resolve_script(script_path, insert_before=None, insert_after=None):
     if script_path in resolved_scripts:
         return resolved_scripts[script_path]
 
-    resolved = resolved_scripts[script_path] = ResolvedScript(script_path)
+    resolved = resolved_scripts[script_path] = ResolvedScript(
+        script_path, insert_before=insert_before, insert_after=insert_after
+    )
     return resolved
 
 
@@ -265,7 +281,9 @@ def punshow():
         to_write = set()
         if len(args.scripts) == 0:
             # None == <stdin>
-            resolved_scripts[None] = ResolvedScript()
+            resolved_scripts[None] = ResolvedScript(
+                insert_before=args.insert_before, insert_after=args.insert_after
+            )
             to_write.add(None)
 
         checked_scripts = list()
@@ -285,7 +303,9 @@ def punshow():
             return 2
 
         for script in checked_scripts:
-            resolve_script(script)
+            resolve_script(
+                script, insert_before=args.insert_before, insert_after=args.insert_after
+            )
             to_write.add(script)
 
         # cmdlikes are cross-source; try to resolve a single time
@@ -821,8 +841,7 @@ class CommandLike(object):
                     solution.no_change()
                     break
                 elif test:
-                    # external is the only case that can currently return more than just t/f
-                    # DIDDING: if I could walk the distinct_cro back to a list of sources that contained it, I could go ahead and mark that these sources need to add this to allowed.
+                    # only external can return more than just t/f
                     solution.replace_name_with(self.name, test)
                     for source in self.order_to_source[distinct_cro]:
                         source.allowed.add(("resholved_inputs", test))
@@ -937,7 +956,7 @@ class ResolvedScript(RecordCommandlike):
         """
         return parse_ctx.MakeOshParser(reader.FileLineReader(script, arena))
 
-    def __init__(self, script_path=None):
+    def __init__(self, script_path=None, insert_before=None, insert_after=None):
 
         # generally, defer work until we know the script loaded
         with (open(script_path) if script_path else sys.stdin) as script:
@@ -974,6 +993,9 @@ class ResolvedScript(RecordCommandlike):
         # actually initialize
         RecordCommandlike.__init__(self)
         self.arena = arena
+        self.root = node
+        self.insert_before = insert_before
+        self.insert_after = insert_after
 
         self.resolved_source = set()  # ResolvedSource objects
 
@@ -1032,6 +1054,30 @@ class ResolvedScript(RecordCommandlike):
             logger.debug("  The replacements are: %r", self.solutions)
             logger.debug("  They'll be made in this order: %r", replacements)
 
+        # if the user has specified a prepend string, find the first
+        # actual code span, so that we can inject before it.
+        if self.insert_before:
+            first_span = 0
+
+            first_node = self.root
+            while True:
+                if hasattr(first_node, "spids") and len(first_node.spids):
+                    first_span = first_node.spids[0]
+                    break
+                if hasattr(first_node, "words"):
+                    first_span = word_.LeftMostSpanForWord(first_node.words[0])
+                    break
+                first_node = first_node.children[0]
+
+            assert first_span <= replacements[0], (
+                "First identified code span (%r) is unexpectedly later than the first identified replacement (%r)."
+                % (first_span, replacements[0])
+            )
+
+            cursor.PrintUntil(first_span)
+            to.write("{:} # injected by resholved\n".format(self.insert_before))
+            cursor.PrintUntil(first_span + 1)
+
         for location in replacements:
             solution = self.solutions[location]
 
@@ -1054,6 +1100,9 @@ class ResolvedScript(RecordCommandlike):
                 raise e
 
         cursor.PrintUntil(self.arena.LastSpanId())
+
+        if self.insert_after:
+            to.write("{:} # injected by resholved\n".format(self.insert_after))
 
         self.write_directives(cursor)
         self.arena.PopSource()
