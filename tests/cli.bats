@@ -216,3 +216,35 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP < alias_riddle.sh
 CASES
+
+@test "Resolve aliases with --resolve-aliases" {
+  require <({
+    status 0
+    line 3 !contains "/nix/store"
+    line 4 contains 'find="/nix/store'
+    line 4 contains 'find2="/nix/store'
+    line 6 !contains "/nix/store"
+    line 8 !contains "/nix/store"
+    line 9 contains "/nix/store"
+    line 10 !contains "/nix/store"
+    line 11 contains "/nix/store"
+    line 12 equals "### resholved directives (auto-generated)"
+    # can't assert the ends; these get sorted
+    # and the hash makes unstable :(
+    line 13 begins "# resholved: allow resholved_inputs:/nix/store/"
+    line 14 begins "# resholved: allow resholved_inputs:/nix/store/"
+  })
+} <<CASES
+resholver --resolve-aliases < alias_riddle.sh
+CASES
+
+@test "Inject before and after script" {
+  require <({
+    status 0
+    line 6 equals "declare BEFORE # injected by resholved"
+    line -1 equals 'declare AFTER # injected by resholved'
+  })
+} <<CASES
+resholver --insert-before-script "declare BEFORE" --insert-after-script "declare AFTER" < find_beginning_and_end.sh
+resholver --insert-before-script "declare BEFORE" --insert-after-script "declare AFTER" < find_beginning_and_end2.sh
+CASES

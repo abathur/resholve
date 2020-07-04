@@ -411,6 +411,18 @@ def make_arg_parser(module):
         metavar="f",
         help="insert f after resolved script",
     )
+    # parser.add_argument(
+    #     "--insert-before-script",
+    #     action="store",
+    #     dest="insert_before",
+    #     help="Insert the argument before the first code line of the script.",
+    # )
+    # parser.add_argument(
+    #     "--insert-after-script",
+    #     action="store",
+    #     dest="insert_after",
+    #     help="Insert the argument after the last code line of the script.",
+    # )
     group3.add_argument(
         "--overwrite",
         action="store_true",
@@ -436,11 +448,14 @@ def lookup(word):
     return executables[word]
 
 
-def resolve_script(script_path):
+# TODO: refactor to deduplicate this before/after stuff
+def resolve_script(script_path, prologue=None, epilogue=None):
     if script_path in resolved_scripts:
         return resolved_scripts[script_path]
 
-    resolved = resolved_scripts[script_path] = ResolvedScript(script_path)
+    resolved = resolved_scripts[script_path] = ResolvedScript(
+        script_path, prologue=prologue, epilogue=epilogue
+    )
     return resolved
 
 
@@ -536,7 +551,10 @@ def punshow():
         if len(args.scripts) == 0:
             # None == <stdin>
             with sourcePATH(dict()):
-                resolved_scripts[None] = ResolvedScript(shebang=shebang)
+                # DOING TODO
+                resolved_scripts[None] = ResolvedScript(
+                    shebang=shebang, prologue=args.prologue, epilogue=args.epilogue
+                )
                 to_write.add(None)
 
         checked_scripts = list()
@@ -561,7 +579,8 @@ def punshow():
 
         with sourcePATH(script_map):
             for script in checked_scripts:
-                resolve_script(script)
+                # DOING TODO
+                resolve_script(script, prologue=args.prologue, epilogue=args.epilogue)
                 to_write.add(script)
 
         # cmdlikes are cross-source; try to resolve a single time
@@ -1121,7 +1140,7 @@ class CommandLike(object):
                     solution.no_change()
                     break
                 elif test:
-                    # only case that can currently return more than t/f is external
+                    # only external can return more than just t/f
                     solution.replace_name_with(self.name, test)
                     for source in self.order_to_source[distinct_cro]:
                         source.directives.keep.add((test,))
@@ -1269,8 +1288,8 @@ class ResolvedScript(RecordCommandlike):
         logger.debug("appending shebang: %r", shebang)
         return StringIO.StringIO((shebang if shebang else "") + fileob.read())
 
-    def __init__(self, script_path=None, shebang=""):
-
+    # DOING TODO
+    def __init__(self, script_path=None, shebang="", prologue=None, epilogue=None):
         # generally, defer work until we know the script loaded
         with (open(script_path) if script_path else sys.stdin) as script:
             if shebang:  # not allow_shebang:
@@ -1309,6 +1328,9 @@ class ResolvedScript(RecordCommandlike):
         # actually initialize
         RecordCommandlike.__init__(self)
         self.arena = arena
+        self.root = node
+        self.prologue = prologue
+        self.epilogue = epilogue
 
         self.resolved_source = set()  # ResolvedSource objects
 
@@ -1421,6 +1443,30 @@ class ResolvedScript(RecordCommandlike):
             logger.debug("  The replacements are: %r", self.solutions)
             logger.debug("  They'll be made in this order: %r", replacements)
 
+        # if the user has specified a prepend string, find the first
+        # actual code span, so that we can inject before it.
+        if self.prologue:
+            first_span = 0
+
+            first_node = self.root
+            while True:
+                if hasattr(first_node, "spids") and len(first_node.spids):
+                    first_span = first_node.spids[0]
+                    break
+                if hasattr(first_node, "words"):
+                    first_span = word_.LeftMostSpanForWord(first_node.words[0])
+                    break
+                first_node = first_node.children[0]
+
+            assert first_span <= replacements[0], (
+                "First identified code span (%r) is unexpectedly later than the first identified replacement (%r)."
+                % (first_span, replacements[0])
+            )
+
+            cursor.PrintUntil(first_span)
+            to.write("{:} # injected by resholved\n".format(self.prologue))
+            cursor.PrintUntil(first_span + 1)
+
         for location in replacements:
             solution = self.solutions[location]
 
@@ -1443,6 +1489,9 @@ class ResolvedScript(RecordCommandlike):
                 raise e
 
         cursor.PrintUntil(self.arena.LastSpanId())
+
+        if self.epilogue:
+            to.write("{:} # injected by resholved\n".format(self.epilogue))
 
         self.write_directives(cursor)
         self.arena.PopSource()
