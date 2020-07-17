@@ -5,6 +5,8 @@ on:
   schedule:
     # every sunday morning
     - cron: "0 0 * * 0"
+    # temp hourly job for perf data
+    - cron: "0 * * * *"
 jobs:
   tests:
     runs-on: ${{ matrix.os }}
