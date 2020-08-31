@@ -5,8 +5,6 @@ on:
   schedule:
     # every sunday morning
     - cron: "0 0 * * 0"
-    # temp hourly job for perf data
-    - cron: "0 * * * *"
 jobs:
   tests:
     runs-on: ${{ matrix.os }}
@@ -15,20 +13,6 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
-    - uses: cachix/install-nix-action@v10
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    - run: nix-build ci.nix
-  # temporary job to collect more information on assessment overhead?
-  macos_perf_test:
-    runs-on: macos-latest
-    steps:
-    - name: Disable syspolicy assessments
-      run: |
-        spctl --status
-        sudo spctl --master-disable
-        spctl --status || true
     - uses: actions/checkout@v2
     - uses: cachix/install-nix-action@v10
       with:
