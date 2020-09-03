@@ -28,7 +28,7 @@ this, but I also want to minimize the work it takes to get
 caught up with upstream at any given time.
 
 Unfortuately, forcing a namespace on Oil and using it in
-resholved isn't enough on its own.
+resholve isn't enough on its own.
 
 A byproduct of the fact that it isn't already packaged and
 that it runs on python2, is that oil's internal imports
@@ -163,7 +163,7 @@ allowed_varsubs = set()
 
 parser = argparse.ArgumentParser(
     description="Resolve external dependencies.",
-    epilog="<!> resholver also requires a PATH-format env, RESHOLVE_PATH, to resolve external commands and scripts from.",
+    epilog="<!> resholve also requires a PATH-format env, RESHOLVE_PATH, to resolve external commands and scripts from.",
 )
 parser.add_argument(
     "scripts",
@@ -438,7 +438,7 @@ class MultiKeyDefaultDict(dict):
 It's probably worth discussing the big picture before the next section. It may
 be a little arcane, but it's in the service of minimizing repeated work.
 
-When resholved process a script, it runs it through Oil's OSH parser and then
+When resholve process a script, it runs it through Oil's OSH parser and then
 visits the corresponding AST looking for "command-like" words (those used as
 if they are a command) to queue them for resolution. On encounter, we can't,
 rule out the possibility that it's an alias defined 3 scripts down a source
@@ -674,7 +674,7 @@ class OrderedCommandResolver(object):
     def resolve_keyword(self):
         """
         leaving kw unimplemented for now; I think oil's parser
-        should shield resholved from needing to worry about it
+        should shield resholve from needing to worry about it
 
         this may become relevant if we try to handle non-bash
         shells with different keywords
@@ -721,7 +721,7 @@ class OrderedCommandResolver(object):
         `compgen -b` run in GNU bash,
         version 5.0.9(1)-release (x86_64-apple-darwin17.7.0)
 
-        NOTE: if you're using resholved for some other shell and have
+        NOTE: if you're using resholve for some other shell and have
         a builtin not in this list, you can add an exemption with
         --allow builtin:<name>
         """
@@ -889,7 +889,7 @@ class RecordCommandlike(object):
         self.solutions[pos] = cmdlikes[word_text].request_command_solution(self)
 
     def record_external_cmd(self, word_object, word_text, position=None):
-        """Record command argument to `command` builtin."""
+        """Record command argument to commands known to run externals."""
         pos = self.get_word_position(word_object, position)
         self.solutions[pos] = cmdlikes[word_text].request_external_solution(self)
 
@@ -994,7 +994,7 @@ class ResolvedScript(RecordCommandlike):
         """
         self.in_doc_directives = set()
         for line in script:
-            if line.startswith("# resholved: allow"):
+            if line.startswith("# resholve: allow"):
                 self.in_doc_directives.add(allow_tuple(line[18:].strip()))
         script.seek(0)
         self.allowed.update(self.in_doc_directives, allowed_varsubs)
@@ -1003,11 +1003,11 @@ class ResolvedScript(RecordCommandlike):
         # we only want items that weren't already in the file
         if len(self.in_doc_directives) < len(self.allowed):
             if len(self.in_doc_directives) == 0:
-                cursor.f.write("\n### resholved directives (auto-generated)\n")
+                cursor.f.write("\n### resholve directives (auto-generated)\n")
             new_directives = self.allowed.difference(self.in_doc_directives)
             cursor.f.writelines(
                 [
-                    "# resholved: allow {:}:{:}\n".format(context, name)
+                    "# resholve: allow {:}:{:}\n".format(context, name)
                     for context, name in sorted(new_directives)
                 ]
                 + ["\n"]
@@ -1101,7 +1101,7 @@ class ResolvedScript(RecordCommandlike):
                         if EMIT_FEEDBACK_REQUESTS:
                             try:
                                 raise FeedbackWantedWarning(
-                                    "Letting dynamic command (first-word variable) through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholved/issues/3",
+                                    "Letting dynamic command (first-word variable) through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholve/issues/3",
                                     word=w_ob1,
                                     token=bad_token,
                                     status=77,
@@ -1154,7 +1154,7 @@ class ResolvedScript(RecordCommandlike):
                 if EMIT_FEEDBACK_REQUESTS:
                     try:
                         raise FeedbackWantedWarning(
-                            "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholved/issues/2",
+                            "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholve/issues/2",
                             w_ob1.parts[0].val,
                             word=w_ob2,
                             status=66,

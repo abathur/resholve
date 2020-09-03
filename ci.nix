@@ -2,9 +2,9 @@
 
 with pkgs;
 let
-  resholved = callPackage ./default.nix { };
+  resholve = callPackage ./default.nix { };
   shunit2 = with pkgs.shunit2;
-    resholved.buildResholvedPackage {
+    resholve.resholvePackage {
       inherit pname src version installPhase;
       scripts = [ "shunit2" ];
       inputs = [ coreutils gnused gnugrep findutils ];
@@ -25,7 +25,7 @@ let
         builtin = [ "setopt" ]; # zsh has it, not sure
       };
     };
-  test_module1 = resholved.buildResholvedPackage {
+  test_module1 = resholve.resholvePackage {
     pname = "testmod1";
     version = "unreleased";
 
@@ -40,7 +40,7 @@ let
       install libressl.sh $out/bin/libressl.sh
     '';
   };
-  test_module2 = resholved.buildResholvedPackage {
+  test_module2 = resholve.resholvePackage {
     pname = "testmod2";
     version = "unreleased";
 
@@ -56,7 +56,7 @@ let
       install openssl.sh $out/bin/openssl.sh
     '';
   };
-  test_module3 = resholved.buildResholvedPackage {
+  test_module3 = resholve.resholvePackage {
     pname = "testmod3";
     version = "unreleased";
 
@@ -74,7 +74,7 @@ let
   resolveTimeDeps = [ file findutils gettext ];
 
 in stdenv.mkDerivation {
-  name = "resholved-ci";
+  name = "resholve-ci";
   src = builtins.filterSource (path: type:
     type != "directory" || baseNameOf path
     == "tests") ./.;
@@ -82,7 +82,7 @@ in stdenv.mkDerivation {
     mkdir $out
   '';
   doCheck = true;
-  buildInputs = [ resholved.resholved bat ];
+  buildInputs = [ resholve.resholve bat ];
   propagatedBuildInputs = [ test_module3 ];
   checkInputs = [ bats ];
 

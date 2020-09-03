@@ -1,4 +1,4 @@
-{ stdenv, lib, resholved, }:
+{ stdenv, lib, resholve, }:
 
 { pname, src, version, scripts, inputs ? [ ], allow ? { }, flags ? [ ], passthru ? { }, ...
 }@attrs:
@@ -7,14 +7,14 @@ let
   self = (stdenv.mkDerivation ((removeAttrs attrs [ "script" "inputs" "allow" "flags" ])
     // {
       inherit pname version src;
-      buildInputs = [ resholved ];
+      buildInputs = [ resholve ];
       RESHOLVE_PATH = "${lib.makeBinPath inputs}";
       RESHOLVE_ALLOW = toString
         (lib.mapAttrsToList (name: value: map (y: name + ":" + y) value) allow);
       #LOGLEVEL="INFO";
       buildPhase = ''
         runHook preBuild
-        resholver ${toString (flags ++ scripts)}
+        resholve ${toString (flags ++ scripts)}
         runHook postBuild
       '';
     }));

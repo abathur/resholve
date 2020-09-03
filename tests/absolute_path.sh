@@ -1,1 +1,1 @@
-/usr/bin/which resholver
+/usr/bin/which resholve

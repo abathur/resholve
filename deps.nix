@@ -54,7 +54,7 @@ rec {
     nativeBuildInputs = [ git ];
   };
 
-  # resholved's primary dependency is this developer build of the oil shell.
+  # resholve's primary dependency is this developer build of the oil shell.
   oildev = python27.pkgs.buildPythonPackage rec {
     pname = "oil";
     version = "undefined";
@@ -107,8 +107,8 @@ rec {
 
 
     # These aren't, strictly speaking, nix/nixpkgs specific, but I've
-    # had hell upstreaming them. Pulling from resholved source and
-    # passing in from resholved.nix
+    # had hell upstreaming them. Pulling from resholve source and
+    # passing in from resholve.nix
     patches = oilPatches;
 
     buildInputs = [ readline cmark py-yajl makeWrapper ];

@@ -4,6 +4,6 @@
 # and isn't exempted with --allow PWD
 source $PWD/file_simple.sh
 
-### resholved directives (auto-generated)
-# resholved: allow source:PWD
+### resholve directives (auto-generated)
+# resholve: allow source:PWD
 

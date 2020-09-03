@@ -1,15 +1,15 @@
 /*
-This shell is for using resholved--it builds and loads
-resholved itself, not just resholved's dependencies.
+This shell is for using resholve--it builds and loads
+resholve itself, not just resholve's dependencies.
 */
 { pkgs ? import <nixpkgs> { } }:
 
 with pkgs;
 let
-  resholved = callPackage ./default.nix { doCheck=false; };
+  resholve = callPackage ./default.nix { doCheck=false; };
   resolveTimeDeps = [ file findutils gettext ];
   checkInputs = [ pkgs.bats ];
 in pkgs.mkShell {
-  buildInputs = [ resholved.resholved ] ++ checkInputs;
+  buildInputs = [ resholve.resholve ] ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
 }

@@ -7,7 +7,7 @@ let
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*
-    Resholved needs to patch Oil, but trying to avoid adding
+    resholve needs to patch Oil, but trying to avoid adding
     them all *to* nixpkgs, since they aren't specific to
     nix/nixpkgs.
     */
@@ -20,7 +20,7 @@ let
   };
   resolveTimeDeps = [ file findutils gettext ];
 in python27.pkgs.buildPythonApplication {
-  pname = "resholved";
+  pname = "resholve";
   version = "unreleased";
   src = rSrc;
   format = "other";
@@ -30,7 +30,7 @@ in python27.pkgs.buildPythonApplication {
   # TODO: try install -Dt $out/bin $src/yadm
   installPhase = ''
     mkdir -p $out/bin
-    install resholver $out/bin/
+    install resholve $out/bin/
   '';
   inherit doCheck;
   checkInputs = [ bats ];
@@ -43,7 +43,7 @@ in python27.pkgs.buildPythonApplication {
 
   meta = {
     description = "Resolve external shell-script dependencies";
-    homepage = "https://github.com/abathur/resholved";
+    homepage = "https://github.com/abathur/resholve";
     license = with stdenv.lib.licenses; [
       mit
     ];

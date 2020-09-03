@@ -5,11 +5,11 @@
 
 with pkgs;
 let
-  resholved = callPackage ./resholved.nix { inherit doCheck; };
-  buildResholvedPackage =
-    callPackage ./mk-resholved-derivation.nix { inherit resholved; };
+  resholve = callPackage ./resholve.nix { inherit doCheck; };
+  resholvePackage =
+    callPackage ./resholve-package.nix { inherit resholve; };
 
 in {
-  inherit resholved;
-  inherit buildResholvedPackage;
+  inherit resholve;
+  inherit resholvePackage;
 }

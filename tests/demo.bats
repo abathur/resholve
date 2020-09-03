@@ -16,73 +16,73 @@ load demo
     status 3
   })
 } <<CASES
-resholver < which_simple.sh
+resholve < which_simple.sh
 CASES
 
 @test "Even in a function, 'which' needs to be in RESHOLVE_PATH" {
   demo "command_in_function.sh" <(status 3)
 } <<CASES
-resholver < command_in_function.sh
+resholve < command_in_function.sh
 CASES
 
 @test "Absolute executable paths need exemptions" {
   demo "absolute_path.sh" <(status 5)
 } <<CASES
-resholver < absolute_path.sh
+resholve < absolute_path.sh
 CASES
 
 @test "Source, among others, needs an exemption for arguments containing variables" {
   demo "source_var_pwd.sh" <(status 6)
 } <<CASES
-resholver < source_var_pwd.sh
+resholve < source_var_pwd.sh
 CASES
 
 @test "Resolves unqualified 'file' to absolute path from RESHOLVE_PATH" {
   demo "file_simple.sh" <(status 0)
 } <<CASES
-resholver < file_simple.sh
+resholve < file_simple.sh
 CASES
 
 # TODO: maybe it better illustrates to just collapse this test with the above (and tests 1 and 2)
 @test "Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH" {
   demo "file_in_function.sh" <(status 0)
 } <<CASES
-resholver < file_in_function.sh
+resholve < file_in_function.sh
 CASES
 
 @test "Only some commands ('source' but NOT 'file', here) are checked for variable arguments." {
   demo "file_home_source_pwd.sh" <(status 6)
 } <<CASES
-resholver < file_home_source_pwd.sh
+resholve < file_home_source_pwd.sh
 CASES
 
 @test "Add an exemption with --allow <scope>:<name>" {
   demo "file_home_source_pwd.sh" <(status 0)
 } <<CASES
-resholver --allow source:PWD < file_home_source_pwd.sh
+resholve --allow source:PWD < file_home_source_pwd.sh
 CASES
 
 @test "Add an exemption with RESHOLVE_ALLOW="source:PWD"" {
   demo "file_home_source_pwd.sh" <(status 0)
 } <<CASES
-RESHOLVE_ALLOW="source:PWD" resholver < file_home_source_pwd.sh
+RESHOLVE_ALLOW="source:PWD" resholve < file_home_source_pwd.sh
 CASES
 
 @test "'source' targets also need to be in RESHOLVE_PATH" {
   demo "source_missing_target.sh" <(status 7)
 } <<CASES
-resholver < source_missing_target.sh
+resholve < source_missing_target.sh
 CASES
 
 @test "Resolves unqualified 'source' to absolute path from RESHOLVE_PATH" {
   demo "source_present_target.sh" <({
     status 0
-    line -1 begins "# resholved: allow resholved_inputs:/nix/store/"
+    line -1 begins "# resholve: allow resholved_inputs:/nix/store/"
     line -1 contains "-gettext-"
     line -1 ends "/bin/gettext.sh"
   })
 } <<CASES
-resholver < source_present_target.sh
+resholve < source_present_target.sh
 CASES
 
 @test "Has (naive) context-specific resolution rules" {
@@ -96,12 +96,12 @@ CASES
     line 9 contains "/nix/store"
     line 10 !contains "/nix/store"
     line 11 contains "/nix/store"
-    line 12 equals "### resholved directives (auto-generated)"
+    line 12 equals "### resholve directives (auto-generated)"
     # can't assert the ends; these get sorted
     # and the hash makes unstable :(
-    line 13 begins "# resholved: allow resholved_inputs:/nix/store/"
-    line 14 begins "# resholved: allow resholved_inputs:/nix/store/"
+    line 13 begins "# resholve: allow resholved_inputs:/nix/store/"
+    line 14 begins "# resholve: allow resholved_inputs:/nix/store/"
   })
 } <<CASES
-resholver --resolve-aliases < alias_riddle.sh
+resholve --resolve-aliases < alias_riddle.sh
 CASES

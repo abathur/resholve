@@ -1,6 +1,6 @@
 # Unsure about the name of this suite, but the intent is to collect tests
 # that try to stake out/exercise specific behavior that demonstrate and
-# codify where the boundaries of what resholved knows how to handle are.
+# codify where the boundaries of what resholve knows how to handle are.
 
 load helpers
 
@@ -14,7 +14,7 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
     line 9 contains "eval_quoted.sh:11: $quoted_eval"
   })
 } <<CASES
-resholver eval_quoted.sh
+resholve eval_quoted.sh
 CASES
 
 # TODO: replace w/ real test once issue is sorted
@@ -59,5 +59,5 @@ var_as_command="FEEDBACK WANTED: Letting dynamic command (first-word variable) t
 
   })
 } <<CASES
-resholver variable_as_command.sh
+resholve variable_as_command.sh
 CASES

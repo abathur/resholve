@@ -1,2 +1,2 @@
 # no inputs provide which
-which resholver
+which resholve
