@@ -1,5 +1,5 @@
 {
-  stdenv, callPackage, file, findutils, gettext, python27, bats,
+  stdenv, callPackage, file, findutils, gettext, python27, bats, bash,
 
   doCheck ? true
 }:
@@ -35,6 +35,9 @@ in python27.pkgs.buildPythonApplication {
   inherit doCheck;
   checkInputs = [ bats ];
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
+
+  # explicit interpreter for test suite; maybe some better way...
+  INTERP = "${bash}/bin/bash";
   checkPhase = ''
     PATH=$out/bin:$PATH
     patchShebangs .

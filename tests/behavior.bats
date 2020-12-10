@@ -14,7 +14,7 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
     line 9 contains "eval_quoted.sh:11: $quoted_eval"
   })
 } <<CASES
-resholve eval_quoted.sh
+resholve --interpreter $INTERP eval_quoted.sh
 CASES
 
 # TODO: replace w/ real test once issue is sorted
@@ -59,5 +59,5 @@ var_as_command="FEEDBACK WANTED: Letting dynamic command (first-word variable) t
 
   })
 } <<CASES
-resholve variable_as_command.sh
+resholve --interpreter $INTERP variable_as_command.sh
 CASES
