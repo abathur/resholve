@@ -1,15 +1,17 @@
-{ stdenv, fetchFromGitHub, makeWrapper,
-
-# re2c deps
-autoreconfHook,
-
-# py-yajl deps
-git,
-
-# oil deps
-readline, cmark, python27, file, glibcLocales,
-
-oilPatches ? []
+{ stdenv
+, fetchFromGitHub
+, makeWrapper
+, # re2c deps
+  autoreconfHook
+, # py-yajl deps
+  git
+, # oil deps
+  readline
+, cmark
+, python27
+, file
+, glibcLocales
+, oilPatches ? [ ]
 }:
 
 /*
@@ -30,9 +32,9 @@ rec {
     version = "1.0.3";
     sourceRoot = "${src.name}/re2c";
     src = fetchFromGitHub {
-      owner  = "skvadrik";
-      repo   = "re2c";
-      rev    = version;
+      owner = "skvadrik";
+      repo = "re2c";
+      rev = version;
       sha256 = "0grx7nl9fwcn880v5ssjljhcb9c5p2a6xpwil7zxpmv0rwnr3yqi";
     };
     nativeBuildInputs = [ autoreconfHook ];
@@ -103,7 +105,7 @@ rec {
 
     # TODO: not sure why I'm having to set this for nix-build...
     #       can anyone tell if I'm doing something wrong?
-    SOURCE_DATE_EPOCH=315532800;
+    SOURCE_DATE_EPOCH = 315532800;
 
 
     # These aren't, strictly speaking, nix/nixpkgs specific, but I've

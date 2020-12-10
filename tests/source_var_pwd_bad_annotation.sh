@@ -5,4 +5,4 @@
 source $PWD/file_simple.sh
 
 ### resholve directives (auto-generated)
-# resholve: allow HOME
+# resholve: keep HOME

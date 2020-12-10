@@ -56,16 +56,16 @@ CASES
 resholve --interpreter $INTERP < file_home_source_pwd.sh
 CASES
 
-@test "Add an exemption with --allow <scope>:<name>" {
+@test "Add an exemption with --keep <scope>:<name>" {
   demo "file_home_source_pwd.sh" <(status 0)
 } <<CASES
-resholve --interpreter $INTERP --allow source:PWD < file_home_source_pwd.sh
+resholve --interpreter $INTERP --keep 'source:\$PWD' < file_home_source_pwd.sh
 CASES
 
-@test "Add an exemption with RESHOLVE_ALLOW="source:PWD"" {
+@test "Add an exemption with RESHOLVE_ALLOW="source:\$PWD"" {
   demo "file_home_source_pwd.sh" <(status 0)
 } <<CASES
-RESHOLVE_ALLOW="source:PWD" resholve --interpreter $INTERP < file_home_source_pwd.sh
+RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < file_home_source_pwd.sh
 CASES
 
 @test "'source' targets also need to be in RESHOLVE_PATH" {
@@ -77,7 +77,7 @@ CASES
 @test "Resolves unqualified 'source' to absolute path from RESHOLVE_PATH" {
   demo "source_present_target.sh" <({
     status 0
-    line -1 begins "# resholve: allow resholved_inputs:/nix/store/"
+    line -1 begins "# resholve: keep /nix/store/"
     line -1 contains "-gettext-"
     line -1 ends "/bin/gettext.sh"
   })
@@ -96,12 +96,13 @@ CASES
     line 10 contains "/nix/store"
     line 11 !contains "/nix/store"
     line 12 contains "/nix/store"
-    line 13 equals "### resholve directives (auto-generated)"
+    line 13 begins "### resholve directives (auto-generated)"
     # can't assert the ends; these get sorted
     # and the hash makes unstable :(
-    line 14 begins "# resholve: allow resholved_inputs:/nix/store/"
-    line 15 begins "# resholve: allow resholved_inputs:/nix/store/"
+    line 14 equals "# resholve: fix aliases"
+    line 15 begins "# resholve: keep /nix/store/"
+    line 16 begins "# resholve: keep /nix/store/"
   })
 } <<CASES
-resholve --interpreter $INTERP --resolve-aliases < alias_riddle.sh
+resholve --interpreter $INTERP --fix aliases < alias_riddle.sh
 CASES

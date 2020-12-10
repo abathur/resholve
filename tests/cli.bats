@@ -17,7 +17,6 @@
 load helpers
 
 @test "invoking resholve without --interpreter prints an error" {
-  unset RESHOLVE_PATH
   require <({
     status 2
     line -1 equals "resholve: error: argument --interpreter is required"
@@ -30,8 +29,8 @@ CASES
 @test "invoking resholve without RESHOLVE_PATH prints an error" {
   unset RESHOLVE_PATH
   require <({
-    status 1
-    line -1 equals "AssertionError: RESHOLVE_PATH must be set"
+    status 2
+    line -1 equals "resholve: error: argument --path is required"
   })
 } <<CASES
 resholve --interpreter /usr/bin/env < file_simple.sh
@@ -96,7 +95,7 @@ CASES
 
   require <({
     status 0
-    line -1 begins "# resholve: allow resholved_inputs:/nix/store"
+    line -1 begins "# resholve: keep /nix/store"
     line -1 contains "-file-"
     line -1 ends "/bin/file"
   })
@@ -125,7 +124,7 @@ CASES
 resholve --interpreter $INTERP file_simple.sh source_present_target.sh source_present_target.sh
 CASES
 
-@test "resholve fails when scripts have dynamic elements that aren't 'allowed'" {
+@test "resholve fails when scripts have untriaged dynamic elements" {
 
   require <({
     status 6
@@ -136,44 +135,43 @@ resholve --interpreter $INTERP source_var_pwd.sh
 resholve --interpreter $INTERP source_home_pwd.sh
 CASES
 
-@test "resholve fails when 'allow' directives are misformatted" {
+@test "resholve fails when 'keep' directives are misformatted" {
 
   require <({
     status 2
-    line -1 contains "should be a scope:var pair"
+    line -1 ends "valid single-part keep directives: \$variable, absolute path"
   })
 } <<CASES
-resholve --interpreter $INTERP --allow source PWD source_var_pwd.sh
-resholve --interpreter $INTERP --allow PWD source_var_pwd.sh
+resholve --interpreter $INTERP --keep source PWD source_var_pwd.sh
+resholve --interpreter $INTERP --keep PWD source_var_pwd.sh
 resholve --interpreter $INTERP < source_var_pwd_bad_annotation.sh
 CASES
 
-@test "resholve fails when 'allow' directive doesn't specify the right thing" {
-
+@test "resholve fails when triage directive doesn't specify the right thing" {
   require <({
     status 6
     line -1 contains "Can't resolve 'source' with a dynamic argument"
   })
 } <<CASES
-resholve --interpreter $INTERP --allow command:PWD < source_var_pwd.sh
-RESHOLVE_ALLOW='command:PWD' resholve --interpreter $INTERP < source_var_pwd.sh
-resholve --interpreter $INTERP --allow source:HOME < source_var_pwd.sh
-RESHOLVE_ALLOW='source:HOME' resholve --interpreter $INTERP < source_var_pwd.sh
+resholve --interpreter $INTERP --keep command:\$PWD < source_var_pwd.sh
+RESHOLVE_KEEP='command:\$PWD' resholve --interpreter $INTERP < source_var_pwd.sh
+resholve --interpreter $INTERP --keep source:\$HOME < source_var_pwd.sh
+RESHOLVE_KEEP='source:\$HOME' resholve --interpreter $INTERP < source_var_pwd.sh
 resholve --interpreter $INTERP < source_var_pwd_misannotated.sh
-resholve --interpreter $INTERP --allow source:PWD < source_home_pwd.sh
-RESHOLVE_ALLOW='source:PWD' resholve --interpreter $INTERP < source_home_pwd.sh
+resholve --interpreter $INTERP --keep source:\$PWD < source_home_pwd.sh
+RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < source_home_pwd.sh
 CASES
 
 @test "resholve succeeds when 1x 'allow' directives are correct" {
 
   require <({
     status 0
-    line -2 equals "### resholve directives (auto-generated)"
-    line -1 equals "# resholve: allow source:PWD"
+    line -2 begins "### resholve directives (auto-generated)"
+    line -1 equals "# resholve: keep source:\$PWD"
   })
 } <<CASES
-resholve --interpreter $INTERP --allow source:PWD < source_var_pwd.sh
-RESHOLVE_ALLOW='source:PWD' resholve --interpreter $INTERP < source_var_pwd.sh
+resholve --interpreter $INTERP --keep 'source:\$PWD' < source_var_pwd.sh
+RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < source_var_pwd.sh
 resholve --interpreter $INTERP < source_var_pwd_annotated.sh
 CASES
 
@@ -181,35 +179,39 @@ CASES
 
   require <({
     status 0
-    line -3 equals "### resholve directives (auto-generated)"
-    # Note: the output order of these in-doc directives is sorted; it *should* be idempotent for equivalent inputs!
-    line -2 equals "# resholve: allow source:HOME"
-    line -1 equals "# resholve: allow source:PWD"
+    line -3 begins "### resholve directives (auto-generated)"
+    # Note: the output order of these in-doc directives is sorted;
+    # it *should* be idempotent for equivalent inputs!
+    line -2 equals "# resholve: keep source:\$HOME"
+    line -1 equals "# resholve: keep source:\$PWD"
   })
 } <<CASES
-resholve --interpreter $INTERP --allow source:PWD --allow source:HOME < source_home_pwd.sh
-RESHOLVE_ALLOW='source:PWD source:HOME' resholve --interpreter $INTERP < source_home_pwd.sh
-RESHOLVE_ALLOW='source:PWD' resholve --interpreter $INTERP --allow source:HOME < source_home_pwd.sh
-RESHOLVE_ALLOW='source:PWD' resholve --interpreter $INTERP < source_home_pwd_annotated_incomplete.sh
-resholve --interpreter $INTERP --allow source:PWD < source_home_pwd_annotated_incomplete.sh
+resholve --interpreter $INTERP --keep 'source:\$PWD' --keep 'source:\$HOME' < source_home_pwd.sh
+RESHOLVE_KEEP='source:\$PWD source:\$HOME' resholve --interpreter $INTERP < source_home_pwd.sh
+resholve --interpreter $INTERP --keep 'source:\$PWD source:\$HOME' < source_home_pwd.sh
+RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < source_home_pwd_annotated_incomplete.sh
+resholve --interpreter $INTERP --keep 'source:\$PWD' < source_home_pwd_annotated_incomplete.sh
 CASES
+# Note (Dec 12 2020): In case I reverse course on merging env directives:
+# The 3rd case previously confirmed that envvars were merged with flags and
+# in-doc directives. I moved 'source:\$HOME' from RESHOLVE_KEEP into --keep
 
-@test "Don't resolve aliases without --resolve-aliases" {
+@test "Don't resolve aliases without' '--fix aliases'" {
   require <({
     status 0
     line 4 !contains "/nix/store"
     line 5 !contains 'find="/nix/store'
-    line 6 !contains 'find2="/nix/store'
+    line 5 !contains 'find2="/nix/store'
     line 7 !contains "/nix/store"
     line 9 !contains "/nix/store"
     line 10 contains "/nix/store"
     line 11 !contains "/nix/store"
     line 12 contains "/nix/store"
-    line 13 equals "### resholve directives (auto-generated)"
+    line 13 begins "### resholve directives (auto-generated)"
     # can't assert the ends; these get sorted
     # and the hash makes unstable :(
-    line 14 begins "# resholve: allow resholved_inputs:/nix/store/"
-    line 15 begins "# resholve: allow resholved_inputs:/nix/store/"
+    line 14 begins "# resholve: keep /nix/store/"
+    line 15 begins "# resholve: keep /nix/store/"
   })
 } <<CASES
 resholve --interpreter $INTERP < alias_riddle.sh

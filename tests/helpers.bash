@@ -143,7 +143,7 @@ require() {
     # casenum=0
     for case in "${_cases[@]}"; do
         # ((casenum = casenum + 1))#
-        run eval "$case"
+        run eval "${case@E}"
         # echo "#  ${BATS_TEST_NUMBER}-${casenum}: ${case%$'\n'}" >&3
         printf "status: %s\n" $status
         printf "output:\n%s" "$output"

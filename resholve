@@ -1,10 +1,16 @@
 #!/usr/bin/env python2
 from __future__ import print_function
 
+__version__ = "@version@"
+__version_info__ = (x for x in __version__.split("."))
+DIRECTIVE_FORMAT = "2"
+
 import sys
 import os
 import StringIO
-import argparse
+
+# TODO: one of the two below :)
+import configargparse as argparse
 import logging
 
 from collections import defaultdict
@@ -16,7 +22,6 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
 
 import oil
 import importlib
-
 
 """
 This is all a little arcane, so it's worth explaining a bit.
@@ -158,59 +163,271 @@ from oil.tools import osh2oil  # Cursor
 
 executables = dict()
 resolved_scripts = dict()
-allowed_varsubs = set()
 
 
-parser = argparse.ArgumentParser(
-    description="Resolve external dependencies.",
-    epilog="<!> resholve also requires a PATH-format env, RESHOLVE_PATH, to resolve external commands and scripts from.",
-)
-parser.add_argument(
-    "scripts",
-    metavar="SCRIPT",
-    type=str,
-    nargs="*",
-    help="Script paths to resolve. Scripts in Nix build/store paths will be overwritten. Elsewhere, written to '<script>.resolved'. Pass script on <stdin> and redirect <stdout> if you need to control destination.",
-)
+class ResolutionDirectives(object):
+    fake = fix = keep = None
+
+    def __init__(self, fake=None, fix=None, keep=None):
+        self.fake = fake or set()
+        self.fix = fix or set()
+        self.keep = keep or set()
+
+    def __len__(self):
+        return len(self.fake) + len(self.fix) + len(self.keep)
+
+    def update(self, *peers):
+        for peer in peers:
+            assert isinstance(peer, ResolutionDirectives)
+            self.fake.update(peer.fake)
+            self.fix.update(peer.fix)
+            self.keep.update(peer.keep)
+
+    @staticmethod
+    def _type_tuple(type, entry):
+        if len(entry) == 1:
+            return (type, entry[0])
+        if len(entry) == 2:
+            return (type, entry[0], entry[1])
+
+    def difference(self, *peers):
+        out = set()
+        for peer in peers:
+            assert isinstance(peer, ResolutionDirectives)
+            for fake in self.fake.difference(peer.fake):
+                out.add((self._type_tuple("fake", fake)))
+            for fix in self.fix.difference(peer.fix):
+                out.add((self._type_tuple("fix", fix)))
+            for keep in self.keep.difference(peer.keep):
+                out.add((self._type_tuple("keep", keep)))
+
+        return out
+
+    def relevant(self, name):
+        def rel_filt(val):
+            if len(val) == 1:
+                return name == val[0]
+            if len(val) == 2:
+                return name == val[1]
+
+        return self.__class__(
+            fake=filter(rel_filt, self.fake),
+            fix=filter(rel_filt, self.fix),
+            keep=filter(rel_filt, self.keep),
+        )
 
 
-def allow_tuple(value):
+directives = ResolutionDirectives()
+
+
+def parse_directive(value, scope_map=None):
+    if not len(value):
+        return None
+    out = set()
     try:
-        context, name = value.split(":")
+        directives = value.split(" ")
+        logger.debug("directives: %r", directives)
+        for directive in directives:
+            rules = directive.split(":")
+            if len(rules) == 1:
+                out.add((rules[0],))
+                continue
+            elif len(rules) == 2:
+                scope = rules[0] if not scope_map else scope_map(rules[0])
+                rules = rules[1]
+                rules = rules.split(";")
+                for rule in rules:
+                    out.add((scope, rule))
+            else:
+                raise argparse.ArgumentTypeError(
+                    "Directives may not have more than one colon: %r" % directive
+                )
     except ValueError as e:
-        raise argparse.ArgumentTypeError("%r should be a scope:var pair" % value)
-    return (context, name)
+        raise argparse.ArgumentTypeError(
+            "I don't recognize %r as a known directive. See 'man resholve'." % value
+        )
+    return out
 
 
-parser.add_argument(
-    "--allow",
-    dest="allowed_varsubs",
-    action="append",
-    metavar="scope:var",
-    help="Allow some violations (such as dynamic statements consisting ONLY of a variable). For example, '--allow source:HOME' allows $HOME in arguments to the source command. (List of options here is TODO and pending a QC round the option names/APIs.)",
-    type=allow_tuple,
-)
+FAKE_DIRECTIVE_MAP = {
+    "a": "alias",
+    "b": "builtin",
+    "e": "external",
+    "f": "function",
+    "k": "keyword",
+}
+FAKE_DIRECTIVE_TYPES = set(FAKE_DIRECTIVE_MAP.keys()) | set(FAKE_DIRECTIVE_MAP.values())
 
-parser.add_argument(
-    "--resolve-aliases",
-    action="store_true",
-    dest="resolve_aliases",
-    help="Resolve commands inside an alias to absolute paths when possible.",
-)
-parser.add_argument(
-    "--overwrite",
-    action="store_true",
-    dest="overwrite",
-    help="Replace script files instead of writing to script.resolved.",
-)
-parser.add_argument(
-    "--interpreter",
-    dest="interpreter",
-    type=str,
-    metavar="path",
-    help="Specify an interpreter for the shebang. Note: the interpreter doesn't otherwise impact how resholve interprets or rewrites a script.",
-    required=True,
-)
+
+def remap_fake_scope(scope):
+    global FAKE_DIRECTIVE_MAP
+    if scope in FAKE_DIRECTIVE_MAP:
+        return FAKE_DIRECTIVE_MAP[scope]
+    else:
+        return scope
+
+
+# TODO: arg tests for all of these formats
+def directive_fake(value):
+    global FAKE_DIRECTIVE_TYPES
+    directives = parse_directive(value, remap_fake_scope)
+    if not directives:
+        return None
+    for directive in directives:
+        if len(directive) == 1:
+            raise argparse.ArgumentTypeError(
+                "valid fake directives must have at least two parts"
+            )
+        elif directive[0] not in FAKE_DIRECTIVE_TYPES:
+            raise argparse.ArgumentTypeError(
+                "fake directive type (%r) is not one of %r"
+                % (directive[0], FAKE_DIRECTIVE_TYPES)
+            )
+
+    return directives
+
+
+def directive_fix(value):
+    directives = parse_directive(value)
+    if not directives:
+        return None
+    logger.debug("validating fix directives %r", directives)
+    for directive in directives:
+        if len(directive) == 1:
+            logger.debug("%r %r", directive[0], directive[0] == "aliases")
+            if directive[0] == "aliases":
+                pass  # ok literal
+            elif os.path.isabs(directive[0]):
+                pass  # ok absolute path
+            else:
+                raise argparse.ArgumentTypeError(
+                    "valid single-part fix directives: 'aliases', absolute path"
+                )
+        elif len(directive) == 2:
+            # we can't validate $variable or outer_command before parse
+            # but we can pre-validate command lookup for the target
+            target = lookup(directive[1])
+            if not target:
+                raise argparse.ArgumentTypeError(
+                    "I couldn't resolve '{command}' in directive {scope}:{command}".format(
+                        scope=directive[0], command=directive[1]
+                    )
+                )
+    return directives
+
+
+def directive_keep(value):
+    directives = parse_directive(value)
+    if not directives:
+        return None
+    logger.debug("validating keep directives %r", directives)
+    for directive in directives:
+        if len(directive) == 1:
+            if directive[0][0] == "$":
+                pass  # ok literal
+            elif os.path.isabs(directive[0]):
+                pass  # ok absolute path
+            else:
+                raise argparse.ArgumentTypeError(
+                    "valid single-part keep directives: $variable, absolute path"
+                )
+        elif len(directive) == 2:
+            pass
+            # can't do much to pre-validate these
+    return directives
+
+
+def make_arg_parser(module):
+    parser = module.ArgumentParser(
+        description="Resolve external command/script references in a shell script to absolute paths. This help is mainly a terse reminder of flag names--see 'man resholve' for usage information.",
+        usage="resholve [options] script ...",
+        auto_env_var_prefix="RESHOLVE_",
+        add_env_var_help=False,
+    )
+
+    group1 = parser.add_argument_group(title="Required arguments",)
+
+    group1.add_argument(
+        "scripts",
+        metavar="script",
+        type=str,
+        nargs="*",
+        help="script paths to resolve",
+    )
+
+    group1.add_argument(
+        "--path",
+        metavar="str",
+        dest="path",
+        type=str,
+        required=True,
+        help="paths to resolve commands from",
+    )
+
+    group1.add_argument(
+        "--interpreter",
+        dest="interpreter",
+        type=str,
+        metavar="p",
+        help="specify interpreter for shebang; does NOT otherwise impact how resholve interprets a script",
+        required=True,
+    )
+
+    group2 = parser.add_argument_group(title="Controlling Resolution",)
+
+    group2.add_argument(
+        "--fake",
+        metavar="str",
+        action="append",
+        type=directive_fake,
+        help="pretend some commands exist",
+    )
+    group2.add_argument(
+        "--fix",
+        metavar="str",
+        action="append",
+        type=directive_fix,
+        help="fix things we can't auto-fix/ignore",
+    )
+    group2.add_argument(
+        "--keep",
+        metavar="str",
+        action="append",
+        type=directive_keep,
+        help="keep things we can't auto-fix/ignore",
+    )
+
+    group3 = parser.add_argument_group(title="Other options")
+
+    group3.add_argument(
+        "--prologue",
+        type=argparse.FileType("r"),
+        metavar="f",
+        help="insert f before resolved script",
+    )
+    group3.add_argument(
+        "--epilogue",
+        type=argparse.FileType("r"),
+        metavar="f",
+        help="insert f after resolved script",
+    )
+    group3.add_argument(
+        "--overwrite",
+        action="store_true",
+        dest="overwrite",
+        help="Replace script files instead of writing to script.resolved.",
+    )
+    # group3.add_argument(
+    #     "--faff", type=int, metavar="int", help="fuzz n times for missed commands",
+    # )
+    parser.add_argument(
+        "--version", action="version", version="%(prog)s {:}".format(__version__),
+    )
+
+    return parser
+
+
+parser = make_arg_parser(argparse)
 
 
 def lookup(word):
@@ -288,22 +505,22 @@ def punshow():
     # that can be passed as kwargs or something...
     logger.debug("argparsed: %r", args)
 
-    if args.allowed_varsubs:
-        allowed_varsubs.update(args.allowed_varsubs)
+    if args.fake:
+        for group in args.fake:
+            directives.fake.update(group)
 
-    # FAIR WARNING: config envs below might change.
-    if "RESHOLVE_ALLOW" in os.environ:
-        allowed_varsubs.update(
-            allow_tuple(x) for x in os.environ["RESHOLVE_ALLOW"].split()
-        )
+    if args.fix:
+        for group in args.fix:
+            directives.fix.update(group)
 
-    # this is a lie; we'll look up against PATH without it--but it might be a common mis-use?
-    assert "RESHOLVE_PATH" in os.environ, "RESHOLVE_PATH must be set"
+    if args.keep:
+        for group in args.keep:
+            directives.keep.update(group)
 
     # adopt the runtime dependency path for resolving external executables
-    os.environ["PATH"] = os.environ["RESHOLVE_PATH"]
+    os.environ["PATH"] = args.path
 
-    if not args.resolve_aliases:
+    if ("aliases",) not in directives.fix:
         RecordCommandlike.disable_alias_replacement()
 
     if args.interpreter == "none":
@@ -333,10 +550,11 @@ def punshow():
                 sys.stderr.write("Aborting due to missing file: %r\n" % abs_script)
                 return 2
 
-        # TODO: this should probably explain why it's a problem
-        # or what to do about it, or something?
         if len(set(checked_scripts)) != len(checked_scripts):
-            sys.stderr.write("Aborting due to duplicate script targets.\n")
+            sys.stderr.write(
+                "Aborting due to duplicate script targets.\n"
+                "Verify your inputs and try again.\n"
+            )
             sys.stderr.write("  Original: %r\n" % args.scripts)
             sys.stderr.write("  Distinct: %r\n" % set(checked_scripts))
             return 2
@@ -355,7 +573,7 @@ def punshow():
             )
 
     except IOError as e:
-        sys.stderr.write("Whoooo buddy " + str(e))
+        sys.stderr.write("Whoooo buddy: " + str(e))
         return 2
     except ResolutionError as e:
         e.print_if_needed()
@@ -363,8 +581,11 @@ def punshow():
     except error._ErrorWithLocation as e:
         ui.PrettyPrintError(e)
         return e.exit_status
+    except InFileDirectiveError as e:
+        sys.stderr.write(str(e))
+        return 2
     except argparse.ArgumentTypeError as e:
-        sys.stderr.write("Hold up there, cowboy " + str(e))
+        sys.stderr.write("Hold up there, cowpoke: " + str(e))
         return 2
     # except Exception as e:
     #     raise e
@@ -476,6 +697,29 @@ if logger.isEnabledFor(logging.WARNING):
 
     class FeedbackWantedWarning(ResolutionWarning):
         label = "FEEDBACK WANTED: "
+
+
+class InFileDirectiveError(Exception):
+    directive = path = None
+    template = (
+        "There's a bad directive already in this file. You may need to\n"
+        "re-resholve it with the current version? Here's the context:\n\n"
+        "   parsing:  {script}\n"
+        " directive:  '{directive}'\n"
+        "     error:  {msg}\n"
+    )
+
+    def __init__(self, msg, path, directive, *args, **kwargs):
+        Exception.__init__(
+            self,
+            self.template.format(
+                msg=msg,
+                script=os.path.relpath(path),
+                directive=directive[0:-1],  # lop off newline
+            ),
+            *args,
+            **kwargs
+        )
 
 
 class SingleKeyDefaultDict(dict):
@@ -650,27 +894,19 @@ class OrderedCommandResolver(object):
         )
 
     def generate_external_resolver(self, relevant):
-        if ("unresholved_inputs", self.name) in relevant:
-            return self._true
-
-        if self.name.startswith("/"):
-            """
-            TODO: this work used to be done in resolve_records, where
-            it also did one other check. I'm pretty sure it's obsolete
-            now, but I'm documenting it here just in case. Probably OK
-            to remove this any time after Aug 1 2020.
-
-            It did something like:
-                # path is already properly resolved (probably by us)
-                basecommand = os.path.basename(command_word)
-                baseexecutable = lookup(basecommand)
-                if command_word == baseexecutable:
-                    continue
-            """
-            if ("resholved_inputs", self.name) in relevant:
+        if self.name.startswith("/") and os.path.isabs(self.name):
+            if (self.name,) in relevant.keep:
+                # user said keep this abspath
                 return self._true
+            elif (self.name,) in relevant.fix:
+                # user said to resolve this abspath as if it were bare
+                self.cmd.name = os.path.basename(self.name)
+                return self.resolve_external
             else:
                 return self._unexpected_absolute_path
+        # if self.name isn't absolute, see if ('external', self.name) is in fake directives?
+        elif ("external", self.name) in relevant.fake:
+            return self._true
 
         return self.resolve_external
 
@@ -682,13 +918,17 @@ class OrderedCommandResolver(object):
         # neither special builtins nor POSIX mode have special handling atm
         # just saving space for them in case...
         self.cro = (
-            self.resolve_alias,
-            self.resolve_keyword,
+            self._true if ("alias", self.name) in relevant.fake else self.resolve_alias,
+            self._true
+            if ("keyword", self.name) in relevant.fake
+            else self.resolve_keyword,
             self.resolve_special_builtin,
             self._true
-            if ("function", self.name) in relevant
+            if ("function", self.name) in relevant.fake
             else self.resolve_function,
-            self._true if ("builtin", self.name) in relevant else self.resolve_builtin,
+            self._true
+            if ("builtin", self.name) in relevant.fake
+            else self.resolve_builtin,
             self.generate_external_resolver(relevant),
         )
 
@@ -824,7 +1064,7 @@ class CommandLike(object):
     def scaffold_new_source(self, source):
         # only exemptions that match this commandlike's name
         # tuple only really for hashability...
-        relevant = tuple({x for x in source.allowed if x[1] == self.name})
+        relevant = source.directives.relevant(self.name)
 
         if relevant in self.known_exemptions:
             # new source, but no novel exemptions
@@ -881,11 +1121,10 @@ class CommandLike(object):
                     solution.no_change()
                     break
                 elif test:
-                    # external is the only case that can currently return more than just t/f
-                    # DIDDING: if I could walk the distinct_cro back to a list of sources that contained it, I could go ahead and mark that these sources need to add this to allowed.
+                    # only case that can currently return more than t/f is external
                     solution.replace_name_with(self.name, test)
                     for source in self.order_to_source[distinct_cro]:
-                        source.allowed.add(("resholved_inputs", test))
+                        source.directives.keep.add((test,))
                     break
 
             # TODO: rm if not seen for a while? Not sure how long... --Jun 27, 2020
@@ -1054,8 +1293,8 @@ class ResolvedScript(RecordCommandlike):
                 arena.PushSource(source.Stdin())
 
             # set([ (scope, identifier), ... ])
-            self.allowed = set()
-            self.parse_directives(script)
+            self.directives = ResolutionDirectives()
+            self.parse_directives(script, script_path)
 
             try:
                 node = main_loop.ParseWholeFile(
@@ -1081,33 +1320,87 @@ class ResolvedScript(RecordCommandlike):
             e.print_if_needed()
             raise e
 
-    def parse_directives(self, script):
+    def parse_directives(self, script, path):
         """
         read the tail of the file for directives;
         abort as soon as we find a nonmatching line
 
-        # resholve: allow scope:<identifier>
+        # resholve: <type> scope:<identifier>
         """
-        self.in_doc_directives = set()
+        global directives
+        path = path if path else "<stdin>"
+        self.in_doc_directives = ResolutionDirectives()
         for line in script:
-            if line.startswith("# resholve: allow"):
-                self.in_doc_directives.add(allow_tuple(line[18:].strip()))
+            if line.startswith("# resholve: "):
+                try:
+                    if line.startswith("# resholve: allow"):
+                        raise InFileDirectiveError(
+                            "While parsing resholve directives already in this "
+                            "script, I encountered an 'allow' directive from "
+                            "resholve(d)'s pre-history. The program no longer "
+                            "supports this directive format--you'll have to "
+                            "re-resholve this script with a modern version. ",
+                            path,
+                            line,
+                        )
+                    elif line.startswith("# resholve: fake"):
+                        self.in_doc_directives.fake.update(
+                            directive_fake(line[17:].strip())
+                        )
+                    elif line.startswith("# resholve: fix"):
+                        self.in_doc_directives.fix.update(
+                            directive_fix(line[16:].strip())
+                        )
+                    elif line.startswith("# resholve: keep"):
+                        self.in_doc_directives.keep.update(
+                            directive_keep(line[17:].strip())
+                        )
+                except argparse.ArgumentTypeError as e:
+                    raise InFileDirectiveError(e.message, path, line)
+            elif line.startswith(
+                "### resholve directives (auto-generated) ## format_version: "
+            ):
+                # some modern version
+                version = line[60:].strip()
+                if version != DIRECTIVE_FORMAT:
+                    logger.warning(
+                        "resholve version {:} with *native* directive "
+                        "fmt v{:} parsing directive fmt v{:}".format(
+                            __version__, DIRECTIVE_FORMAT, version
+                        )
+                    )
+                # TODO: haven't decided what we should do w/ mismatches
         script.seek(0)
-        self.allowed.update(self.in_doc_directives, allowed_varsubs)
+        self.directives.update(self.in_doc_directives, directives)
 
     def write_directives(self, cursor):
+        global DIRECTIVE_FORMAT
+        template = "\n### {:} ## {:}: {:}\n"
         # we only want items that weren't already in the file
-        if len(self.in_doc_directives) < len(self.allowed):
+        if len(self.in_doc_directives) < len(self.directives):
             if len(self.in_doc_directives) == 0:
-                cursor.f.write("\n### resholve directives (auto-generated)\n")
-            new_directives = self.allowed.difference(self.in_doc_directives)
+                cursor.f.write(
+                    template.format(
+                        "resholve directives (auto-generated)",
+                        "format_version",
+                        DIRECTIVE_FORMAT,
+                    )
+                )
+            new_directives = self.directives.difference(self.in_doc_directives)
             cursor.f.writelines(
                 [
-                    "# resholve: allow {:}:{:}\n".format(context, name)
-                    for context, name in sorted(new_directives)
+                    self.write_directive(directive)
+                    for directive in sorted(new_directives)
                 ]
                 + ["\n"]
             )
+
+    @staticmethod
+    def write_directive(directive):
+        if len(directive) == 3:
+            return "# resholve: {:} {:}:{:}\n".format(*directive)
+        elif len(directive) == 2:
+            return "# resholve: {:} {:}\n".format(*directive)
 
     def write_to(self, path=None):
         f = open(path, "w") if path else sys.stdout
@@ -1163,7 +1456,7 @@ class ResolvedScript(RecordCommandlike):
                 logger.info("Parsing sourced script %r", res_source)
                 resolved = self.__class__(res_source)
                 resolved_scripts[res_source] = resolved
-            self.allowed.add(("resholved_inputs", res_source))
+            self.directives.keep.add((res_source,))
 
     def _visit_command_Simple(self, node):
         if not node.words:
@@ -1176,36 +1469,39 @@ class ResolvedScript(RecordCommandlike):
                 bad_token = find_dynamic_token(part)
                 if bad_token:
                     # number subs are probably okayish?
-                    if bad_token.id == Id.VSub_Number:
+                    if bad_token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
+                        logger.debug(
+                            "allowing dynamic command (first-word variable) with positional ($1, $@, $*) varsub %r:%r",
+                            word1,
+                            bad_token.val,
+                        )
                         return
-                    # # this is how we'd exempt braced subs by name
-                    # elif (
-                    #     bad_token.id == Id.VSub_Name
-                    #     # TODO: not sure about this "variable_as_command" name
-                    #     and ("variable_as_command", bad_token.val) in self.allowed
-                    # ):
-                    #     return
-                    # # this is how we'd exempt unbraced subs by name
-                    # elif (
-                    #     bad_token.id == Id.VSub_DollarName
-                    #     # [1:] to leave off the $
-                    #     and ("variable_as_command", bad_token.val[1:]) in self.allowed
-                    # ):
-                    #     return
                     else:
-                        # Only spend time when enabled
-                        if EMIT_FEEDBACK_REQUESTS:
-                            try:
-                                raise FeedbackWantedWarning(
-                                    "Letting dynamic command (first-word variable) through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholve/issues/3",
-                                    word=w_ob1,
-                                    token=bad_token,
-                                    status=77,
-                                    arena=self.arena,
-                                )
-                            except FeedbackWantedWarning:
-                                pass
-                        return
+                        # normalize across braced and unbraced subs
+                        bad_token_name = None
+                        if bad_token.id == Id.VSub_Name:
+                            # add $ prefix
+                            bad_token_name = "${:}".format(bad_token.val)
+                        elif bad_token.id == Id.VSub_DollarName:
+                            # it already has $ prefixed
+                            bad_token_name = bad_token.val
+
+                        if (bad_token_name,) in self.directives.keep:
+                            # skip exempted name
+                            logger.debug(
+                                "allowing dynamic command (first-word variable) with exempted ${varsub} %r:%r",
+                                word1,
+                                bad_token.val,
+                            )
+                            return
+
+                        raise ResolutionError(
+                            "Can't resolve dynamic command (first-word variable)",
+                            word=w_ob1,
+                            token=bad_token,
+                            status=9,
+                            arena=self.arena,
+                        )
             else:
                 logger.debug(
                     "Couldn't statically evaluate 1st word object of command: %r", w_ob1
@@ -1272,19 +1568,9 @@ class ResolvedScript(RecordCommandlike):
                         #
                         # In practice, these could be paths we want to
                         # resolve, *or* be perfectly fine as is.
-                        if bad_token.id == Id.VSub_Number:
-                            # TODO: if there's a good way to walk back out
-                            # could record the outer context as sourcing
-                            # its arguments. But the naive version doesn't
-                            # give us much more than outright rejecting here.
-                            # A non-naive version would need to figure out
-                            # which numbered argument it was, be able to figure
-                            # out if set/shift were used to fiddle with it,
-                            # and walk it all the way back out to the string
-                            # passed into the original function call to treat
-                            # *that* as the token to resolve.
+                        if bad_token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
                             logger.debug(
-                                "allowing dynamic command with numeric varsub %r:%r",
+                                "allowing dynamic command with positional ($1, $@, $*) varsub %r:%r",
                                 word1,
                                 bad_token.val,
                             )
@@ -1302,7 +1588,7 @@ class ResolvedScript(RecordCommandlike):
                         # exceptions, but make them easy to add)
                         elif (
                             bad_token.id == Id.VSub_Name
-                            and (word1, bad_token.val) in self.allowed
+                            and (word1, bad_token.val) in self.directives.keep
                         ):
                             logger.debug(
                                 "allowing dynamic command with exempted named ${varsub} %r:%r",
@@ -1316,7 +1602,7 @@ class ResolvedScript(RecordCommandlike):
                         elif (
                             bad_token.id == Id.VSub_DollarName
                             # [1:] to leave off the $
-                            and (word1, bad_token.val[1:]) in self.allowed
+                            and (word1, bad_token.val) in self.directives.keep
                         ):
                             logger.debug(
                                 "allowing dynamic command with exempted named $varsub %r:%r",
@@ -1482,8 +1768,11 @@ class ResolvedScript(RecordCommandlike):
         cmdlikes[node.name].function = True
 
     def _Visit(self, node):
-        # TODO: may debug log here?
         cls = node.__class__
+        # TODO: maybe a custom loglevel for this? It's useful, but
+        # very situational and very spammy (especially on very large
+        # scripts). For now, just uncomment as needed...
+        # logger.debug("Visiting node %r (class: %r)", node, cls)
         if cls is command.Simple:
             self._visit_command_Simple(node)
 
@@ -1516,4 +1805,5 @@ class ResolvedScript(RecordCommandlike):
 
 
 if __name__ == "__main__":
+    # punshow()  # DEBUG: toggle comments here when you want exceptions
     sys.exit(punshow())

@@ -1,7 +1,7 @@
-GIT_PROGRAM="git"
-LS_PROGRAM="ls -la"
-STAT_HERE="stat ."
-ELSEWHERE=~/
+GIT_PROGRAM="gix"
+declare LS_PROGRAM="ls -la" GIT_PROGRAM="git"
+export STAT_HERE="stat ." LS_PROGRAM="ls -lat"
+readonly ELSEWHERE=~/
 STAT_ELSEWHERE="stat $ELSEWHERE"
 
 $GIT_PROGRAM status
@@ -72,3 +72,10 @@ ${@}
 "${@}"
 # '$@' # actual error
 # '${@}' # actual error
+
+$*
+${*}
+"$*"
+"${*}"
+# '$*' # actual error
+# '${*}' # actual error

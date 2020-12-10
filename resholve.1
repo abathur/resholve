@@ -1,0 +1,230 @@
+.\" WIP mdoc
+.Dd September 26, 2020
+.Dt RESHOLVE 1
+.Os
+.\" coolcomment
+.Sh NAME
+.Nm resholve
+.Nd resolve external command/script references in shell scripts
+.Sh SYNOPSIS
+.Nm
+.Op Ar options
+.Ar script
+.No ...
+.Nm
+.Op Ar options
+<
+.Ar script
+.Sh DESCRIPTION
+.Nm
+replaces bare references (subject to a PATH search at runtime) to external
+commands and scripts with absolute paths.
+.Pp
+This small super-power helps ensure script dependencies
+are declared, present, and don't unexpectely shift when the PATH changes.
+.Pp
+.Nm
+is developed to enable the Nix package manager to package and integrate
+Shell projects, but its features are not Nix-specific and inevitably have other
+applications.
+.Sh REQUIRED ARGUMENTS
+.Bl -tag -width 1n
+.It Ar script
+.Bl -bullet -compact
+.It
+given as input on <stdin>, write resolved script to <stdout>
+.It
+given a path, write to
+.Ar script Ns .resolved (unless
+.Fl Fl overwrite
+is used, in which case the script is replaced)
+.El
+.It Fl Fl interpreter Cm none | Ar path
+The absolute interpreter
+.Ar path
+for the script's shebang. The special value
+.Cm none
+ensures there is no shebang. See
+.Xr execve 2
+.It Fl Fl path Ar path | Pf RESHOLVE_PATH= Ar path
+A PATH-format list of paths to resholve external dependencies from.
+.El
+.Sh OPTIONS
+.Bd -literal
+.Fl Fl fake Ar directives
+.Fl Fl fix Ar directives
+.Fl Fl keep Ar directives
+.Ed
+.Bd -ragged -offset 3n -compact
+Adjust how resolution is performed. See
+.Sx CONTROLLING RESOLUTION .
+.Ed
+.\".Bd -literal
+.\".Fl Fl preresolved Eo ' Ns Ar name : Ns Ar abspath Ns Ec Ns ' | Pf RESHOLVE_PRERESOLVED= Eo ' Ns Ar name : Ns Ar abspath Ns Ec Ns '
+.\".Ed
+.\".Bd -ragged -offset 3n -compact
+.\"Provide exact paths for some external dependencies (override
+.\".Ar --path
+.\"and
+.\".Ar RESHOLVE_PATH Ns ).
+.\"It is an error if the path doesn't exist or is not used.
+.\".Ed
+.\".Bd -literal
+.\".Fl Fl prologue Ar file
+.\".Fl Fl epilogue Ar file
+.\".Ed
+.\".Bd -ragged -offset 3n -compact
+.\"Once the target script is resolved, inject
+.\".Ar file
+.\"immediately before or
+.\"after the target's active code.
+.\".Ed
+.Bl -tag -width x
+.It Fl Fl overwrite
+Resolve script in-place (useful for out-of-tree builds).
+.\".It Fl Fl lint
+.\"Report errors and warnings without outputting a resolved script.
+.\".It Fl Fl faff Ar n
+.\"Fuzz script
+.\".Ar n
+.\"times for missed commands.
+.It Fl Fl version
+Show brief syntax help.
+.It Fl Fl help
+Show usage summary.
+.El
+.Sh CONTROLLING RESOLUTION
+If resholve can't figure something out, you can often help it along with a mix
+of fake, fix, and keep
+.Ar directives .
+If quoted, directives can be separated
+by a space:
+.Eo ' Ns Ar directive Ns [
+.Ar directive ] Ns ... Ec Ns '
+.Bl -tag -width 2n
+.It Fl Fl fake Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_FAKE= Eo ' Ns Ar directives Ec Ns '
+Pretend some commands exist (if there's a good reason resholve doesn't know
+about them). There is one directive form:
+.Bl -tag -width 1n
+.It Ar type : Ns Ar name Ns [; Ns Ar name ] Ns ...
+Treat
+.Ar name Ns (s)
+of
+.Ar type
+as defined;
+.Ar type
+is the full word or first letter of:
+.Ar a Ns lias,
+.Ar b Ns uiltin,
+.Ar e Ns xternal,
+.Ar f Ns unction,
+or
+.Ar k Ns eyword.
+.It Ex: Fl Fl fake No 'f:setUp;tearDown builtin:setopt'
+.El
+.It Fl Fl fix Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_FIX= Eo ' Ns Ar directives Ec Ns '
+Fix some things it it isn't safe to fix/ignore by default. Directive forms:
+.Bl -tag -width 1n
+.\".It Ar outer_command : Ns Ar inner_command Ns [; Ns Ar inner_command ] Ns ...
+.\"resolve
+.\".Ar inner_command Ns (s)
+.\"in the arguments to outer_command
+.\".It $ Ns Ar variable : Ns Ar command Ns [; Ns Ar command ] Ns ... No (Note: $ may need escaping)
+.\"resolve
+.\".Ar command Ns (s)
+.\"in the definition of
+.\".No $ Ns Ar variable
+.It Ar absolute_path
+treat
+.Ar absolute_path
+as a bare reference that must be resolved
+.It Cm aliases
+resolve into alias definitions
+.It Ex: Fl Fl fix No 'aliases xargs:ls $GIT:gix'
+.El
+.It Fl Fl keep Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_KEEP= Eo ' Ns Ar directives Ec Ns '
+Ignore (omit errors for) some things it isn't safe to fix/ignore by default. Directive forms:
+.Bl -tag -width 1n
+.It Ar outer_command : Ns Ar inner_command Ns [; Ns Ar inner_command ] Ns ...
+ignore
+.Ar inner_command Ns (s)
+in the arguments to
+.Ar outer_command
+.\".It Ar command : Ns $ Ns Ar variable Ns [; Ns $ Ns Ar variable ] Ns ... No (Note: $ may need escaping)
+.\"ignore
+.\".No $ Ns Ar variable Ns (s)
+.\"in the arguments to
+.\".Ar command
+.\".It $ Ns Ar variable : Ns Ar command Ns [; Ns Ar command ] Ns ... No (Note: $ may need escaping)
+.\"ignore
+.\".Ar command Ns (s)
+.\"in the definition of
+.\".No $ Ns Ar variable
+.It $ Ns Ar variable No (Note: $ may need escaping)
+ignore
+.No $ Ns Ar variable
+used as all or part of a first word (command)
+.Pp
+Such as: `$GIT status` or `$BUSYBOX/ls`
+.It Ar absolute_path
+ignore a specific
+.Ar absolute_path
+.It Ex: Fl Fl keep No 'which:git;curl source:$HOME $LS:exa /etc/bashrc'
+.El
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width "RESHOLVE_KEEP" -compact
+.\".It  RESHOLVE_FAFF
+.It  RESHOLVE_INTERPRETER
+.It  RESHOLVE_PATH
+.It  RESHOLVE_FAKE
+.It  RESHOLVE_FIX
+.It  RESHOLVE_KEEP
+.\".It  RESHOLVE_PRERESOLVED
+.It  RESHOLVE_OVERWRITE
+.\".It  RESHOLVE_LINT
+.\".It  RESHOLVE_PROLOGUE
+.\".It  RESHOLVE_EPILOGUE
+.\" equivalent to --keep
+.El
+.\" .Sh FILES
+.\" .Sh EXIT STATUS
+.\" For sections 1, 6, and 8 only.
+.Sh EXAMPLES
+Basic invocations:
+.Bd -literal
+$ resholve --interpreter "$(which bash)" --path "$PATH" script.sh
+$ resholve --interpreter "$(which bash)" --path "$PATH" < script.sh
+$ resholve --interpreter "$(which bash)" --path "$PATH" script1.sh script2.sh
+.Ed
+.\" .Sh EXAMPLES
+.\" .Sh DIAGNOSTICS
+.\" For sections 1, 4, 6, 7, 8, and 9 printf/stderr messages only.
+.Sh LIMITATIONS
+.Nm
+is built on the bash-compatible OSH parser (from the Oil shell
+project). It can't handle any script OSH can't parse.
+.Bl -bullet
+.It
+Support for non-bash shells is a happy side-effect of how similar POSIX-ish
+shell languages are. If you run into a parse error with any non-bash syntax,
+your only real option is changing the script.
+.It
+If you run into a parse error with valid bash syntax, check Oil's
+issue tracker (https://github.com/oilshell/oil/issues)
+to see if the issue
+is known and whether it is likely to be fixed. If it won't be fixed, your only
+recourse is changing the script.
+.El
+.Sh "SEE ALSO"
+.Xr bash 1 ,
+.Xr osh 1 ,
+.Xr sh 1 ,
+.Xr execve 2
+.\" .Sh STANDARDS
+.\" .Sh HISTORY
+.Sh AUTHORS
+.An Travis A. Everett Aq Mt travis.a.everett@gmail.com
+.\" .Sh CAVEATS
+.\" .Sh BUGS
+.\" .Sh SECURITY CONSIDERATIONS

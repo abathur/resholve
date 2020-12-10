@@ -2,6 +2,23 @@
 
 resholve is not yet versioned (though it will be in the near future). Until it is, I'll list major changes by date.
 
+## Dec 14 2020
+- flags renamed/restructured
+    - tasks from `--allow` are now split out over `--keep` (the closest analogue to allow), `--fix`, and `--fake`
+    - "fake" directives instruct resholve to pretend some entities are defined if it can't locate them in the code (i.e., they come from another file, or are defined in eval-ed code.) This type subsumes the --allow alias/builtin/function/unresholved_inputs:name pattern(s).
+    - added a manpage documenting these flags
+- Nix API updated to track this (though there are some rough edges here that may beg for further iteration...)
+- it is now possible to instruct resholve to treat an absolute path as if it were a bare command (and thus resolve it) with `--fix /absolute/path`
+- more-consistent support for env-var equivalents to CLI arguments (generally, RESHOLVE_argname)
+- in-file-directive format updated (backwards-incompatible)
+- no longer merges directives in an environment variable with those provided in a flag. background: 
+    - resholve has a general pattern of liberally merging directives from multiple sources: ENV, space-separated in a single quoted flag argument, accumulated from multiple uses of the flag, and from in-document directives if present. 
+    - resholve is adopting an argument-parsing module (configargparse) which does not use the environment variable if the flag is used. I'd rather not row against it, so I'm dropping this support (but I'm open to reconsidering it if there's a compelling argument made later).
+- no longer raises a feedback warning for first-word variables (variables run as commands, or executables with a path-prefix variable).
+    - it now raises an error
+    - this error can be silenced with --keep '$variable' (implementing this feature is what un-blocks the change, which I've wanted to do for a bit)
+    - this fix is a short-term compromise; a principled solution to this issue will be more-complex: resolving the variable itself. But, this is a real issue, and I think this incremental step is a material improvement.
+
 ## Dec 10 2020
 This update marks the start of a period (*hopefully a short one*) with many breaking API changes. I am trying to get a few partially-finished features into the codebase, and will then be largely reworking the flag names before finally tagging an initial 0.1.0 release.
 - *BREAKING*: Improved handling of single packages with multiple scripts (such as submodules.) 

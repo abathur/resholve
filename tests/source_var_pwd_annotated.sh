@@ -5,5 +5,5 @@
 source $PWD/file_simple.sh
 
 ### resholve directives (auto-generated)
-# resholve: allow source:PWD
+# resholve: keep source:$PWD
 

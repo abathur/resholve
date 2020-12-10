@@ -1,9 +1,16 @@
-{
-  stdenv, callPackage, file, findutils, gettext, python27, bats, bash,
-
-  doCheck ? true
+{ stdenv
+, callPackage
+, installShellFiles
+, file
+, findutils
+, gettext
+, python27
+, bats
+, bash
+, doCheck ? true
 }:
 let
+  version = "0.1.0-unreleased";
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*
@@ -19,18 +26,28 @@ let
     ];
   };
   resolveTimeDeps = [ file findutils gettext ];
-in python27.pkgs.buildPythonApplication {
+in
+python27.pkgs.buildPythonApplication {
   pname = "resholve";
-  version = "unreleased";
+  # version = "0.1.0-unreleased";
+  inherit version;
   src = rSrc;
   format = "other";
 
-  propagatedBuildInputs = [ deps.oildev ];
+  nativeBuildInputs = [ installShellFiles ];
 
-  # TODO: try install -Dt $out/bin $src/yadm
+  propagatedBuildInputs = [ deps.oildev python27.pkgs.ConfigArgParse ];
+
+  patchPhase = ''
+    for file in resholve; do
+      substituteInPlace $file --subst-var-by version ${version}
+    done
+  '';
+
   installPhase = ''
     mkdir -p $out/bin
     install resholve $out/bin/
+    installManPage resholve.1
   '';
   inherit doCheck;
   checkInputs = [ bats ];

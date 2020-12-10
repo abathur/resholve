@@ -3,5 +3,6 @@ openssl_sh() {
     openssl version
     set +x
 }
+alias blah=openssl
 
 source shunit2

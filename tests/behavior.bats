@@ -17,47 +17,35 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 resholve --interpreter $INTERP eval_quoted.sh
 CASES
 
-# TODO: replace w/ real test once issue is sorted
-var_as_command="FEEDBACK WANTED: Letting dynamic command (first-word variable) through"
-@test "verify warnings are thrown for variable-as-command" {
+@test "verify --keep '$varname' allows dynamic commands (first-word variable)" {
   require <({
     status 0
-    line 3 contains "variable_as_command.sh:7: $var_as_command"
-    line 6 contains "variable_as_command.sh:8: $var_as_command"
-    line 9 contains "variable_as_command.sh:9: $var_as_command"
-    line 12 contains "variable_as_command.sh:10: $var_as_command"
-    line 15 contains "variable_as_command.sh:11: $var_as_command"
-
-    line 18 contains "variable_as_command.sh:17: $var_as_command"
-    line 21 contains "variable_as_command.sh:18: $var_as_command"
-    line 24 contains "variable_as_command.sh:19: $var_as_command"
-
-    line 27 contains "variable_as_command.sh:23: $var_as_command"
-    line 30 contains "variable_as_command.sh:24: $var_as_command"
-    line 33 contains "variable_as_command.sh:25: $var_as_command"
-    line 36 contains "variable_as_command.sh:26: $var_as_command"
-    line 39 contains "variable_as_command.sh:27: $var_as_command"
-
-    line 42 contains "variable_as_command.sh:33: $var_as_command"
-    line 45 contains "variable_as_command.sh:34: $var_as_command"
-    line 48 contains "variable_as_command.sh:35: $var_as_command"
-    line 51 contains "variable_as_command.sh:36: $var_as_command"
-    line 54 contains "variable_as_command.sh:37: $var_as_command"
-
-    line 57 contains "variable_as_command.sh:43: $var_as_command"
-    line 60 contains "variable_as_command.sh:44: $var_as_command"
-    line 63 contains "variable_as_command.sh:45: $var_as_command"
-
-    line 66 contains "variable_as_command.sh:49: $var_as_command"
-    line 69 contains "variable_as_command.sh:50: $var_as_command"
-    line 72 contains "variable_as_command.sh:51: $var_as_command"
-
-    line 75 contains "variable_as_command.sh:69: $var_as_command"
-    line 78 contains "variable_as_command.sh:70: $var_as_command"
-    line 81 contains "variable_as_command.sh:71: $var_as_command"
-    line 84 contains "variable_as_command.sh:72: $var_as_command"
-
+    line -1 begins "Rewrote"
+    line -1 ends "variable_as_command.sh.resolved'"
   })
 } <<CASES
-resholve --interpreter $INTERP variable_as_command.sh
+resholve --interpreter $INTERP --keep '\$GIT_PROGRAM \$LS_PROGRAM \$STAT_HERE \$STAT_ELSEWHERE' variable_as_command.sh
+CASES
+
+@test "Resolve aliases when specified" {
+  require <({
+    status 0
+    line 4 !contains "/nix/store"
+    line 5 contains 'find="/nix/store'
+    line 5 contains 'find2="/nix/store'
+    line 7 !contains "/nix/store"
+    line 9 !contains "/nix/store"
+    line 10 contains "/nix/store"
+    line 11 !contains "/nix/store"
+    line 12 contains "/nix/store"
+    line 13 begins "### resholve directives (auto-generated)"
+    # can't assert the ends; these get sorted
+    # and the hash makes unstable :(
+    line 14 equals "# resholve: fix aliases"
+    line 15 begins "# resholve: keep /nix/store/"
+    line 16 begins "# resholve: keep /nix/store/"
+  })
+} <<CASES
+resholve --interpreter $INTERP --fix aliases < alias_riddle.sh
+RESHOLVE_FIX=aliases resholve --interpreter $INTERP < alias_riddle.sh
 CASES
