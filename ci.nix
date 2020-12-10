@@ -6,7 +6,7 @@ let
   shunit2 = with pkgs.shunit2;
     resholve.resholvePackage {
       inherit pname src version installPhase;
-      scripts = [ "shunit2" ];
+      scripts = [ "bin/shunit2" ];
       inputs = [ coreutils gnused gnugrep findutils ];
       patchPhase = ''
         substituteInPlace shunit2 --replace "/usr/bin/od" "od"
@@ -31,13 +31,15 @@ let
 
     src = lib.cleanSource tests/nix/libressl/.;
 
-    scripts = [ "libressl.sh" ];
+    # submodule to demonstrate
+    scripts = [ "bin/libressl.sh" "submodule/helper.sh" ];
     inputs = [ jq test_module2 libressl.bin ];
     allow = { };
 
     installPhase = ''
-      mkdir -p $out/bin
+      mkdir -p $out/{bin,submodule}
       install libressl.sh $out/bin/libressl.sh
+      install submodule/helper.sh $out/submodule/helper.sh
     '';
   };
   test_module2 = resholve.resholvePackage {
@@ -48,7 +50,7 @@ let
     # no aliases here, so this has no impact--just using it
     # to illustrate the Nix API, and have a test that'll break
     flags = [ "--resolve-aliases" ];
-    scripts = [ "openssl.sh" ];
+    scripts = [ "bin/openssl.sh" ];
     inputs = [ shunit2 openssl.bin ];
 
     installPhase = ''
@@ -62,7 +64,7 @@ let
 
     src = lib.cleanSource tests/nix/future_perfect_tense/.;
 
-    scripts = [ "conjure.sh" ];
+    scripts = [ "bin/conjure.sh" ];
     inputs = [ test_module1 ];
 
     # TODO: try install -Dt $out/bin $src/yadm
@@ -88,6 +90,9 @@ in stdenv.mkDerivation {
 
   RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
 
+  # explicit interpreter for demo suite; maybe some better way...
+  INTERP = "${bash}/bin/bash";
+
   checkPhase = ''
     patchShebangs .
     printf "\033[33m============================= resholver demo ===================================\033[0m\n"
@@ -95,6 +100,6 @@ in stdenv.mkDerivation {
 
     printf "\033[33m============================= resholver Nix demo ===============================\033[0m\n"
     env -i $(type -p conjure.sh)
-    bat --paging=never --color=always $(type -p conjure.sh openssl.sh libressl.sh)
+    bat --paging=never --color=always $(type -p conjure.sh ${test_module2}/bin/openssl.sh ${test_module1}/bin/libressl.sh)
   '';
 }

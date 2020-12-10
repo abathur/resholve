@@ -2,6 +2,20 @@
 
 resholve is not yet versioned (though it will be in the near future). Until it is, I'll list major changes by date.
 
+## Dec 10 2020
+This update marks the start of a period (*hopefully a short one*) with many breaking API changes. I am trying to get a few partially-finished features into the codebase, and will then be largely reworking the flag names before finally tagging an initial 0.1.0 release.
+- *BREAKING*: Improved handling of single packages with multiple scripts (such as submodules.) 
+    - At least for now, all of the scripts you want to resolve should be passed (in the Nix api as `scripts`, and as final arguments on the command line).
+    - In order to make this work, I did need to shift the Nix API to run after the files were already in their final locations--during fixup phase (currently as preFixup). Before this change, `scripts` would be a list of filenames relative to the build, but it is now relative to $out.
+
+    If you had something like `scripts = [ "openssl.sh" ];` to resolve a script before installing it to `$out/bin/openssl.sh` the updated form is: `scripts = [ "bin/openssl.sh" ];`
+- *BREAKING*: resholve is now "handling" the interpreter/shebang. Since resholve doesn't actually understand your shebang, this takes a fairly explicit/declarative/idempotent approach. You now *must* specify an `--interpreter`, which may be
+    - a path, in which case any existing shebang will be stripped and a shebang pointing to only this interpreter added
+    - the magic string 'none', in which case any existing shebang will be stripped and nothing will replace it
+- Made the decision to overwrite a script or not explicit via the `--overwrite` flag (when passed as a path). 
+    - Before, resholve would only overwrite the script when it looked like it was running in a Nix build environment.
+    - The Nix `resholvePackage` function takes care of passing this option, so it should be transparent if you're using the Nix API.
+
 ## Sep 2 2020
 Rename resholved -> resholve (and resholver -> resholve)
 

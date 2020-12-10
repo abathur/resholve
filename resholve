@@ -3,8 +3,8 @@ from __future__ import print_function
 
 import sys
 import os
+import StringIO
 import argparse
-import fileinput
 import logging
 
 from collections import defaultdict
@@ -197,6 +197,20 @@ parser.add_argument(
     dest="resolve_aliases",
     help="Resolve commands inside an alias to absolute paths when possible.",
 )
+parser.add_argument(
+    "--overwrite",
+    action="store_true",
+    dest="overwrite",
+    help="Replace script files instead of writing to script.resolved.",
+)
+parser.add_argument(
+    "--interpreter",
+    dest="interpreter",
+    type=str,
+    metavar="path",
+    help="Specify an interpreter for the shebang. Note: the interpreter doesn't otherwise impact how resholve interprets or rewrites a script.",
+    required=True,
+)
 
 
 def lookup(word):
@@ -213,21 +227,16 @@ def resolve_script(script_path):
     return resolved
 
 
-def write_resolved_script(script_path, resolved):
+def write_resolved_script(script_path, resolved, overwrite=False):
     if not script_path:
         resolved.write_to()
-    elif "NIX_BUILD_TOP" in os.environ and script_path.startswith(
-        os.environ["NIX_BUILD_TOP"]
-    ):
-        logger.info(
-            "script %r located in nix build dir; will attempt to overwrite", script_path
-        )
+    elif overwrite:
+        logger.info("attempting to overwrite script %r", script_path)
         resolved.write_to(script_path)
         sys.stderr.write("Overwrote %r\n" % (script_path))
     else:
         logger.info(
-            "script %r not in Nix build dir; will attempt to write to: %s%s",
-            script_path,
+            "overwrite not set; will attempt to write to: %s%s",
             script_path,
             ".resolved",
         )
@@ -235,6 +244,42 @@ def write_resolved_script(script_path, resolved):
         sys.stderr.write(
             "Rewrote %r to %r\n" % (script_path, script_path + ".resolved")
         )
+
+
+def lookup_source(word):
+    """
+    wrap lookup(word) to special-case source lookups
+
+    lookup can't resolve something like `source submodule/helper.sh`
+    unless we add subdirs to PATH, but that could let all kinds of
+    stuff into the resolution scope.
+
+    Instead, we'll try to resolve source calls from the list of
+    input scripts before giving lookup a chance.
+
+    This is a little weird, but this is a not-implemented stub for
+    documentation. The business-end of this function is temporarily
+    published the sourcePATH() context manager during punshow()
+    """
+    raise NotImplementedError("lookup_source called outside of sourcePATH context")
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def sourcePATH(script_map):
+    global lookup_source
+
+    def contextual_lookup_source(word):
+        if word in script_map:
+            return script_map[word]
+        return lookup(word)
+
+    prev = lookup_source
+    lookup_source = contextual_lookup_source
+    yield
+    lookup_source = prev
 
 
 def punshow():
@@ -261,19 +306,31 @@ def punshow():
     if not args.resolve_aliases:
         RecordCommandlike.disable_alias_replacement()
 
+    if args.interpreter == "none":
+        shebang = None
+    else:
+        interp = args.interpreter
+        assert os.path.exists(interp), "Interpreter must exist or be the string 'none'"
+        assert os.path.isabs(interp), "Interpreter path must be absolute"
+        assert os.access(interp, os.X_OK), "Interpreter must be executable"
+        shebang = "#!{:}\n".format(interp)
     try:
         to_write = set()
         if len(args.scripts) == 0:
             # None == <stdin>
-            resolved_scripts[None] = ResolvedScript()
-            to_write.add(None)
+            with sourcePATH(dict()):
+                resolved_scripts[None] = ResolvedScript(shebang=shebang)
+                to_write.add(None)
 
         checked_scripts = list()
-        for script in map(os.path.abspath, args.scripts):
-            if os.path.exists(script):
-                checked_scripts.append(script)
+        script_map = dict()
+        for in_script in args.scripts:
+            abs_script = os.path.abspath(in_script)
+            if os.path.exists(abs_script):
+                checked_scripts.append(abs_script)
+                script_map[in_script] = abs_script
             else:
-                sys.stderr.write("Aborting due to missing file: %r\n" % script)
+                sys.stderr.write("Aborting due to missing file: %r\n" % abs_script)
                 return 2
 
         # TODO: this should probably explain why it's a problem
@@ -284,15 +341,18 @@ def punshow():
             sys.stderr.write("  Distinct: %r\n" % set(checked_scripts))
             return 2
 
-        for script in checked_scripts:
-            resolve_script(script)
-            to_write.add(script)
+        with sourcePATH(script_map):
+            for script in checked_scripts:
+                resolve_script(script)
+                to_write.add(script)
 
         # cmdlikes are cross-source; try to resolve a single time
         resolve_cmdlikes()
 
         for script_path in to_write:
-            write_resolved_script(script_path, resolved_scripts[script_path])
+            write_resolved_script(
+                script_path, resolved_scripts[script_path], args.overwrite
+            )
 
     except IOError as e:
         sys.stderr.write("Whoooo buddy " + str(e))
@@ -928,7 +988,16 @@ class ResolvedScript(RecordCommandlike):
 
     # We need to extract more info after hitting some firstwords
     # This list is just for noticing if something is breaking expectations
-    WATCH_FIRSTWORDS = {"sudo", "command", "eval", "exec", ".", "source", "alias"}
+    WATCH_FIRSTWORDS = {
+        "sudo",
+        "command",
+        "eval",
+        "exec",
+        ".",
+        "source",
+        "alias",
+        "env",
+    }
 
     @staticmethod
     def _make_parser(parse_ctx, script, arena):
@@ -937,10 +1006,37 @@ class ResolvedScript(RecordCommandlike):
         """
         return parse_ctx.MakeOshParser(reader.FileLineReader(script, arena))
 
-    def __init__(self, script_path=None):
+    def replace_shebang(self, fileob, shebang=False):
+        """
+        - skip over the shebang lines, else raise
+        - prepend new shebang if available
+        """
+        pos = fileob.tell()
+        line = fileob.readline()
+
+        while line[0:2] == "#!":
+            if shebang is False:
+                raise Exception(
+                    "Oh gosh :( you gotta get this shebang looked at", line, pos
+                )
+            elif shebang or shebang is None:
+                logger.debug("Skipping shebang line: %r", line)
+
+            pos = fileob.tell()
+            line = fileob.readline()
+
+        logger.debug("First non-shebang line: %r", line)
+        fileob.seek(pos)
+        logger.debug("appending shebang: %r", shebang)
+        return StringIO.StringIO((shebang if shebang else "") + fileob.read())
+
+    def __init__(self, script_path=None, shebang=""):
 
         # generally, defer work until we know the script loaded
         with (open(script_path) if script_path else sys.stdin) as script:
+            if shebang:  # not allow_shebang:
+                script = self.replace_shebang(script, shebang)
+
             arena = alloc.Arena()
             parse_ctx = parse_lib.ParseContext(
                 arena=arena,
@@ -1145,7 +1241,7 @@ class ResolvedScript(RecordCommandlike):
         # source?
 
         # TODO: should builtin be here? Currently not because we don't want to replace them...
-        if word1 in (".", "source", "sudo", "command", "eval", "exec", "alias"):
+        if word1 in self.WATCH_FIRSTWORDS:
             logger.info("Visiting command: %s %s", word1, word2)
             if word1 == "eval" and w_ob2.parts[0].tag in (
                 word_part_e.SingleQuoted,
@@ -1249,12 +1345,12 @@ class ResolvedScript(RecordCommandlike):
                 if word1 in ("command", "eval"):
                     # TODO: not absolutely certain about resolution order here
                     self.record_command_cmd(w_ob2, word2)
-                elif word1 in ("sudo", "exec"):
+                elif word1 in ("sudo", "exec", "env"):
                     # TODO: not absolutely certain about resolution order here
                     self.record_external_cmd(w_ob2, word2)
                 elif word1 in (".", "source"):
                     # CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
-                    target = lookup(word2)
+                    target = lookup_source(word2)
                     logger.debug("Looked up source: %r -> %r", word2, target)
                     # it was already a valid absolute path
                     if target == word2 and target[0] == "/":
