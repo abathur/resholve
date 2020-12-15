@@ -6,7 +6,7 @@ I've built two different demos to illustrate what you can do with resholve--one 
 
 If you'd like to run them yourself (you'll need Nix installed), start with:
 
-```console
+```shell
 git clone https://github.com/abathur/resholve.git
 cd resholve
 ```
@@ -20,13 +20,13 @@ This demo runs a handful of commands on a set of test `.sh` scripts (you can see
 
 To run this demo yourself:
 
-```console
+```shell
 nix-shell --run "./demo"
 ```
 
 The demo output is colored for easier reading, but I've included an example of the output below as well:
 
-```console
+```shell
 $ nix-shell --run "./demo"
 EOF
 
@@ -52,13 +52,13 @@ This demo (which is just a shell script executing with `set -x` enabled around p
 
 It is currently tied into the CI run, so for now you'll have to run the whole thing if you want to see it locally (sorry!):
 
-```console
+```shell
 nix-build ci.nix
 ```
 
 I'll try to keep these up-to-date, but if suspect this file is outdated you can also find the output at the end of the main phase of resholve's latest successful [weekly scheduled CI run](https://github.com/abathur/resholve/actions?query=branch%3Amaster+event%3Aschedule+is%3Asuccess).
 
-```console
+```shell
 $ nix-build ci.nix
 EOF
 
