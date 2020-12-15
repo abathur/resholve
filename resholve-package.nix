@@ -1,6 +1,5 @@
-{ stdenv, lib, resholve, bash }:
+{ stdenv, lib, resholve }:
 
-# faff = 5;
 { pname
 , src
 , version

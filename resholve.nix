@@ -10,7 +10,7 @@
 , doCheck ? true
 }:
 let
-  version = "0.1.0-unreleased";
+  version = "0.1.1";
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*
@@ -29,7 +29,6 @@ let
 in
 python27.pkgs.buildPythonApplication {
   pname = "resholve";
-  # version = "0.1.0-unreleased";
   inherit version;
   src = rSrc;
   format = "other";

@@ -1464,7 +1464,9 @@ class ResolvedScript(RecordCommandlike):
             )
 
             cursor.PrintUntil(first_span)
-            to.write("{:} # injected by resholved\n".format(self.prologue))
+            to.write("\n# begin prologue inserted by resholve\n")
+            to.write(self.prologue.read())
+            to.write("\n# end prologue inserted by resholve\n")
             cursor.PrintUntil(first_span + 1)
 
         for location in replacements:
@@ -1491,7 +1493,9 @@ class ResolvedScript(RecordCommandlike):
         cursor.PrintUntil(self.arena.LastSpanId())
 
         if self.epilogue:
-            to.write("{:} # injected by resholved\n".format(self.epilogue))
+            to.write("\n# begin epilogue inserted by resholve\n")
+            to.write(self.epilogue.read())
+            to.write("\n# end epilogue inserted by resholve\n")
 
         self.write_directives(cursor)
         self.arena.PopSource()
