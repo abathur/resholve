@@ -1,8 +1,9 @@
 # Changelog
 
-resholve is not yet versioned (though it will be in the near future). Until it is, I'll list major changes by date.
+## v0.1.1 (Dec 14 2020)
+Add actual code support for --prologue --epilogue, which were accidentally left out of v0.1.0
 
-## Dec 14 2020
+## v0.1.0 (Dec 14 2020)
 - flags renamed/restructured
     - tasks from `--allow` are now split out over `--keep` (the closest analogue to allow), `--fix`, and `--fake`
     - "fake" directives instruct resholve to pretend some entities are defined if it can't locate them in the code (i.e., they come from another file, or are defined in eval-ed code.) This type subsumes the --allow alias/builtin/function/unresholved_inputs:name pattern(s).
@@ -18,6 +19,8 @@ resholve is not yet versioned (though it will be in the near future). Until it i
     - it now raises an error
     - this error can be silenced with --keep '$variable' (implementing this feature is what un-blocks the change, which I've wanted to do for a bit)
     - this fix is a short-term compromise; a principled solution to this issue will be more-complex: resolving the variable itself. But, this is a real issue, and I think this incremental step is a material improvement.
+
+Before this point resholve was not versioned; major changes by date.
 
 ## Dec 10 2020
 This update marks the start of a period (*hopefully a short one*) with many breaking API changes. I am trying to get a few partially-finished features into the codebase, and will then be largely reworking the flag names before finally tagging an initial 0.1.0 release.
