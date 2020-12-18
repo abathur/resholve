@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.0 (Dec 17 2020)
+- add `--inputs` and `RESHOLVE_INPUTS` as aliases of `--path`
+  and `RESHOLVE_PATH`
+
 ## v0.1.1 (Dec 14 2020)
 Add actual code support for --prologue --epilogue, which were accidentally left out of v0.1.0
 

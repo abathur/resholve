@@ -26,11 +26,11 @@ resholve < file_simple.sh
 resholve file_simple.sh
 CASES
 
-@test "invoking resholve without RESHOLVE_PATH prints an error" {
+@test "invoking resholve without path/inputs prints an error" {
   unset RESHOLVE_PATH
   require <({
     status 2
-    line -1 equals "resholve: error: argument --path is required"
+    line -1 equals "resholve: error: one of the arguments --path --inputs is required"
   })
 } <<CASES
 resholve --interpreter /usr/bin/env < file_simple.sh
@@ -103,8 +103,31 @@ CASES
 resholve --interpreter $INTERP < file_simple.sh
 CASES
 
-@test "resholve fails if target script isn't found" {
+export FILE_PATH="$RESHOLVE_PATH"
+@test "path/inputs can be supplied with the inputs alias" {
+  unset RESHOLVE_PATH
+  export RESHOLVE_INPUTS=
+  declare -p FILE_PATH
+  require <({
+    status 0
+    line -1 contains "wrote "
+  })
+} <<CASES
+RESHOLVE_INPUTS="$FILE_PATH" resholve --interpreter $INTERP file_simple.sh
+resholve --inputs "$FILE_PATH" --interpreter $INTERP file_simple.sh
+CASES
 
+@test "only one of path/inputs can be supplied" {
+  require <({
+    status 2
+    line -1 equals "resholve: error: argument --inputs: not allowed with argument --path"
+  })
+} <<CASES
+RESHOLVE_INPUTS="$RESHOLVE_PATH" resholve --interpreter $INTERP < file_simple.sh
+resholve --inputs "$RESHOLVE_PATH" --interpreter $INTERP file_simple.sh
+CASES
+
+@test "resholve fails if target script isn't found" {
   require <({
     status 2
     line -1 begins "Aborting due to missing file: '/hopenot/file_simple.sh'"

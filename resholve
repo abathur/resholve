@@ -339,32 +339,35 @@ def directive_keep(value):
 
 def make_arg_parser(module):
     parser = module.ArgumentParser(
-        description="Resolve external command/script references in a shell script to absolute paths. This help is mainly a terse reminder of flag names--see 'man resholve' for usage information.",
+        description="Resolve external command/script references in a shell script to absolute paths. This is a terse reminder of flag names; see 'man resholve' for usage.",
         usage="resholve [options] script ...",
         auto_env_var_prefix="RESHOLVE_",
         add_env_var_help=False,
+        add_help=False,
     )
 
-    group1 = parser.add_argument_group(title="Required arguments",)
+    req = parser.add_argument_group(title="Required",)
+    req_path = req.add_mutually_exclusive_group(required=True)
 
-    group1.add_argument(
+    req.add_argument(
         "scripts",
         metavar="script",
         type=str,
         nargs="*",
         help="script paths to resolve",
     )
-
-    group1.add_argument(
+    req_path.add_argument(
         "--path",
         metavar="str",
         dest="path",
         type=str,
-        required=True,
         help="paths to resolve commands from",
     )
+    req_path.add_argument(
+        "--inputs", metavar="str", dest="path", type=str, help="alias for --path",
+    )
 
-    group1.add_argument(
+    req.add_argument(
         "--interpreter",
         dest="interpreter",
         type=str,
@@ -373,23 +376,23 @@ def make_arg_parser(module):
         required=True,
     )
 
-    group2 = parser.add_argument_group(title="Controlling Resolution",)
+    res = parser.add_argument_group(title="Controlling resolution",)
 
-    group2.add_argument(
+    res.add_argument(
         "--fake",
         metavar="str",
         action="append",
         type=directive_fake,
         help="pretend some commands exist",
     )
-    group2.add_argument(
+    res.add_argument(
         "--fix",
         metavar="str",
         action="append",
         type=directive_fix,
         help="fix things we can't auto-fix/ignore",
     )
-    group2.add_argument(
+    res.add_argument(
         "--keep",
         metavar="str",
         action="append",
@@ -397,42 +400,35 @@ def make_arg_parser(module):
         help="keep things we can't auto-fix/ignore",
     )
 
-    group3 = parser.add_argument_group(title="Other options")
+    other = parser.add_argument_group(title="Other")
 
-    group3.add_argument(
+    other.add_argument(
         "--prologue",
         type=argparse.FileType("r"),
         metavar="f",
-        help="insert f before resolved script",
+        help="insert file before resolved script",
     )
-    group3.add_argument(
+    other.add_argument(
         "--epilogue",
         type=argparse.FileType("r"),
         metavar="f",
-        help="insert f after resolved script",
+        help="insert file after resolved script",
     )
-    # parser.add_argument(
-    #     "--insert-before-script",
-    #     action="store",
-    #     dest="insert_before",
-    #     help="Insert the argument before the first code line of the script.",
-    # )
-    # parser.add_argument(
-    #     "--insert-after-script",
-    #     action="store",
-    #     dest="insert_after",
-    #     help="Insert the argument after the last code line of the script.",
-    # )
-    group3.add_argument(
+
+    other.add_argument(
         "--overwrite",
         action="store_true",
         dest="overwrite",
         help="Replace script files instead of writing to script.resolved.",
     )
-    # group3.add_argument(
+    # other.add_argument(
     #     "--faff", type=int, metavar="int", help="fuzz n times for missed commands",
     # )
-    parser.add_argument(
+    meta = parser.add_argument_group(title="Meta")
+    meta.add_argument(
+        "-h", "--help", action="help", help="show this help message and exit"
+    )
+    meta.add_argument(
         "--version", action="version", version="%(prog)s {:}".format(__version__),
     )
 
@@ -518,7 +514,18 @@ def punshow():
     args = parser.parse_args()
     # if it makes sense at some point, vars(args) yields a dict of these
     # that can be passed as kwargs or something...
-    logger.debug("argparsed: %r", args)
+    logger.info("argparsed: %r", args)
+    logger.debug("argument sources: \n%s", parser.format_values())
+
+    # adopt the runtime dependency path for resolving external executables
+    if args.path is None:
+        # made this not-required in order to support both "path" and
+        # "inputs" terminology (inputs is more nix-idiomatic) but
+        # store in a single dest; fake our own error
+        parser.error(
+            "argument --path/--inputs (or RESHOLVE_PATH/RESHOLVE_INPUTS) is required"
+        )
+    os.environ["PATH"] = args.path
 
     if args.fake:
         for group in args.fake:
@@ -531,9 +538,6 @@ def punshow():
     if args.keep:
         for group in args.keep:
             directives.keep.update(group)
-
-    # adopt the runtime dependency path for resolving external executables
-    os.environ["PATH"] = args.path
 
     if ("aliases",) not in directives.fix:
         RecordCommandlike.disable_alias_replacement()

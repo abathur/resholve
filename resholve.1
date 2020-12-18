@@ -48,6 +48,10 @@ ensures there is no shebang. See
 .Xr execve 2
 .It Fl Fl path Ar path | Pf RESHOLVE_PATH= Ar path
 A PATH-format list of paths to resholve external dependencies from.
+You may also use aliases
+.Fl Fl inputs
+or
+.Ev RESHOLVE_PATH .
 .El
 .Sh OPTIONS
 .Bd -literal
@@ -173,18 +177,22 @@ ignore a specific
 .El
 .El
 .Sh ENVIRONMENT
+Most options can also be passed via environment variables. For example,
+all of the following are supported:
+.Pp
 .Bl -tag -width "RESHOLVE_KEEP" -compact
 .\".It  RESHOLVE_FAFF
 .It  RESHOLVE_INTERPRETER
 .It  RESHOLVE_PATH
+.It RESHOLVE_INPUTS
 .It  RESHOLVE_FAKE
 .It  RESHOLVE_FIX
 .It  RESHOLVE_KEEP
 .\".It  RESHOLVE_PRERESOLVED
 .It  RESHOLVE_OVERWRITE
 .\".It  RESHOLVE_LINT
-.\".It  RESHOLVE_PROLOGUE
-.\".It  RESHOLVE_EPILOGUE
+.It  RESHOLVE_PROLOGUE
+.It  RESHOLVE_EPILOGUE
 .\" equivalent to --keep
 .El
 .\" .Sh FILES
