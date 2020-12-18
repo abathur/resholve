@@ -5,6 +5,7 @@
   and `RESHOLVE_PATH`
 - add a plaintext copy of the manpage as stopgap documentation
   and update README
+- support multiple resholve invocations per package from Nix API
 
 ## v0.1.1 (Dec 14 2020)
 Add actual code support for --prologue --epilogue, which were accidentally left out of v0.1.0
