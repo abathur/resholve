@@ -273,7 +273,7 @@ It is currently tied into the CI run, so for now you'll have to run the whole th
 nix-build ci.nix
 ```
 
-I'll try to keep these up-to-date, but if suspect this file is outdated you can also find the output at the end of the main phase of resholve's latest successful [weekly scheduled CI run](https://github.com/abathur/resholve/actions?query=branch%3Amaster+event%3Aschedule+is%3Asuccess).
+I'll try to keep these up-to-date, but if you suspect this file is outdated you can also find the output at the end of the main phase of resholve's latest successful [weekly scheduled CI run](https://github.com/abathur/resholve/actions?query=branch%3Amaster+event%3Aschedule+is%3Asuccess).
 
 ```shell
 $ nix-build ci.nix
@@ -281,8 +281,8 @@ much help
 test_future_perfection
 nothing up my sleeve
 +++++ type jq openssl
-/nix/store/0wn7bqz8hm28vjmrbxjy4jpf5cjqvqbc-testmod3-unreleased/bin/conjure.sh: line 7: type: jq: not found
-/nix/store/0wn7bqz8hm28vjmrbxjy4jpf5cjqvqbc-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
+/nix/store/4yqa1w3qplrax1vjw19rppg1f2hmx00j-testmod3-unreleased/bin/conjure.sh: line 7: type: jq: not found
+/nix/store/4yqa1w3qplrax1vjw19rppg1f2hmx00j-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
 +++++ set +x
 test_openssl
 +++++ /nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl version
@@ -301,7 +301,7 @@ Ran 3 tests.
 
 OK
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/0wn7bqz8hm28vjmrbxjy4jpf5cjqvqbc-testmod3-unreleased/bin/conjure.sh
+       │ File: /nix/store/4yqa1w3qplrax1vjw19rppg1f2hmx00j-testmod3-unreleased/bin/conjure.sh
 ───────┼────────────────────────────────────────────────────────────────────────
    1   │ #!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
    2   │ test_future_perfection() {
@@ -323,14 +323,14 @@ OK
   18   │     libressl_sh
   19   │ }
   20   │ 
-  21   │ source /nix/store/3q002i0wr1mq9m3m92b5f130zh5930mk-testmod1-unreleased/bin/libressl.sh
+  21   │ source /nix/store/1w9bgx17jhgdh547km109d4qlc9sw9mn-testmod1-unreleased/bin/libressl.sh
   22   │ 
   23   │ ### resholve directives (auto-generated) ## format_version: 2
-  24   │ # resholve: keep /nix/store/3q002i0wr1mq9m3m92b5f130zh5930mk-testmod1-unreleased/bin/libressl.sh
+  24   │ # resholve: keep /nix/store/1w9bgx17jhgdh547km109d4qlc9sw9mn-testmod1-unreleased/bin/libressl.sh
   25   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/nha64mwcj71h37d321gqzhwrz13d83a9-testmod2-unreleased/bin/openssl.sh
+       │ File: /nix/store/89avpzvfvhr6kz9hjqsvvmza0z1pi4c2-testmod2-unreleased/bin/openssl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
    1   │ openssl_sh() {
    2   │     set -x
@@ -339,18 +339,18 @@ OK
    5   │ }
    6   │ alias blah=/nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl
    7   │ 
-   8   │ source /nix/store/97j0f9q6nswd3lxdrrxc5gi1ydb6vv0z-shunit2-2019-08-10/bin/shunit2
+   8   │ source /nix/store/f6l86mcsif3v6mii4d2xnmhrcd559xp6-shunit2-2019-08-10/bin/shunit2
    9   │ 
   10   │ ### resholve directives (auto-generated) ## format_version: 2
   11   │ # resholve: fix aliases
-  12   │ # resholve: keep /nix/store/97j0f9q6nswd3lxdrrxc5gi1ydb6vv0z-shunit2-2019-08-10/bin/shunit2
+  12   │ # resholve: keep /nix/store/f6l86mcsif3v6mii4d2xnmhrcd559xp6-shunit2-2019-08-10/bin/shunit2
   13   │ # resholve: keep /nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl
   14   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/3q002i0wr1mq9m3m92b5f130zh5930mk-testmod1-unreleased/bin/libressl.sh
+       │ File: /nix/store/1w9bgx17jhgdh547km109d4qlc9sw9mn-testmod1-unreleased/bin/libressl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
-   1   │ source /nix/store/3q002i0wr1mq9m3m92b5f130zh5930mk-testmod1-unreleased/submodule/helper.sh
+   1   │ source /nix/store/1w9bgx17jhgdh547km109d4qlc9sw9mn-testmod1-unreleased/submodule/helper.sh
    2   │ 
    3   │ libressl_sh() {
    4   │     set -x
@@ -361,13 +361,13 @@ OK
    9   │ 
   10   │ just_being_helpful
   11   │ 
-  12   │ source /nix/store/nha64mwcj71h37d321gqzhwrz13d83a9-testmod2-unreleased/bin/openssl.sh
+  12   │ source /nix/store/89avpzvfvhr6kz9hjqsvvmza0z1pi4c2-testmod2-unreleased/bin/openssl.sh
   13   │ 
   14   │ ### resholve directives (auto-generated) ## format_version: 2
-  15   │ # resholve: keep /nix/store/3q002i0wr1mq9m3m92b5f130zh5930mk-testmod1-unreleased/submodule/helper.sh
-  16   │ # resholve: keep /nix/store/mbahl5am0rx7aqf0z2wg34vvcld7124y-jq-1.6-bin/bin/jq
-  17   │ # resholve: keep /nix/store/n5rhhyjrjygps9iapqxvwn8ns6nqxdmx-libressl-3.1.3-bin/bin/openssl
-  18   │ # resholve: keep /nix/store/nha64mwcj71h37d321gqzhwrz13d83a9-testmod2-unreleased/bin/openssl.sh
+  15   │ # resholve: keep /nix/store/1w9bgx17jhgdh547km109d4qlc9sw9mn-testmod1-unreleased/submodule/helper.sh
+  16   │ # resholve: keep /nix/store/89avpzvfvhr6kz9hjqsvvmza0z1pi4c2-testmod2-unreleased/bin/openssl.sh
+  17   │ # resholve: keep /nix/store/mbahl5am0rx7aqf0z2wg34vvcld7124y-jq-1.6-bin/bin/jq
+  18   │ # resholve: keep /nix/store/n5rhhyjrjygps9iapqxvwn8ns6nqxdmx-libressl-3.1.3-bin/bin/openssl
   19   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ```

@@ -50,7 +50,7 @@ Here are a few things resholve is already helping us do in the Nix ecosystem:
 ## Quickstart
 > *Note:* resholve is a young project. It *works for a living* already, but not much is done beyond the golden path. For example, resholve is *only* packaged for the [Nix package manager](https://nixos.org/nix/). You may want to review the [limitations](#limitations) section for more.
 
-This section focuses on getting resholve to play with it. Once you have it, you should review `man resholve` (which is currently the only canonical usage documentation).
+This section focuses on getting resholve to play with it. Once you have it, you should review `man resholve` (or the [plaintext](resholve.1.txt) copy).
 
 ### CLI
 resholve isn't quite in nixpkgs yet, but once it is, you can try it
@@ -80,7 +80,7 @@ nix-shell
 If you have short-term plans to *depend* on resholve, I recommend making sure you understand its limitations.
 
 ### Documentation
-- The manpage is currently the canonical reference to resholve's options and behavior; there is no online version. See #19.
+- The manpage is currently the canonical reference to resholve's options and behavior; the only online format is [plaintext](resholve.1.txt). See #19.
 - The existing documentation doesn't really address the Nix API, though there are some examples.
 
 ### Packaging

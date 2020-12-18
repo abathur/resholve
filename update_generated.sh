@@ -56,7 +56,7 @@ It is currently tied into the CI run, so for now you'll have to run the whole th
 nix-build ci.nix
 ```
 
-I'll try to keep these up-to-date, but if suspect this file is outdated you can also find the output at the end of the main phase of resholve's latest successful [weekly scheduled CI run](https://github.com/abathur/resholve/actions?query=branch%3Amaster+event%3Aschedule+is%3Asuccess).
+I'll try to keep these up-to-date, but if you suspect this file is outdated you can also find the output at the end of the main phase of resholve's latest successful [weekly scheduled CI run](https://github.com/abathur/resholve/actions?query=branch%3Amaster+event%3Aschedule+is%3Asuccess).
 
 ```shell
 $ nix-build ci.nix
@@ -68,3 +68,4 @@ echo '```'
 nix-build ci.nix
 update
 # gen plaintext manpage?
+groff -m mdoc -T utf8 resholve.1 > resholve.1.txt

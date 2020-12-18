@@ -1,0 +1,135 @@
+
+RESHOLVE(1)               BSD General Commands Manual              RESHOLVE(1)
+
+NNAAMMEE
+     rreesshhoollvvee — resolve external command/script references in shell scripts
+
+SSYYNNOOPPSSIISS
+     rreesshhoollvvee [_o_p_t_i_o_n_s] _s_c_r_i_p_t ...
+     rreesshhoollvvee [_o_p_t_i_o_n_s] < _s_c_r_i_p_t
+
+DDEESSCCRRIIPPTTIIOONN
+     rreesshhoollvvee replaces bare references (subject to a PATH search at runtime)
+     to external commands and scripts with absolute paths.
+
+     This small super‐power helps ensure script dependencies are declared,
+     present, and don’t unexpectely shift when the PATH changes.
+
+     rreesshhoollvvee is developed to enable the Nix package manager to package and
+     integrate Shell projects, but its features are not Nix‐specific and
+     inevitably have other applications.
+
+RREEQQUUIIRREEDD AARRGGUUMMEENNTTSS
+     _s_c_r_i_p_t
+        ··   given as input on <stdin>, write resolved script to <stdout>
+        ··   given a path, write to _s_c_r_i_p_t.resolved (unless −−−−oovveerrwwrriittee is
+            used, in which case the script is replaced)
+
+     −−−−iinntteerrpprreetteerr nnoonnee | _p_a_t_h
+        The absolute interpreter _p_a_t_h for the script’s shebang. The special
+        value nnoonnee ensures there is no shebang. See execve(2)
+
+     −−−−ppaatthh _p_a_t_h | RESHOLVE_PATH=_p_a_t_h
+        A PATH‐format list of paths to resholve external dependencies from.
+        You may also use aliases −−−−iinnppuuttss or RESHOLVE_PATH.
+
+OOPPTTIIOONNSS
+     −−−−ffaakkee _d_i_r_e_c_t_i_v_e_s
+     −−−−ffiixx _d_i_r_e_c_t_i_v_e_s
+     −−−−kkeeeepp _d_i_r_e_c_t_i_v_e_s
+        Adjust how resolution is performed. See _C_O_N_T_R_O_L_L_I_N_G _R_E_S_O_L_U_T_I_O_N.
+
+     −−−−oovveerrwwrriittee
+        Resolve script in‐place (useful for out‐of‐tree builds).
+
+     −−−−vveerrssiioonn
+        Show brief syntax help.
+
+     −−−−hheellpp
+        Show usage summary.
+
+CCOONNTTRROOLLLLIINNGG RREESSOOLLUUTTIIOONN
+     If resholve can’t figure something out, you can often help it along with
+     a mix of fake, fix, and keep _d_i_r_e_c_t_i_v_e_s.  If quoted, directives can be
+     separated by a space: ’_d_i_r_e_c_t_i_v_e[ _d_i_r_e_c_t_i_v_e]...’
+
+     −−−−ffaakkee ’_d_i_r_e_c_t_i_v_e_s’ | RESHOLVE_FAKE=’_d_i_r_e_c_t_i_v_e_s’
+         Pretend some commands exist (if there’s a good reason resholve
+         doesn’t know about them). There is one directive form:
+
+         _t_y_p_e:_n_a_m_e[;_n_a_m_e]...
+            Treat _n_a_m_e(s) of _t_y_p_e as defined; _t_y_p_e is the full word or first
+            letter of: _alias, _builtin, _external, _function, or _keyword.
+
+         Ex: −−−−ffaakkee ’f:setUp;tearDown builtin:setopt’
+
+     −−−−ffiixx ’_d_i_r_e_c_t_i_v_e_s’ | RESHOLVE_FIX=’_d_i_r_e_c_t_i_v_e_s’
+         Fix some things it it isn’t safe to fix/ignore by default. Directive
+         forms:
+
+         _a_b_s_o_l_u_t_e___p_a_t_h
+            treat _a_b_s_o_l_u_t_e___p_a_t_h as a bare reference that must be resolved
+
+         aalliiaasseess
+            resolve into alias definitions
+
+         Ex: −−−−ffiixx ’aliases xargs:ls $GIT:gix’
+
+     −−−−kkeeeepp ’_d_i_r_e_c_t_i_v_e_s’ | RESHOLVE_KEEP=’_d_i_r_e_c_t_i_v_e_s’
+         Ignore (omit errors for) some things it isn’t safe to fix/ignore by
+         default. Directive forms:
+
+         _o_u_t_e_r___c_o_m_m_a_n_d:_i_n_n_e_r___c_o_m_m_a_n_d[;_i_n_n_e_r___c_o_m_m_a_n_d]...
+            ignore _i_n_n_e_r___c_o_m_m_a_n_d(s) in the arguments to _o_u_t_e_r___c_o_m_m_a_n_d
+
+         $_v_a_r_i_a_b_l_e (Note: $ may need escaping)
+            ignore $_v_a_r_i_a_b_l_e used as all or part of a first word (command)
+
+            Such as: ‘$GIT status‘ or ‘$BUSYBOX/ls‘
+
+         _a_b_s_o_l_u_t_e___p_a_t_h
+            ignore a specific _a_b_s_o_l_u_t_e___p_a_t_h
+
+         Ex: −−−−kkeeeepp ’which:git;curl source:$HOME $LS:exa /etc/bashrc’
+
+EENNVVIIRROONNMMEENNTT
+     Most options can also be passed via environment variables. For example,
+     all of the following are supported:
+
+     RESHOLVE_INTERPRETER
+     RESHOLVE_PATH
+     RESHOLVE_INPUTS
+     RESHOLVE_FAKE
+     RESHOLVE_FIX
+     RESHOLVE_KEEP
+     RESHOLVE_OVERWRITE
+     RESHOLVE_PROLOGUE
+     RESHOLVE_EPILOGUE
+
+EEXXAAMMPPLLEESS
+     Basic invocations:
+
+     $ resholve ‐‐interpreter "$(which bash)" ‐‐path "$PATH" script.sh
+     $ resholve ‐‐interpreter "$(which bash)" ‐‐path "$PATH" < script.sh
+     $ resholve ‐‐interpreter "$(which bash)" ‐‐path "$PATH" script1.sh script2.sh
+
+LLIIMMIITTAATTIIOONNSS
+     rreesshhoollvvee is built on the bash‐compatible OSH parser (from the Oil shell
+     project). It can’t handle any script OSH can’t parse.
+
+     ··   Support for non‐bash shells is a happy side‐effect of how similar
+         POSIX‐ish shell languages are. If you run into a parse error with any
+         non‐bash syntax, your only real option is changing the script.
+
+     ··   If you run into a parse error with valid bash syntax, check Oil’s
+         issue tracker (https://github.com/oilshell/oil/issues) to see if the
+         issue is known and whether it is likely to be fixed. If it won’t be
+         fixed, your only recourse is changing the script.
+
+SSEEEE AALLSSOO
+     bash(1), osh(1), sh(1), execve(2)
+
+AAUUTTHHOORRSS
+     Travis A. Everett ⟨_t_r_a_v_i_s_._a_._e_v_e_r_e_t_t_@_g_m_a_i_l_._c_o_m⟩
+
+BSD                           September 26, 2020                           BSD
