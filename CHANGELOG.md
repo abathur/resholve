@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.2.1 (Dec 27 2020)
+- support basic `coproc command` syntax
+
 ## v0.2.0 (Dec 27 2020)
 - add `--inputs` and `RESHOLVE_INPUTS` as aliases of `--path`
   and `RESHOLVE_PATH`

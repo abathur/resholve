@@ -13,4 +13,5 @@ in
 pkgs.mkShell {
   buildInputs = [ resholve.resholve bats nixpkgs-fmt ] ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
+  INTERP = "${bash}/bin/bash";
 }

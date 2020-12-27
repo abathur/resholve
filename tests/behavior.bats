@@ -49,3 +49,22 @@ CASES
 resholve --interpreter $INTERP --fix aliases < alias_riddle.sh
 RESHOLVE_FIX=aliases resholve --interpreter $INTERP < alias_riddle.sh
 CASES
+
+@test "can resolve a simple coproc" {
+  require <({
+    status 0
+    line 2 begins "coproc /nix/store"
+    line 2 ends "bin/file"
+  })
+} <<CASES
+resholve --interpreter $INTERP < coproc_simple.sh
+CASES
+
+@test "can't resolve a named coproc w/o upstream support :(" {
+  require <({
+    status 2
+    line 3 ends "error: Unexpected word while parsing command line"
+  })
+} <<CASES
+resholve --interpreter $INTERP < coproc_named.sh
+CASES
