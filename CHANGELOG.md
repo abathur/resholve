@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.0 (Dec 17 2020)
+## v0.2.0 (Dec 27 2020)
 - add `--inputs` and `RESHOLVE_INPUTS` as aliases of `--path`
   and `RESHOLVE_PATH`
 - add a plaintext copy of the manpage as stopgap documentation
