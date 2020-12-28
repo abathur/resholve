@@ -68,3 +68,78 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP < coproc_named.sh
 CASES
+
+@test "objects to unexempted absolute source paths" {
+  require <({
+    status 5
+    line 3 ends "Unexpected absolute source path (not supplied by a listed dependency). You should patch/substitute it."
+  })
+} <<CASES
+resholve --interpreter $INTERP < absolute_source.sh
+CASES
+
+echo "source $PWD/tests/source_present_target.sh" > $PWD/tests/temp_source_test.sh
+@test "allows exempted absolute source paths" {
+  require <({
+    status 0
+    line -1 ends "/tests/source_present_target.sh"
+  })
+} <<CASES
+resholve --interpreter $INTERP --keep source:$PWD/tests/source_present_target.sh < $PWD/tests/temp_source_test.sh && rm $PWD/tests/temp_source_test.sh
+CASES
+
+@test "allow (but do not parse) --fake 'source:path'" {
+  require <({
+    status 5
+    line 3 ends "Unexpected absolute source path (not supplied by a listed dependency). You should patch/substitute it."
+  })
+} <<CASES
+resholve --interpreter $INTERP --fake 'source:/not/a/real/script' < absolute_source.sh
+CASES
+
+@test "allow (*and* do not parse) --keep 'source:path' + --fake 'source:path'" {
+  require <({
+    status 0
+    line 2 equals "source /not/a/real/script"
+  })
+} <<CASES
+resholve --interpreter $INTERP --keep 'source:/not/a/real/script' --fake 'source:/not/a/real/script' < absolute_source.sh
+resholve --interpreter $INTERP --keep '.:/not/a/real/script' --fake 'source:/not/a/real/script' < absolute_source.sh
+CASES
+
+@test "objects to unexempted tilde executable paths" {
+  require <({
+    status 9
+    line -1 equals "[ stdinNone ]:2: Can't resolve dynamic command"
+  })
+} <<CASES
+resholve --interpreter $INTERP < $PWD/tests/tilde_dynamic_pipeline.sh
+CASES
+
+@test "allows exempted tilde executable paths" {
+  require <({
+    status 0
+    line -1 equals "# resholve: keep ~/.bashrc"
+  })
+} <<CASES
+resholve --interpreter $INTERP --keep '~/.bashrc' < $PWD/tests/tilde_dynamic_pipeline.sh
+CASES
+
+@test "allows --fake executable" {
+  require <({
+    status 0
+    line -1 equals "# resholve: fake external:osascript"
+  })
+} <<CASES
+resholve --interpreter $INTERP --fake 'external:osascript' < osascript.sh
+CASES
+
+@test "allows --fake function with colons" {
+  require <({
+    status 0
+    line -2 equals "# resholve: fake function:colon:colon:colon"
+    line -1 equals "# resholve: fake function:weirdtimes"
+  })
+} <<CASES
+resholve --interpreter $INTERP --fake 'function:colon:colon:colon;weirdtimes' < function_colon.sh
+CASES

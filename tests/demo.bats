@@ -77,7 +77,7 @@ CASES
 @test "Resolves unqualified 'source' to absolute path from RESHOLVE_PATH" {
   demo "source_present_target.sh" <({
     status 0
-    line -1 begins "# resholve: keep /nix/store/"
+    line -1 begins "# resholve: keep source:/nix/store/"
     line -1 contains "-gettext-"
     line -1 ends "/bin/gettext.sh"
   })

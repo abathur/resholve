@@ -94,7 +94,16 @@ def _import(name, *args):
             # but also add it under the un-rewritten name
             sys.modules[name] = ret
 
-            if len(set([id(ret),])) > 1:
+            if (
+                len(
+                    set(
+                        [
+                            id(ret),
+                        ]
+                    )
+                )
+                > 1
+            ):
                 raise Exception("Module IDs unexpectedly differ")
         except ImportError:
             ret = original_import(name, _globals, _locals, _ids, _lvl)
@@ -346,7 +355,9 @@ def make_arg_parser(module):
         add_help=False,
     )
 
-    req = parser.add_argument_group(title="Required",)
+    req = parser.add_argument_group(
+        title="Required",
+    )
     req_path = req.add_mutually_exclusive_group(required=True)
 
     req.add_argument(
@@ -364,7 +375,11 @@ def make_arg_parser(module):
         help="paths to resolve commands from",
     )
     req_path.add_argument(
-        "--inputs", metavar="str", dest="path", type=str, help="alias for --path",
+        "--inputs",
+        metavar="str",
+        dest="path",
+        type=str,
+        help="alias for --path",
     )
 
     req.add_argument(
@@ -376,7 +391,9 @@ def make_arg_parser(module):
         required=True,
     )
 
-    res = parser.add_argument_group(title="Controlling resolution",)
+    res = parser.add_argument_group(
+        title="Controlling resolution",
+    )
 
     res.add_argument(
         "--fake",
@@ -429,7 +446,9 @@ def make_arg_parser(module):
         "-h", "--help", action="help", help="show this help message and exit"
     )
     meta.add_argument(
-        "--version", action="version", version="%(prog)s {:}".format(__version__),
+        "--version",
+        action="version",
+        version="%(prog)s {:}".format(__version__),
     )
 
     return parser
@@ -1528,7 +1547,12 @@ class ResolvedScript(RecordCommandlike):
                 logger.info("Parsing sourced script %r", res_source)
                 resolved = self.__class__(res_source)
                 resolved_scripts[res_source] = resolved
-            self.directives.keep.add((res_source,))
+            self.directives.keep.add(
+                (
+                    "source",
+                    res_source,
+                )
+            )
 
     def _visit_command_Simple(self, node):
         if not node.words:
@@ -1701,6 +1725,9 @@ class ResolvedScript(RecordCommandlike):
                 logger.info("   Command is static")
                 # No magic
                 if word1 in ("command", "eval", "coproc"):
+                    # TODO: could skip command -p/-v/-V here, but that's
+                    # a step down a slippery slope I don't want to take
+                    # without some better ~command handler
                     # TODO: not absolutely certain about resolution order here
                     self.record_command_cmd(w_ob2, word2)
                 elif word1 in ("sudo", "exec", "env"):
@@ -1708,29 +1735,56 @@ class ResolvedScript(RecordCommandlike):
                     self.record_external_cmd(w_ob2, word2)
                 elif word1 in (".", "source"):
                     # CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
-                    target = lookup_source(word2)
-                    logger.debug("Looked up source: %r -> %r", word2, target)
-                    # it was already a valid absolute path
-                    if target == word2 and target[0] == "/":
-                        # TODO: I'm not sure if we should do anything about absolute paths
-                        # but if so, this is where we'd do it.
-                        # raise ResolutionError(
-                        #     "Do we want to object to absolute paths like %r ?",
-                        #     word2,
-                        #     word=w_ob2,
-                        #     status=2,
-                        # )
-                        self.record_external_source(w_ob2, word2)
-                    # lookup() seems to resolve relative filenames for files in the
-                    # current directory, no matter what path is set to...
-                    elif target == word2:
-                        # TODO: I guess these all need to get prefxed with $out?
-                        self.record_external_source(w_ob2, word2)
-                    # it resolved to a new location
-                    elif target:
-                        self.record_external_source(w_ob2, word2, replace_with=target)
-                    # It didn't resolve, or it was an invalid absolute path
+                    target = None
+                    if word2.startswith("/") and os.path.isabs(word2):
+                        # Note: logic here tracks generate_external_resolver()
+                        if ("source", word2) in self.directives.keep or (
+                            ".",
+                            word2,
+                        ) in self.directives.keep:
+                            # user said keep this abspath
+                            self.record_external_source(w_ob2, word2)
+                            target = False
+                        elif ("source", word2,) in self.directives.fix or (
+                            ".",
+                            word2,
+                        ) in self.directives.fix:
+                            # user said to resolve this abspath as if it were bare
+                            relword2 = os.path.basename(word2)
+                            target = lookup_source(relword2)
+                            logger.debug(
+                                "Looked up source: %r -> %r -> %r",
+                                word2,
+                                relword2,
+                                target,
+                            )
+                        else:
+                            # TODO: better message
+                            raise ResolutionError(
+                                "Unexpected absolute source path (not supplied by a listed dependency). You should patch/substitute it.",
+                                word=w_ob2,
+                                status=5,
+                                arena=self.arena,
+                            )
                     else:
+                        target = lookup_source(word2)
+                        logger.debug("Looked up source: %r -> %r", word2, target)
+
+                    # it was already a valid absolute path
+                    if target:
+                        # lookup() seems to resolve relative filenames for files in the
+                        # current directory, no matter what path is set to...
+                        if target == word2:
+                            # TODO: I guess these all need to get prefxed with $out?
+                            # TODO: be skeptical of this
+                            self.record_external_source(w_ob2, word2)
+                        # it resolved to a new location
+                        elif target:
+                            self.record_external_source(
+                                w_ob2, word2, replace_with=target
+                            )
+                    # It didn't resolve, or it was an invalid absolute path
+                    elif target != False:
                         # in theory I could pass this exception to the new
                         # self.record_external_source, but this would mean we can't
                         # fail as soon. Failing soon seems better, no?
