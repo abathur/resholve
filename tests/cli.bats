@@ -162,7 +162,7 @@ CASES
 
   require <({
     status 2
-    line -1 ends "valid single-part keep directives: \$variable, absolute path"
+    line -1 ends "valid single-part keep directives: \$variable, absolute path, ~/path"
   })
 } <<CASES
 resholve --interpreter $INTERP --keep source PWD source_var_pwd.sh
@@ -185,7 +185,7 @@ resholve --interpreter $INTERP --keep source:\$PWD < source_home_pwd.sh
 RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < source_home_pwd.sh
 CASES
 
-@test "resholve succeeds when 1x 'allow' directives are correct" {
+@test "resholve succeeds when 1x 'keep' directives are correct" {
 
   require <({
     status 0
@@ -198,7 +198,7 @@ RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < source_var_pwd.sh
 resholve --interpreter $INTERP < source_var_pwd_annotated.sh
 CASES
 
-@test "resholve succeeds when 2x 'allow' directives are correct" {
+@test "resholve succeeds when 2x 'keep' directives are correct" {
 
   require <({
     status 0

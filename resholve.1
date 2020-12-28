@@ -107,7 +107,7 @@ by a space:
 .Ar directive ] Ns ... Ec Ns '
 .Bl -tag -width 2n
 .It Fl Fl fake Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_FAKE= Eo ' Ns Ar directives Ec Ns '
-Pretend some commands exist (if there's a good reason resholve doesn't know
+Pretend some things exist (if there's a good reason resholve doesn't know
 about them). There is one directive form:
 .Bl -tag -width 1n
 .It Ar type : Ns Ar name Ns [; Ns Ar name ] Ns ...
@@ -122,9 +122,10 @@ is the full word or first letter of:
 .Ar b Ns uiltin,
 .Ar e Ns xternal,
 .Ar f Ns unction,
+.Ar k Ns eyword,
 or
-.Ar k Ns eyword.
-.It Ex: Fl Fl fake No 'f:setUp;tearDown builtin:setopt'
+.Ar s Ns ource.
+.It Ex: Fl Fl fake No 'f:setUp;tearDown builtin:setopt source:/etc/bashrc'
 .El
 .It Fl Fl fix Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_FIX= Eo ' Ns Ar directives Ec Ns '
 Fix some things it it isn't safe to fix/ignore by default. Directive forms:
@@ -167,13 +168,18 @@ in the arguments to
 .It $ Ns Ar variable No (Note: $ may need escaping)
 ignore
 .No $ Ns Ar variable
+or
+.No ${ Ns Ar variable Ns No }
 used as all or part of a first word (command)
 .Pp
 Such as: `$GIT status` or `$BUSYBOX/ls`
 .It Ar absolute_path
 ignore a specific
 .Ar absolute_path
-.It Ex: Fl Fl keep No 'which:git;curl source:$HOME $LS:exa /etc/bashrc'
+.It Ar ~/path
+ignore a specific
+.Ar home-relative_path
+.It Ex: Fl Fl keep No 'which:git;ls .:$HOME $LS:exa /etc/bashrc ~/.bashrc'
 .El
 .El
 .Sh ENVIRONMENT

@@ -1,1 +1,1 @@
-source /etc/profile
+source /not/a/real/script

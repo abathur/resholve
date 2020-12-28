@@ -148,7 +148,7 @@ from oil.core import main_loop  # ParseWholeFile
 from oil.core import optview  # Parse
 from oil.core import ui  # PrettyPrintError
 
-from oil.osh import word_  # LeftMostSpanForWord, StaticEval
+from oil.osh import word_  # LeftMostSpanForWord, RightMostSpanForWord StaticEval
 
 # LookupSpecialBuiltin, LookupAssignBuiltin, LookupNormalBuiltin, NO_INDEX
 from oil.frontend import consts
@@ -172,6 +172,13 @@ from oil.tools import osh2oil  # Cursor
 
 executables = dict()
 resolved_scripts = dict()
+
+
+def span_pair(word_object, arena):
+    return (
+        arena.GetLineSpan(word_.LeftMostSpanForWord(word_object)),
+        arena.GetLineSpan(word_.RightMostSpanForWord(word_object)),
+    )
 
 
 class ResolutionDirectives(object):
@@ -237,7 +244,7 @@ def parse_directive(value, scope_map=None):
         directives = value.split(" ")
         logger.debug("directives: %r", directives)
         for directive in directives:
-            rules = directive.split(":")
+            rules = directive.split(":", 1)
             if len(rules) == 1:
                 out.add((rules[0],))
                 continue
@@ -264,6 +271,7 @@ FAKE_DIRECTIVE_MAP = {
     "e": "external",
     "f": "function",
     "k": "keyword",
+    "s": "source",
 }
 FAKE_DIRECTIVE_TYPES = set(FAKE_DIRECTIVE_MAP.keys()) | set(FAKE_DIRECTIVE_MAP.values())
 
@@ -334,11 +342,15 @@ def directive_keep(value):
         if len(directive) == 1:
             if directive[0][0] == "$":
                 pass  # ok literal
+            elif directive[0][0:2] == "~/" and os.path.isabs(
+                os.path.expanduser(directive[0])
+            ):
+                pass
             elif os.path.isabs(directive[0]):
                 pass  # ok absolute path
             else:
                 raise argparse.ArgumentTypeError(
-                    "valid single-part keep directives: $variable, absolute path"
+                    "valid single-part keep directives: $variable, absolute path, ~/path"
                 )
         elif len(directive) == 2:
             pass
@@ -985,7 +997,9 @@ class OrderedCommandResolver(object):
             self._true
             if ("builtin", self.name) in relevant.fake
             else self.resolve_builtin,
-            self.generate_external_resolver(relevant),
+            self._true
+            if ("external", self.name) in relevant.fake
+            else self.generate_external_resolver(relevant),
         )
 
     @property
@@ -1543,7 +1557,10 @@ class ResolvedScript(RecordCommandlike):
         global resolved_scripts
         logger.info("Resolving sources")
         for res_source in self.resolved_source:
-            if res_source not in resolved_scripts:
+            if (
+                res_source not in resolved_scripts
+                and ("source", res_source) not in self.directives.fake
+            ):
                 logger.info("Parsing sourced script %r", res_source)
                 resolved = self.__class__(res_source)
                 resolved_scripts[res_source] = resolved
@@ -1566,7 +1583,7 @@ class ResolvedScript(RecordCommandlike):
                 if bad_token:
                     # number subs are probably okayish?
                     if bad_token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
-                        logger.debug(
+                        logger.info(
                             "allowing dynamic command (first-word variable) with positional ($1, $@, $*) varsub %r:%r",
                             word1,
                             bad_token.val,
@@ -1581,18 +1598,25 @@ class ResolvedScript(RecordCommandlike):
                         elif bad_token.id == Id.VSub_DollarName:
                             # it already has $ prefixed
                             bad_token_name = bad_token.val
+                        elif bad_token.id == Id.Lit_TildeLike:
+                            # try to get the text
+                            # confidence in approach: medium
+                            left, right = span_pair(w_ob1, self.arena)
+                            line = self.arena.GetLine(left.line_id)
+                            start = left.col
+                            end = right.col + right.length
+                            bad_token_name = line[start:end]
 
                         if (bad_token_name,) in self.directives.keep:
                             # skip exempted name
-                            logger.debug(
-                                "allowing dynamic command (first-word variable) with exempted ${varsub} %r:%r",
-                                word1,
-                                bad_token.val,
+                            logger.info(
+                                "allowing exempted dynamic command %r",
+                                bad_token_name,
                             )
                             return
 
                         raise ResolutionError(
-                            "Can't resolve dynamic command (first-word variable)",
+                            "Can't resolve dynamic command",
                             word=w_ob1,
                             token=bad_token,
                             status=9,

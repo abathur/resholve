@@ -17,7 +17,7 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 resholve --interpreter $INTERP eval_quoted.sh
 CASES
 
-@test "verify --keep '$varname' allows dynamic commands (first-word variable)" {
+@test "verify --keep '$varname' allows dynamic commands" {
   require <({
     status 0
     line -1 begins "Rewrote"
