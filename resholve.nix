@@ -1,10 +1,10 @@
 { stdenv
 , callPackage
+, pythonPackages
 , installShellFiles
 , file
 , findutils
 , gettext
-, python27
 , bats
 , bash
 , doCheck ? true
@@ -27,15 +27,16 @@ let
   };
   resolveTimeDeps = [ file findutils gettext ];
 in
-python27.pkgs.buildPythonApplication {
+pythonPackages.buildPythonApplication {
   pname = "resholve";
   inherit version;
   src = rSrc;
   format = "other";
+  disabled = !pythonPackages.isPy27;
 
   nativeBuildInputs = [ installShellFiles ];
 
-  propagatedBuildInputs = [ deps.oildev python27.pkgs.ConfigArgParse ];
+  propagatedBuildInputs = [ deps.oildev pythonPackages.ConfigArgParse ];
 
   patchPhase = ''
     for file in resholve; do
