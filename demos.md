@@ -27,7 +27,7 @@ The demo output is colored for easier reading, but I've included an example of t
 $ nix-shell --run "./demo"
 1..12
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < which_simple.sh (exit: 3) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < which_simple.sh (exit: 3) ]
 
 Original:
 >>> # no inputs provide which
@@ -41,7 +41,7 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 1 'which' needs to be in RESHOLVE_PATH
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < command_in_function.sh (exit: 3) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < command_in_function.sh (exit: 3) ]
 
 Original:
 >>> source file_simple.sh
@@ -58,7 +58,7 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < absolute_path.sh (exit: 5) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < absolute_path.sh (exit: 5) ]
 
 Original:
 >>> /usr/bin/which resholve
@@ -71,7 +71,7 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 3 Absolute executable paths need exemptions
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < source_var_pwd.sh (exit: 6) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < source_var_pwd.sh (exit: 6) ]
 
 Original:
 >>> # fails because $PWD requires a dynamic parse
@@ -88,45 +88,45 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 4 Source, among others, needs an exemption for arguments containing variables
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < file_simple.sh (exit: 0) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < file_simple.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
 >>> @@ -1,2 +1,6 @@
->>> +#!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+>>> +#!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
 >>>  # resolves file from inputs
 >>> -file resholver
->>> +/nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file resholver
+>>> +/nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file resholver
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
->>> +# resholve: keep /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file
+>>> +# resholve: keep /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 5 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < file_in_function.sh (exit: 0) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < file_in_function.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
 >>> @@ -1,5 +1,10 @@
->>> +#!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+>>> +#!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
 >>>  source which_simple.sh
 >>>  which() {
 >>>      # resolves file here too
 >>> -    file "$@"
->>> +    /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file "$@"
+>>> +    /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file "$@"
 >>>  }
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
->>> +# resholve: keep /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file
->>> +# resholve: keep which_simple.sh
+>>> +# resholve: keep /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file
+>>> +# resholve: keep source:which_simple.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 6 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < file_home_source_pwd.sh (exit: 6) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < file_home_source_pwd.sh (exit: 6) ]
 
 Original:
 >>> # $HOME not blocking here; vars currently only checked in:
@@ -143,49 +143,49 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 7 Only some commands ('source' but NOT 'file', here) are checked for variable arguments.
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash --keep 'source:$PWD' < file_home_source_pwd.sh (exit: 0) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash --keep 'source:$PWD' < file_home_source_pwd.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
 >>> @@ -1,5 +1,10 @@
->>> +#!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+>>> +#!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
 >>>  # $HOME not blocking here; vars currently only checked in:
 >>>  #   alias command eval exec source|. sudo env
 >>> -file $HOME/file_simple.sh
->>> +/nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file $HOME/file_simple.sh
+>>> +/nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file $HOME/file_simple.sh
 >>>  # PWD needs exemption: --allow source:PWD or RESHOLVE_ALLOW='source:PWD'
 >>>  source $PWD/file_simple.sh
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
->>> +# resholve: keep /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file
+>>> +# resholve: keep /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file
 >>> +# resholve: keep source:$PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 8 Add an exemption with --keep <scope>:<name>
 
---[ RESHOLVE_KEEP='source:$PWD' resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < file_home_source_pwd.sh (exit: 0) ]
+--[ RESHOLVE_KEEP='source:$PWD' resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < file_home_source_pwd.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
 >>> @@ -1,5 +1,10 @@
->>> +#!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+>>> +#!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
 >>>  # $HOME not blocking here; vars currently only checked in:
 >>>  #   alias command eval exec source|. sudo env
 >>> -file $HOME/file_simple.sh
->>> +/nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file $HOME/file_simple.sh
+>>> +/nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file $HOME/file_simple.sh
 >>>  # PWD needs exemption: --allow source:PWD or RESHOLVE_ALLOW='source:PWD'
 >>>  source $PWD/file_simple.sh
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
->>> +# resholve: keep /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file
+>>> +# resholve: keep /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file
 >>> +# resholve: keep source:$PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 9 Add an exemption with RESHOLVE_ALLOW=source:$PWD
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < source_missing_target.sh (exit: 7) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < source_missing_target.sh (exit: 7) ]
 
 Original:
 >>> # fails to resolve this (from inputs, or relative to directory)
@@ -199,35 +199,35 @@ Output:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 10 'source' targets also need to be in RESHOLVE_PATH
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash < source_present_target.sh (exit: 0) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash < source_present_target.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
 >>> @@ -1,2 +1,6 @@
->>> +#!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+>>> +#!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
 >>>  # resolves gettext from inputs
 >>> -source gettext.sh
->>> +source /nix/store/vrxrz8fqi2cmv0z7kxfza2nycbbbkh1k-gettext-0.21/bin/gettext.sh
+>>> +source /nix/store/77xzn9vm7pgk4an48znriq5yl375fg2g-gettext-0.21/bin/gettext.sh
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
->>> +# resholve: keep /nix/store/vrxrz8fqi2cmv0z7kxfza2nycbbbkh1k-gettext-0.21/bin/gettext.sh
+>>> +# resholve: keep source:/nix/store/77xzn9vm7pgk4an48znriq5yl375fg2g-gettext-0.21/bin/gettext.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 11 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH
 
---[ resholve --interpreter /nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash --fix aliases < alias_riddle.sh (exit: 0) ]
+--[ resholve --interpreter /nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash --fix aliases < alias_riddle.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
 >>> @@ -1,14 +1,20 @@
->>> +#!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+>>> +#!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
 >>>  # don't try to run me; I'll probably crash or hang or something
 >>>  # I'm just a succinct test for complex resolution logic...
 >>>  alias file="file -n" # the function
 >>> -alias find="find -H" find2="find -P" # external!
->>> +alias find="/nix/store/xg4310nmfd8a1gkwgn1g178v0jp7913k-findutils-4.7.0/bin/find -H" find2="/nix/store/xg4310nmfd8a1gkwgn1g178v0jp7913k-findutils-4.7.0/bin/find -P" # external!
+>>> +alias find="/nix/store/1f3xmrfp6j913bmj8l9njvdjhsn2sx9f-findutils-4.7.0/bin/find -H" find2="/nix/store/1f3xmrfp6j913bmj8l9njvdjhsn2sx9f-findutils-4.7.0/bin/find -P" # external!
 >>>  
 >>>  function file(){
 >>>  	file -n # the alias :P
@@ -235,16 +235,16 @@ Diff:
 >>>  
 >>>  file # I'm the alias
 >>> -command file # external
->>> +command /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file # external
+>>> +command /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file # external
 >>>  
 >>>  find # alias
 >>> -command find # external
->>> +command /nix/store/xg4310nmfd8a1gkwgn1g178v0jp7913k-findutils-4.7.0/bin/find # external
+>>> +command /nix/store/1f3xmrfp6j913bmj8l9njvdjhsn2sx9f-findutils-4.7.0/bin/find # external
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
 >>> +# resholve: fix aliases
->>> +# resholve: keep /nix/store/wzina4gcrg38pq5k5j0pv4p254wwc4nk-file-5.39/bin/file
->>> +# resholve: keep /nix/store/xg4310nmfd8a1gkwgn1g178v0jp7913k-findutils-4.7.0/bin/find
+>>> +# resholve: keep /nix/store/1f3xmrfp6j913bmj8l9njvdjhsn2sx9f-findutils-4.7.0/bin/find
+>>> +# resholve: keep /nix/store/s4b4dia2k572fbzpiqy3yspaddn3ja57-file-5.39/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 12 Has (naive) context-specific resolution rules
@@ -281,29 +281,29 @@ much help
 test_future_perfection
 nothing up my sleeve
 +++++ type jq openssl
-/nix/store/83kv2d97a79zfw48j3a3rrjgdwiik9yr-testmod3-unreleased/bin/conjure.sh: line 7: type: jq: not found
-/nix/store/83kv2d97a79zfw48j3a3rrjgdwiik9yr-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
+/nix/store/nb7dnhhx5bbpy6i3maxwsmc6hy4g3j71-testmod3-unreleased/bin/conjure.sh: line 7: type: jq: not found
+/nix/store/nb7dnhhx5bbpy6i3maxwsmc6hy4g3j71-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
 +++++ set +x
 test_openssl
-+++++ /nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl version
-OpenSSL 1.1.1g  21 Apr 2020
++++++ /nix/store/mp0ivq7pbfiqf54bzdh333gf7v4brjx2-openssl-1.1.1h-bin/bin/openssl version
+OpenSSL 1.1.1h  22 Sep 2020
 +++++ set +x
 test_libressl
-+++++ /nix/store/mbahl5am0rx7aqf0z2wg34vvcld7124y-jq-1.6-bin/bin/jq -n --arg greeting world '{"hello":$greeting}'
++++++ /nix/store/hcl24glm0i9rzva0f96r4yagmj2n2w1k-jq-1.6-bin/bin/jq -n --arg greeting world '{"hello":$greeting}'
 {
   "hello": "world"
 }
-+++++ /nix/store/n5rhhyjrjygps9iapqxvwn8ns6nqxdmx-libressl-3.1.3-bin/bin/openssl version
-LibreSSL 3.1.3
++++++ /nix/store/6lbq9zpqzmqsscj66n7lhn7ir2x6i50n-libressl-3.1.4-bin/bin/openssl version
+LibreSSL 3.1.4
 +++++ set +x
 
 Ran 3 tests.
 
 OK
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/83kv2d97a79zfw48j3a3rrjgdwiik9yr-testmod3-unreleased/bin/conjure.sh
+       │ File: /nix/store/nb7dnhhx5bbpy6i3maxwsmc6hy4g3j71-testmod3-unreleased/bin/conjure.sh
 ───────┼────────────────────────────────────────────────────────────────────────
-   1   │ #!/nix/store/m0a4283w5mzspfcx353633262kaqn5d6-bash-4.4-p23/bin/bash
+   1   │ #!/nix/store/drz9yxh2v1swn9yl88c8w5g0x69b8wk2-bash-4.4-p23/bin/bash
    2   │ test_future_perfection() {
    3   │     echo "nothing up my sleeve"
    4   │ 
@@ -323,51 +323,51 @@ OK
   18   │     libressl_sh
   19   │ }
   20   │ 
-  21   │ source /nix/store/6z7mjlcwrxl8nby82f5vnfs5gmd8whac-testmod1-unreleased/bin/libressl.sh
+  21   │ source /nix/store/1z05cfn8bw3dpg7bff2wfv6xhrwbyfdq-testmod1-unreleased/bin/libressl.sh
   22   │ 
   23   │ ### resholve directives (auto-generated) ## format_version: 2
-  24   │ # resholve: keep /nix/store/6z7mjlcwrxl8nby82f5vnfs5gmd8whac-testmod1-unreleased/bin/libressl.sh
+  24   │ # resholve: keep source:/nix/store/1z05cfn8bw3dpg7bff2wfv6xhrwbyfdq-testmod1-unreleased/bin/libressl.sh
   25   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/mckzqnnmb5v29n8cxmvdvgj1ryr5pm1d-testmod2-unreleased/bin/openssl.sh
+       │ File: /nix/store/bv2bcf9x0bh9va9f0pf6qsd61355x7xl-testmod2-unreleased/bin/openssl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
    1   │ openssl_sh() {
    2   │     set -x
-   3   │     /nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl version
+   3   │     /nix/store/mp0ivq7pbfiqf54bzdh333gf7v4brjx2-openssl-1.1.1h-bin/bin/openssl version
    4   │     set +x
    5   │ }
-   6   │ alias blah=/nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl
+   6   │ alias blah=/nix/store/mp0ivq7pbfiqf54bzdh333gf7v4brjx2-openssl-1.1.1h-bin/bin/openssl
    7   │ 
-   8   │ source /nix/store/rwpk73qh60pfvh7cqkgmaxcjplscc6wx-shunit2-2019-08-10/bin/shunit2
+   8   │ source /nix/store/4d75f9mfx3gccw8qhghbj4r0m33bm7vi-shunit2-2019-08-10/bin/shunit2
    9   │ 
   10   │ ### resholve directives (auto-generated) ## format_version: 2
   11   │ # resholve: fix aliases
-  12   │ # resholve: keep /nix/store/rwpk73qh60pfvh7cqkgmaxcjplscc6wx-shunit2-2019-08-10/bin/shunit2
-  13   │ # resholve: keep /nix/store/szz2jl78h6v7mvxf9kp978vkka7ma5lg-openssl-1.1.1g-bin/bin/openssl
+  12   │ # resholve: keep /nix/store/mp0ivq7pbfiqf54bzdh333gf7v4brjx2-openssl-1.1.1h-bin/bin/openssl
+  13   │ # resholve: keep source:/nix/store/4d75f9mfx3gccw8qhghbj4r0m33bm7vi-shunit2-2019-08-10/bin/shunit2
   14   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/6z7mjlcwrxl8nby82f5vnfs5gmd8whac-testmod1-unreleased/bin/libressl.sh
+       │ File: /nix/store/1z05cfn8bw3dpg7bff2wfv6xhrwbyfdq-testmod1-unreleased/bin/libressl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
-   1   │ source /nix/store/6z7mjlcwrxl8nby82f5vnfs5gmd8whac-testmod1-unreleased/submodule/helper.sh
+   1   │ source /nix/store/1z05cfn8bw3dpg7bff2wfv6xhrwbyfdq-testmod1-unreleased/submodule/helper.sh
    2   │ 
    3   │ libressl_sh() {
    4   │     set -x
-   5   │     /nix/store/mbahl5am0rx7aqf0z2wg34vvcld7124y-jq-1.6-bin/bin/jq -n --arg greeting world '{"hello":$greeting}'
-   6   │     /nix/store/n5rhhyjrjygps9iapqxvwn8ns6nqxdmx-libressl-3.1.3-bin/bin/openssl version
+   5   │     /nix/store/hcl24glm0i9rzva0f96r4yagmj2n2w1k-jq-1.6-bin/bin/jq -n --arg greeting world '{"hello":$greeting}'
+   6   │     /nix/store/6lbq9zpqzmqsscj66n7lhn7ir2x6i50n-libressl-3.1.4-bin/bin/openssl version
    7   │     set +x
    8   │ }
    9   │ 
   10   │ just_being_helpful
   11   │ 
-  12   │ source /nix/store/mckzqnnmb5v29n8cxmvdvgj1ryr5pm1d-testmod2-unreleased/bin/openssl.sh
+  12   │ source /nix/store/bv2bcf9x0bh9va9f0pf6qsd61355x7xl-testmod2-unreleased/bin/openssl.sh
   13   │ 
   14   │ ### resholve directives (auto-generated) ## format_version: 2
-  15   │ # resholve: keep /nix/store/6z7mjlcwrxl8nby82f5vnfs5gmd8whac-testmod1-unreleased/submodule/helper.sh
-  16   │ # resholve: keep /nix/store/mbahl5am0rx7aqf0z2wg34vvcld7124y-jq-1.6-bin/bin/jq
-  17   │ # resholve: keep /nix/store/mckzqnnmb5v29n8cxmvdvgj1ryr5pm1d-testmod2-unreleased/bin/openssl.sh
-  18   │ # resholve: keep /nix/store/n5rhhyjrjygps9iapqxvwn8ns6nqxdmx-libressl-3.1.3-bin/bin/openssl
+  15   │ # resholve: keep /nix/store/6lbq9zpqzmqsscj66n7lhn7ir2x6i50n-libressl-3.1.4-bin/bin/openssl
+  16   │ # resholve: keep /nix/store/hcl24glm0i9rzva0f96r4yagmj2n2w1k-jq-1.6-bin/bin/jq
+  17   │ # resholve: keep source:/nix/store/1z05cfn8bw3dpg7bff2wfv6xhrwbyfdq-testmod1-unreleased/submodule/helper.sh
+  18   │ # resholve: keep source:/nix/store/bv2bcf9x0bh9va9f0pf6qsd61355x7xl-testmod2-unreleased/bin/openssl.sh
   19   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ```

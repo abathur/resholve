@@ -10,7 +10,7 @@
 , doCheck ? true
 }:
 let
-  version = "0.2.1";
+  version = "0.3.0";
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*

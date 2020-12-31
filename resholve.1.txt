@@ -54,14 +54,14 @@ CCOONNTTRROOLLLLIINNGG RREESSOOLLUUTTIIOONN
      separated by a space: ’_d_i_r_e_c_t_i_v_e[ _d_i_r_e_c_t_i_v_e]...’
 
      −−−−ffaakkee ’_d_i_r_e_c_t_i_v_e_s’ | RESHOLVE_FAKE=’_d_i_r_e_c_t_i_v_e_s’
-         Pretend some commands exist (if there’s a good reason resholve
-         doesn’t know about them). There is one directive form:
+         Pretend some things exist (if there’s a good reason resholve doesn’t
+         know about them). There is one directive form:
 
          _t_y_p_e:_n_a_m_e[;_n_a_m_e]...
             Treat _n_a_m_e(s) of _t_y_p_e as defined; _t_y_p_e is the full word or first
-            letter of: _alias, _builtin, _external, _function, or _keyword.
+            letter of: _alias, _builtin, _external, _function, _keyword, or _source.
 
-         Ex: −−−−ffaakkee ’f:setUp;tearDown builtin:setopt’
+         Ex: −−−−ffaakkee ’f:setUp;tearDown builtin:setopt source:/etc/bashrc’
 
      −−−−ffiixx ’_d_i_r_e_c_t_i_v_e_s’ | RESHOLVE_FIX=’_d_i_r_e_c_t_i_v_e_s’
          Fix some things it it isn’t safe to fix/ignore by default. Directive
@@ -83,14 +83,18 @@ CCOONNTTRROOLLLLIINNGG RREESSOOLLUUTTIIOONN
             ignore _i_n_n_e_r___c_o_m_m_a_n_d(s) in the arguments to _o_u_t_e_r___c_o_m_m_a_n_d
 
          $_v_a_r_i_a_b_l_e (Note: $ may need escaping)
-            ignore $_v_a_r_i_a_b_l_e used as all or part of a first word (command)
+            ignore $_v_a_r_i_a_b_l_e or ${_v_a_r_i_a_b_l_e} used as all or part of a first
+            word (command)
 
             Such as: ‘$GIT status‘ or ‘$BUSYBOX/ls‘
 
          _a_b_s_o_l_u_t_e___p_a_t_h
             ignore a specific _a_b_s_o_l_u_t_e___p_a_t_h
 
-         Ex: −−−−kkeeeepp ’which:git;curl source:$HOME $LS:exa /etc/bashrc’
+         _~_/_p_a_t_h
+            ignore a specific _h_o_m_e_‐_r_e_l_a_t_i_v_e___p_a_t_h
+
+         Ex: −−−−kkeeeepp ’which:git;ls .:$HOME $LS:exa /etc/bashrc ~/.bashrc’
 
 EENNVVIIRROONNMMEENNTT
      Most options can also be passed via environment variables. For example,

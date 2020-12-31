@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.0 (Dec 30 2020)
+- require exemption to source abspaths (i.e. `--keep source:abspath`). This path will still have to exist--because resholve will need to parse the sourced file.
+- related to above, added a `source:path` fake directive for instructing resholve not to parse or care about the existence of a sourced file (try not to use this)
+- added a `--keep ~/path` form, which allows invocations of a specific user-home-relative path
+
 ## v0.2.1 (Dec 27 2020)
 - support basic `coproc command` syntax
 
