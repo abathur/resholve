@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.0 (Jan 4 2021)
+I've updated the Nix API to address some PR feedback. This isn't really a functional change, but it does flatten out the namespace:
+- `resholve.resholve` should now be `resholve`
+- `resholve.resholvePackage` should now be `resholvePackage`
+
+Before this change, I consumed resholve myself with something like:
+```nix
+resholve = self.callPackage ../pkgs/resholve { };
+```
+
+I now consume it like:
+
+```nix
+inherit (self.callPackage ../pkgs/resholve { })
+  resholve resholvePackage;
+```
+
 ## v0.3.0 (Dec 30 2020)
 - require exemption to source abspaths (i.e. `--keep source:abspath`). This path will still have to exist--because resholve will need to parse the sourced file.
 - related to above, added a `source:path` fake directive for instructing resholve not to parse or care about the existence of a sourced file (try not to use this)

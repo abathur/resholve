@@ -10,7 +10,7 @@
 , doCheck ? true
 }:
 let
-  version = "0.3.0";
+  version = "0.4.0";
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*
@@ -32,7 +32,6 @@ python27Packages.buildPythonApplication {
   inherit version;
   src = rSrc;
   format = "other";
-  disabled = !python27Packages.isPy27;
 
   nativeBuildInputs = [ installShellFiles ];
 
@@ -45,29 +44,26 @@ python27Packages.buildPythonApplication {
   '';
 
   installPhase = ''
-    mkdir -p $out/bin
-    install resholve $out/bin/
+    install -Dm755 resholve $out/bin/resholve
     installManPage resholve.1
   '';
+
   inherit doCheck;
   checkInputs = [ bats ];
-  RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
+  RESHOLVE_PATH = "${stdenv.lib.makeBinPath [ file findutils gettext ]}";
 
-  # explicit interpreter for test suite; maybe some better way...
-  INTERP = "${bash}/bin/bash";
   checkPhase = ''
-    PATH=$out/bin:$PATH
+    # explicit interpreter for test suite
+    export INTERP="${bash}/bin/bash" PATH="$out/bin:$PATH"
     patchShebangs .
     ./test.sh
   '';
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Resolve external shell-script dependencies";
     homepage = "https://github.com/abathur/resholve";
-    license = with stdenv.lib.licenses; [
-      mit
-    ];
-    maintainers = with stdenv.lib.maintainers; [ abathur ];
-    platforms = stdenv.lib.platforms.all;
+    license = with licenses; [ mit ];
+    maintainers = with maintainers; [ abathur ];
+    platforms = platforms.all;
   };
 }

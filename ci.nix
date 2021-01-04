@@ -2,9 +2,11 @@
 
 with pkgs;
 let
-  resholve = callPackage ./default.nix { };
+  inherit (callPackage ./default.nix { })
+    resholve resholvePackage;
+
   shunit2 = with pkgs.shunit2;
-    resholve.resholvePackage {
+    resholvePackage {
       inherit pname src version installPhase;
       solutions = {
         shunit = {
@@ -45,7 +47,7 @@ let
         };
       };
     };
-  test_module1 = resholve.resholvePackage {
+  test_module1 = resholvePackage {
     pname = "testmod1";
     version = "unreleased";
 
@@ -68,7 +70,7 @@ let
 
     is_it_okay_with_arbitrary_envs = "shonuff";
   };
-  test_module2 = resholve.resholvePackage {
+  test_module2 = resholvePackage {
     pname = "testmod2";
     version = "unreleased";
 
@@ -96,7 +98,7 @@ let
       };
     };
   };
-  test_module3 = resholve.resholvePackage {
+  test_module3 = resholvePackage {
     pname = "testmod3";
     version = "unreleased";
 
@@ -129,7 +131,7 @@ stdenv.mkDerivation {
     cp *demo.txt $out/
   '';
   doCheck = true;
-  buildInputs = [ resholve.resholve bat ansifilter ];
+  buildInputs = [ resholve bat ansifilter ];
   propagatedBuildInputs = [ test_module3 ];
   checkInputs = [ bats ];
 
