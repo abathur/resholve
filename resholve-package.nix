@@ -72,7 +72,7 @@ let
   /* Build a single resholve invocation */
   makeInvocation = solution: value:
     if validateSolution value then
-      "${makeEnvs solution value} resholve --overwrite ${makeArgs value}"
+      "${makeEnvs solution value} ${resholve}/bin/resholve --overwrite ${makeArgs value}"
     else throw "invalid solution"; # shouldn't trigger for now
 
   /* Build resholve invocation for each solution. */
@@ -82,7 +82,6 @@ let
   self = (stdenv.mkDerivation ((removeAttrs attrs [ "solutions" ])
     // {
     inherit pname version src;
-    buildInputs = [ resholve ];
 
     # enable below for verbose debug info if needed
     # supports default python.logging levels
