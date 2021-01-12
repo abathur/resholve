@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.4.1 (Jan 11 2021)
+The Nix API now uses a workaround to avoid leaking resholve's python dependencies into the environment of packages that use `resholve` or `resholvePackage`.
+
 ## v0.4.0 (Jan 4 2021)
 I've updated the Nix API to address some PR feedback. This isn't really a functional change, but it does flatten out the namespace:
 - `resholve.resholve` should now be `resholve`

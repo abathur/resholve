@@ -10,7 +10,7 @@
 , doCheck ? true
 }:
 let
-  version = "0.4.0";
+  version = "0.4.1";
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*
@@ -57,6 +57,12 @@ python27Packages.buildPythonApplication {
     export INTERP="${bash}/bin/bash" PATH="$out/bin:$PATH"
     patchShebangs .
     ./test.sh
+  '';
+
+  # Do not propagate Python; may be obsoleted by nixos/nixpkgs#102613
+  # for context on why, see abathur/resholve#20
+  postFixup = ''
+    rm $out/nix-support/propagated-build-inputs
   '';
 
   meta = with stdenv.lib; {
