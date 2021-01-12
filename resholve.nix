@@ -59,6 +59,12 @@ python27Packages.buildPythonApplication {
     ./test.sh
   '';
 
+  # Do not propagate Python; may be obsoleted by nixos/nixpkgs#102613
+  # for context on why, see abathur/resholve#20
+  postFixup = ''
+    rm $out/nix-support/propagated-build-inputs
+  '';
+
   meta = with stdenv.lib; {
     description = "Resolve external shell-script dependencies";
     homepage = "https://github.com/abathur/resholve";
