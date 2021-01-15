@@ -68,4 +68,4 @@ echo '```'
 nix-build ci.nix
 update
 # gen plaintext manpage?
-groff -m mdoc -T utf8 resholve.1 > resholve.1.txt
+groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt

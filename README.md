@@ -6,7 +6,7 @@ resholve replaces references to a bash/shell script's external
 dependencies (commands and sourced scripts) with absolute paths, ensuring
 they are declared, present, and don't shift if PATH changes.
 
-Some people think of resholve as the missing linker for bash scripts.
+Others have called resholve "patchelf, but for shell scripts" and a "linker for bash scripts."
 
 It treats references it can't resolve as errors (to block a build, 
 install, package, or deploy process) until you tell it how to handle 
