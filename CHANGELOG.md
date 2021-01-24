@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.4.2 (Jan 24 2021)
+Fix a bug that caused the shebang not to be correctly generated in some circumstances.
+
 ## v0.4.1 (Jan 11 2021)
 The Nix API now uses a workaround to avoid leaking resholve's python dependencies into the environment of packages that use `resholve` or `resholvePackage`.
 

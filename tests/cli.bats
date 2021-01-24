@@ -81,6 +81,16 @@ resholve --interpreter $INTERP < file_simple.sh
 resholve --interpreter $INTERP file_simple.sh
 CASES
 
+@test "ensure shebangs are identical" {
+  resholve --interpreter $INTERP file_simple.sh
+  resholve --interpreter $INTERP < file_simple.sh > file_simple.sh.resolved2
+  require <({
+    status 0
+  })
+} <<CASES
+diff file_simple.sh.resolved file_simple.sh.resolved2
+CASES
+
 @test "resholve resolves simple external dependency from command-line args" {
   require <({
     status 0
