@@ -9,9 +9,9 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 @test "verify warnings are thrown for quoted evals" {
   require <({
     status 0
-    line 3 contains "eval_quoted.sh:3: $quoted_eval"
-    line 6 contains "eval_quoted.sh:6: $quoted_eval"
-    line 9 contains "eval_quoted.sh:11: $quoted_eval"
+    line 3 contains "eval_quoted.sh:4: $quoted_eval"
+    line 6 contains "eval_quoted.sh:7: $quoted_eval"
+    line 9 contains "eval_quoted.sh:12: $quoted_eval"
   })
 } <<CASES
 resholve --interpreter $INTERP eval_quoted.sh

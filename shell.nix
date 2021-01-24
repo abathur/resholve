@@ -6,12 +6,12 @@ resholve itself, not just resholve's dependencies.
 
 with pkgs;
 let
-  resholve = callPackage ./default.nix { doCheck = false; };
+  resholve = callPackage ./resholve.nix { doCheck = false; };
   resolveTimeDeps = [ file findutils gettext ];
   checkInputs = [ pkgs.bats ];
 in
 pkgs.mkShell {
-  buildInputs = [ resholve.resholve bats nixpkgs-fmt ] ++ checkInputs;
+  buildInputs = [ resholve bats nixpkgs-fmt ] ++ checkInputs;
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
   INTERP = "${bash}/bin/bash";
 }
