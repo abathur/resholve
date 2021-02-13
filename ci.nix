@@ -142,6 +142,7 @@ stdenv.mkDerivation {
 
   checkPhase = ''
     patchShebangs .
+    echo ci.nix $TERM
     printf "\033[33m============================= resholve demo ===================================\033[0m\n"
     ./demo |& tee demo.ansi
 
