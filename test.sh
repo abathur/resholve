@@ -6,4 +6,5 @@ set -o errexit
 python tests/test_oil_namespace.py
 
 # and run all bats tests
+echo IN TEST, OUTSIDE OF BATS $TERM
 bats tests
