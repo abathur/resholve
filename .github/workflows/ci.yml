@@ -1,4 +1,5 @@
 name: "Test"
+
 on:
   pull_request:
   push:
@@ -19,3 +20,4 @@ jobs:
         nix_path: nixpkgs=channel:nixos-unstable
     - run: echo outside $TERM
     - run: nix-build ci.nix
+      shell: 'bash -i {0}'
