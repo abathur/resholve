@@ -62,7 +62,7 @@ nix-shell -p resholve
 ```
 
 ### Nix builder
-TODO
+The best documentation on the Nix builder is currently in [nixpkgs](https://github.com/nixos/nixpkgs/blob/master/pkgs/development/misc/resholve/README.md).
 
 ### DIY
 
