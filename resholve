@@ -1686,6 +1686,16 @@ class ResolvedScript(RecordCommandlike):
                 for part in w_ob2.parts:
                     bad_token = find_dynamic_token(part)
                     if bad_token:
+                        # normalize across braced and unbraced subs
+                        # TODO: dedup
+                        bad_token_name = None
+                        if bad_token.id == Id.VSub_Name:
+                            # add $ prefix
+                            bad_token_name = "${:}".format(bad_token.val)
+                        elif bad_token.id == Id.VSub_DollarName:
+                            # it already has $ prefixed
+                            bad_token_name = bad_token.val
+
                         # Letting $1-style subs through for now.
                         #
                         # In practice, these could be paths we want to
@@ -1694,7 +1704,7 @@ class ResolvedScript(RecordCommandlike):
                             logger.debug(
                                 "allowing dynamic command with positional ($1, $@, $*) varsub %r:%r",
                                 word1,
-                                bad_token.val,
+                                bad_token_name,
                             )
                             return
                         # TODO: practice below mostly considers part vars like
@@ -1710,12 +1720,12 @@ class ResolvedScript(RecordCommandlike):
                         # exceptions, but make them easy to add)
                         elif (
                             bad_token.id == Id.VSub_Name
-                            and (word1, bad_token.val) in self.directives.keep
+                            and (word1, bad_token_name) in self.directives.keep
                         ):
                             logger.debug(
                                 "allowing dynamic command with exempted named ${varsub} %r:%r",
                                 word1,
-                                bad_token.val,
+                                bad_token_name,
                             )
                             return
                         # Letting $name-style subs through only if they're in
@@ -1724,12 +1734,12 @@ class ResolvedScript(RecordCommandlike):
                         elif (
                             bad_token.id == Id.VSub_DollarName
                             # [1:] to leave off the $
-                            and (word1, bad_token.val) in self.directives.keep
+                            and (word1, bad_token_name) in self.directives.keep
                         ):
                             logger.debug(
                                 "allowing dynamic command with exempted named $varsub %r:%r",
                                 word1,
-                                bad_token.val[1:],
+                                bad_token_name,
                             )
                             return
                         else:
