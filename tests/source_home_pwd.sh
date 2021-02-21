@@ -1,4 +1,4 @@
-# HOME needs exemption: --allow source:HOME or RESHOLVE_ALLOW='source:HOME'
+# HOME needs exemption: --keep source:$HOME or RESHOLVE_KEEP='source:$HOME'
 source $HOME/file_simple.sh
-# PWD needs exemption: --allow source:PWD or RESHOLVE_ALLOW='source:PWD'
+# PWD needs exemption: --keep source:$PWD or RESHOLVE_KEEP='source:$PWD'
 source $PWD/file_simple.sh

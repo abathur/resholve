@@ -1096,7 +1096,7 @@ class OrderedCommandResolver(object):
 
         NOTE: if you're using resholve for some other shell and have
         a builtin not in this list, you can add an exemption with
-        --allow builtin:<name>
+        --fake builtin:<name>
         """
         return True if self.name in self.KNOWN_BUILTINS else False
 
@@ -1445,7 +1445,18 @@ class ResolvedScript(RecordCommandlike):
                             __version__, DIRECTIVE_FORMAT, version
                         )
                     )
-                # TODO: haven't decided what we should do w/ mismatches
+            # older directive separator
+            elif line.startswith("### resholve directives (auto-generated)"):
+                # some modern version
+                version = "1"
+                if version != DIRECTIVE_FORMAT:
+                    logger.warning(
+                        "resholve version {:} with *native* directive "
+                        "fmt v{:} parsing directive fmt v{:}".format(
+                            __version__, DIRECTIVE_FORMAT, version
+                        )
+                    )
+            # TODO: any lines we should freak out about?
         script.seek(0)
         self.directives.update(self.in_doc_directives, directives)
 
