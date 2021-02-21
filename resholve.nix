@@ -1,4 +1,4 @@
-{ stdenv
+{ lib
 , callPackage
 , python27Packages
 , installShellFiles
@@ -50,7 +50,7 @@ python27Packages.buildPythonApplication {
 
   inherit doCheck;
   checkInputs = [ bats ];
-  RESHOLVE_PATH = "${stdenv.lib.makeBinPath [ file findutils gettext ]}";
+  RESHOLVE_PATH = "${lib.makeBinPath [ file findutils gettext ]}";
 
   checkPhase = ''
     # explicit interpreter for test suite
@@ -65,7 +65,7 @@ python27Packages.buildPythonApplication {
     rm $out/nix-support/propagated-build-inputs
   '';
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "Resolve external shell-script dependencies";
     homepage = "https://github.com/abathur/resholve";
     license = with licenses; [ mit ];

@@ -135,7 +135,7 @@ stdenv.mkDerivation {
   propagatedBuildInputs = [ test_module3 ];
   checkInputs = [ bats ];
 
-  RESHOLVE_PATH = "${stdenv.lib.makeBinPath resolveTimeDeps}";
+  RESHOLVE_PATH = "${lib.makeBinPath resolveTimeDeps}";
 
   # explicit interpreter for demo suite; maybe some better way...
   INTERP = "${bash}/bin/bash";
