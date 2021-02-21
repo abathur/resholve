@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.4.3 (Feb 21 2021)
+Fix missing $V/${V} normalization in --keep command:$var forms (this prevented ${V} from being exempted correctly).
+
 ## v0.4.2 (Jan 24 2021)
 Fix a bug that caused the shebang not to be correctly generated in some circumstances.
 
