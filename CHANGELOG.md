@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.5.0 (Feb 26 2021)
+Update resholve's oil dependency from ~0.8.pre4 to 0.8.7. In theory this should have little real impact since resholve's own options/APIs remain unchanged, but the impacts certainly *could* be greater than a normal bugfix release.
+
 ## v0.4.3 (Feb 21 2021)
 Fix missing $V/${V} normalization in --keep command:$var forms (this prevented ${V} from being exempted correctly).
 

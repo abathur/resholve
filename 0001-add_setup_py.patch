@@ -29,7 +29,7 @@ index 00000000..ed7189af
 +
 +setup(
 +    name="oil",
-+    version="0.8",
++    version="0.8.7",
 +    description="A new unix shell",
 +    package_dir={"oil": ""},
 +    packages=["oil"] + ["oil."+x for x in find_packages()],

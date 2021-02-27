@@ -10,7 +10,7 @@
 , doCheck ? true
 }:
 let
-  version = "0.4.3";
+  version = "0.5.0";
   rSrc = ./.;
   deps = callPackage ./deps.nix {
     /*
@@ -23,6 +23,9 @@ let
       "${rSrc}/0002-add_MANIFEST_in.patch"
       "${rSrc}/0003-fix_codegen_shebang.patch"
       "${rSrc}/0004-disable-internal-py-yajl-for-nix-built.patch"
+      "${rSrc}/0005_revert_libc_locale.patch"
+      "${rSrc}/0006_disable_failing_libc_tests.patch"
+      "${rSrc}/0007_restore_root_init_py.patch"
     ];
   };
   resolveTimeDeps = [ file findutils gettext ];
