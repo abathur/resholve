@@ -60,7 +60,7 @@ rec {
   # resholve's primary dependency is this developer build of the oil shell.
   oildev = python27Packages.buildPythonPackage rec {
     pname = "oildev-unstable";
-    version = "2020-03-31";
+    version = "2021-02-26";
 
     src = fetchFromGitHub {
       owner = "oilshell";
