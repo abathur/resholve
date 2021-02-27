@@ -62,7 +62,7 @@ CASES
 
 @test "can't resolve a named coproc w/o upstream support :(" {
   require <({
-    status 2
+    status 1
     line 3 ends "error: Unexpected word while parsing command line"
   })
 } <<CASES

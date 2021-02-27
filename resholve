@@ -146,6 +146,7 @@ from oil.core import alloc  # Arena
 from oil.core import error  # Parse, _ErrorWithLocation
 from oil.core import main_loop  # ParseWholeFile
 from oil.core import optview  # Parse
+from oil.core import state  # InitOpts
 from oil.core import ui  # PrettyPrintError
 
 from oil.osh import word_  # LeftMostSpanForWord, RightMostSpanForWord StaticEval
@@ -717,14 +718,14 @@ def find_dynamic_token(part):
             raise AssertionError(part.tag_())
 
 
-# before, we had to do optview.parse([False] * option_i.ARRAY_SIZE) and
-# optview.Exec([False] * option_i.ARRAY_SIZE, errexit)
-class FalseListFake(object):
+# For optview.Parse. Oil does [False] * option_i.ARRAY_SIZE and
+# [None] * option_i.ARRAY_SIZE; we'll cheat
+class NoneListFake(object):
     def __getitem__(self, option):
-        return False
+        return None
 
 
-NO_OPTIONS = FalseListFake()
+NO_OPTIONS_OVERLAY = NoneListFake()
 
 
 class ExceptionWithContext(error._ErrorWithLocation):
@@ -1350,9 +1351,10 @@ class ResolvedScript(RecordCommandlike):
                 script = self.replace_shebang(script, shebang)
 
             arena = alloc.Arena()
+
             parse_ctx = parse_lib.ParseContext(
                 arena=arena,
-                parse_opts=optview.Parse(NO_OPTIONS),
+                parse_opts=optview.Parse(state.InitOpts(), NO_OPTIONS_OVERLAY),
                 aliases={},  # dummy
                 oil_grammar=None,
             )
