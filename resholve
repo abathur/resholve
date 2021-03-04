@@ -952,6 +952,10 @@ class OrderedCommandResolver(object):
     def name(self):
         return self.cmd.name
 
+    @property
+    def path(self):
+        return self.cmd.path
+
     def _true(self):
         return True
 
@@ -972,6 +976,7 @@ class OrderedCommandResolver(object):
                 return self._true
             elif (self.name,) in relevant.fix:
                 # user said to resolve this abspath as if it were bare
+                self.cmd.path = self.name
                 self.cmd.name = os.path.basename(self.name)
                 return self.resolve_external
             else:
@@ -1125,7 +1130,7 @@ class CommandLike(object):
     Represents each distinct command-like "word" we encounter.
     """
 
-    name = function = alias = None
+    name = function = alias = path = None
 
     def __init__(self, name):
         self.name = name
@@ -1196,7 +1201,7 @@ class CommandLike(object):
                     break
                 elif test:
                     # only external can return more than just t/f
-                    solution.replace_name_with(self.name, test)
+                    solution.replace_name_with(self.path or self.name, test)
                     for source in self.order_to_source[distinct_cro]:
                         source.directives.keep.add((test,))
                     break

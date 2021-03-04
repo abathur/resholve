@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.5.1 (Mar 4 20201)
+Fix re-resolution of an existing abspath command (specified via --fix abspath), which was incorrectly replacing the basename with the new abspath instead of replacing the entire command path.
+
 ## v0.5.0 (Feb 26 2021)
 Update resholve's oil dependency from ~0.8.pre4 to 0.8.7. In theory this should have little real impact since resholve's own options/APIs remain unchanged, but the impacts certainly *could* be greater than a normal bugfix release.
 

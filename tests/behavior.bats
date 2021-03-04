@@ -143,3 +143,13 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP --fake 'function:colon:colon:colon;weirdtimes' < function_colon.sh
 CASES
+
+@test "resolve abspath with --fix abspath" {
+  require <({
+    status 0
+    line 2 begins "/nix/store/"
+    line 2 ends "/bin/file"
+  })
+} <<CASES
+resholve --interpreter $INTERP --fix '/usr/bin/file' < abspath_command.sh
+CASES
