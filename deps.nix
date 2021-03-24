@@ -65,8 +65,8 @@ rec {
     src = fetchFromGitHub {
       owner = "oilshell";
       repo = "oil";
-      rev = "11c6bd3ca0e126862c7a1f938c8510779837affa";
-      hash = "sha256-UTQywtx+Dn1/qx5uocqgGn7oFYW4R5DbuiRNF8t/BzY=";
+      rev = "270a93a1360d9bfbe77e7f0ec566fe8637da4048";
+      hash = "sha256-A/0v8hb2g9Rw1MUqrfYyFx5PNi0mRkcM67SlBMGGlbA=";
 
       /*
       It's not critical to drop most of these; the primary target is
@@ -104,9 +104,6 @@ rec {
     '';
 
     _NIX_SHELL_LIBCMARK = "${cmark}/lib/libcmark${stdenv.hostPlatform.extensions.sharedLibrary}";
-
-    # See earlier note on glibcLocales
-    LOCALE_ARCHIVE = lib.optionalString (stdenv.buildPlatform.libc == "glibc") "${glibcLocales}/lib/locale/locale-archive";
 
     meta = {
       description = "A new unix shell";
