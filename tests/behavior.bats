@@ -153,3 +153,14 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP --fix '/usr/bin/file' < abspath_command.sh
 CASES
+
+us=$'\x1f'
+@test "resolve commands in args to execing executables" {
+  require <({
+    status 0
+    line 5 contains '/bin/find $(type -p file) -name file -exec /nix/store/'
+    line 5 contains "/bin/file {} +  "
+  })
+} <<CASES
+resholve --interpreter $INTERP --assay <(echo $(type -p find)${us}find __NO_COMMAND_SUB__ -name file -exec file {} +${us}yes${us}5 ; echo abspath${us}cmdname${us}args${us}no) < nested_execer.sh
+CASES

@@ -56,8 +56,14 @@ python27Packages.buildPythonApplication {
   RESHOLVE_PATH = "${lib.makeBinPath [ file findutils gettext ]}";
 
   checkPhase = ''
+    us=$'\x1f'
+    echo can''${us}${findutils}/bin/find >> $PWD/lore
+    echo cannot''${us}${file}/bin/file >> $PWD/lore
+    for each in gettext ngettext envsubst; do
+      echo cannot''${us}${gettext}/bin/$each >> $PWD/lore
+    done
     # explicit interpreter for test suite
-    export INTERP="${bash}/bin/bash" PATH="$out/bin:$PATH"
+    export INTERP="${bash}/bin/bash" PATH="$out/bin:$PATH" RESHOLVE_LORE=$PWD/lore
     patchShebangs .
     ./test.sh
   '';

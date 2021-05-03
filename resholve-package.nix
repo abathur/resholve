@@ -1,4 +1,4 @@
-{ stdenv, lib, resholve }:
+{ stdenv, lib, resholve, binlore }:
 
 { pname
 , src
@@ -72,7 +72,12 @@ let
   /* Build a single resholve invocation */
   makeInvocation = solution: value:
     if validateSolution value then
-      "${makeEnvs solution value} resholve --overwrite ${makeArgs value}"
+      # TODO/DOING: one of a few things MUST be true:
+      # 1. resholve has a semantic way to pass separate files (and the code here figures out how to deliver)
+      # 2. we pass resholve a directory, and it bitches if the correct lorefiles aren't present
+      # 3. binlore's format gets collapsed down into a single file, presumably with a leading type specifier on every line (bleh)
+      # 4. ?
+      "RESHOLVE_LORE=${binlore.collect { drvs = value.inputs; } }/execers ${makeEnvs solution value} resholve --overwrite ${makeArgs value}"
     else throw "invalid solution"; # shouldn't trigger for now
 
   /* Build resholve invocation for each solution. */
@@ -83,13 +88,14 @@ let
     // {
     inherit pname version src;
     buildInputs = [ resholve ];
-
     # enable below for verbose debug info if needed
     # supports default python.logging levels
     # LOGLEVEL="INFO";
     preFixup = ''
       pushd "$out"
+      set -x # TODO: temporary for debug/clarity
       ${builtins.concatStringsSep "\n" (makeCommands solutions)}
+      set +x
       popd
     '';
   }));

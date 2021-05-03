@@ -5,6 +5,35 @@ let
   inherit (callPackage ./default.nix { })
     resholve resholvePackage;
 
+  # binlore = pkgs.callPackage ../binlore { };
+  binlore = callPackage (fetchFromGitHub {
+    owner = "abathur";
+    repo = "binlore";
+    rev = "73db2f951d7318a9a401583445b737728d52153e";
+    hash = "sha256-puUiXxmdV31Mh1MQmFdT+ukv4hkNujavMui2U46hYd8=";
+  }) { };
+
+  /* TODO: wrapped copy of find so that we can eventually test
+  our ability to see through wrappers. Unused for now. */
+  wrapfind = runCommand "wrapped-find" { } ''
+    source ${makeWrapper}/nix-support/setup-hook
+    makeWrapper ${findutils}/bin/find $out/bin/wrapped-find
+  '';
+  /* TODO:
+  unrelated, but is there already a function (or would
+  there be demand for one?) along the lines of:
+  wrap = { drv, executable(s?), args ? { } }: that:
+  - generates a sane output name
+  - sources makewrapper
+  - retargets real executable if already wrapped
+  - wraps the executable
+
+  I wonder because my first thought here was overrideAttrs,
+  but I realized rebuilding just for a custom wrapper is an
+  ongoing waste of time. If it is a common pattern in the
+  wild, it would be a nice QoL improvement.
+  */
+
   shunit2 = with pkgs.shunit2;
     resholvePackage {
       inherit pname src version installPhase;
@@ -136,6 +165,7 @@ stdenv.mkDerivation {
   checkInputs = [ bats ];
 
   RESHOLVE_PATH = "${lib.makeBinPath resolveTimeDeps}";
+  RESHOLVE_LORE = "${binlore.collect { drvs = resolveTimeDeps; } }/execers";
 
   # explicit interpreter for demo suite; maybe some better way...
   INTERP = "${bash}/bin/bash";

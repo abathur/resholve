@@ -8,6 +8,7 @@ DIRECTIVE_FORMAT = "2"
 import sys
 import os
 import StringIO
+import io
 
 # TODO: one of the two below :)
 import configargparse as argparse
@@ -164,6 +165,7 @@ from oil._devbuild.gen.syntax_asdl import (
     source,  # MainFile, Stdin
     word_part_e,  # ArithSub, AssocArrayLiteral, BracedVarSub, CommandSub, DoubleQuoted, EscapedLiteral, ExtGlob, Literal, ShArrayLiteral, SimpleVarSub, SingleQuoted, Splice, TildeSub
     command,  # ShFunction, Simple
+    command_sub,  # TODO
     double_quoted,  # directly for cast()
     Token,  # directly for cast(), also for alias parsing
 )
@@ -429,6 +431,34 @@ def make_arg_parser(module):
         type=directive_keep,
         help="keep things we can't auto-fix/ignore",
     )
+    res.add_argument(
+        "--oracle",
+        dest="oracle",
+        metavar="str",
+        action="append",
+        type=str,
+        help="executable TODO",
+    )
+    res.add_argument(
+        "--lore",
+        type=argparse.FileType("r"),
+        metavar="f",
+        help="lorefile TODO",
+    )
+    res.add_argument(
+        "--assayer",
+        dest="assayer",
+        metavar="str",
+        action="append",
+        type=str,
+        help="executable TODO",
+    )
+    res.add_argument(
+        "--assay",
+        type=argparse.FileType("r"),
+        metavar="f",
+        help="assayfile TODO",
+    )
 
     other = parser.add_argument_group(title="Other")
 
@@ -542,6 +572,62 @@ def sourcePATH(script_map):
     lookup_source = prev
 
 
+import csv
+
+
+class serialization_format(csv.Dialect):
+    delimiter = str("\x1f")  # https://en.wikipedia.org/wiki/Unit_separator
+    quotechar = "z"  # something absurd to make it obvious if it leaks
+    doublequote = False
+    skipinitialspace = False
+    lineterminator = "\n"
+    quoting = csv.QUOTE_NONE
+
+
+csv.register_dialect("ascii", serialization_format)
+
+lore = dict()
+decided_execers = defaultdict(dict)
+
+
+def ingest_lore(lorefile):
+    reader = csv.DictReader(
+        lorefile,
+        # TODO: this isn't right, yet, or incomplete? wrappers not addressed
+        ["verdict", "executable"],  # can|cannot|might|unknown  # abspath
+        dialect="ascii",
+    )
+    for row in reader:
+        lore[row["executable"]] = row["verdict"]
+
+
+def ingest_assay(assayfile):
+    reader = csv.DictReader(
+        assayfile,
+        [
+            "executable",  # abspath TODO: decide how wrappers affect this
+            "command",  # ~basename $@
+            # let's see if a single command works and only sep from args
+            # if absolutely necessary?
+            # "arguments", # $@
+            "verdict",  # yes|no|unknown
+            # positions 0-indexed
+            # let's try to work at the word level first?
+            "wordnum"
+            # "start",  # first char of sub-executable in args
+            # "end"  # start + len(sub-executable)
+            # ex: start=5 end=9 "xxxx yyyy zzzz"[start:end] -> "yyyy"
+        ],
+        dialect="ascii",
+    )
+    for row in reader:
+        # TODO: IDK what the right format is
+        # decided_execers[row["executable"]][row["command"]] = {
+        #     k: v for k, v in row.items() if k != "executable"
+        # }
+        decided_execers[row["command"].split()[0]] = {k: v for k, v in row.items()}
+
+
 def punshow():
     args = parser.parse_args()
     # if it makes sense at some point, vars(args) yields a dict of these
@@ -571,6 +657,12 @@ def punshow():
         for group in args.keep:
             directives.keep.update(group)
 
+    if args.lore:
+        ingest_lore(args.lore)
+
+    if args.assay:
+        ingest_assay(args.assay)
+
     if ("aliases",) not in directives.fix:
         RecordCommandlike.disable_alias_replacement()
 
@@ -588,7 +680,14 @@ def punshow():
             # None == <stdin>
             with sourcePATH(dict()):
                 resolved_scripts[None] = ResolvedScript(
-                    shebang=shebang, prologue=args.prologue, epilogue=args.epilogue
+                    shebang=shebang,
+                    prologue=args.prologue,
+                    epilogue=args.epilogue,
+                    # TODO: decide if passing these is needed or if it can be global state?
+                    # lore=args.lore,
+                    # oracle=args.oracle,
+                    # assay=args.assay,
+                    # assayer=args.assayer,
                 )
                 to_write.add(None)
 
@@ -820,7 +919,7 @@ rule out the possibility that it's an alias defined 3 scripts down a source
 chain without parsing everything before we start resolving--so we queue.
 
 On each encounter, the visitor calls a context-specific record_ method from
-the RecordCommandlike mixin to. Each of these methods corresponds to a known
+the RecordCommandlike mixin. Each of these methods corresponds to a known
 command resolution order--a sequence of the types of command this command-like
 would resolve to. (Resolution rules differ across different contexts, like
 inside an alias, and following certain commands). This call:
@@ -864,6 +963,12 @@ class Solution(object):
 
     replacement = None
     exception = None
+
+    def __str__(self):
+        if self.solved:
+            return "{:} -> {:}".format(self.name, self.replacement)
+        else:
+            return "{:} (unsolved)".format(self.name)
 
     @property
     def solved(self):
@@ -1107,6 +1212,7 @@ class OrderedCommandResolver(object):
         return True if self.name in self.KNOWN_BUILTINS else False
 
     def resolve_external(self):
+        global lore
         executable = lookup(self.name)
         if not executable:
             # Types of ExceptionWithContext need other values in order
@@ -1122,12 +1228,40 @@ class OrderedCommandResolver(object):
                 status=3,
             )
         else:
-            return executable
+            # if we know about the executable
+            # - and know it cannot exec
+            #   - we can move on
+            # - otherwise, we need per-invocation triage (but maybe we print a warning that they can help with hinting?)
+            # if we don't
+            # - either require triage, or outright fail due to the lack of lore
+            if executable not in lore:
+                raise Exception(
+                    "wee-oo-wee-oo: resholve is now more pedantic--you have to submit lore for every executable it finds",
+                    executable,
+                    lore,
+                    # lore[executable]
+                )
+            else:
+                if lore[executable] == "cannot":
+                    logger.debug(
+                        "allowing safe-passage for executable declared 'cannot'"
+                    )
+                    # TODO: technically we could jettison position/token info for this executable now; idk if meaningful
+                    return executable
+                else:
+                    return executable
+                    # TODO: this is where we need to have recorded pos/token info, check assay, etc.
+                    # raise Exception(
+                    #     "wee-oo-wee-oo: resholve is now more pedantic--you'll have to triage whether or not every invocation of this executable could sub-exec.",
+                    #     executable,
+                    # )
 
 
 class CommandLike(object):
     """
     Represents each distinct command-like "word" we encounter.
+
+    TODO: explain!
     """
 
     name = function = alias = path = None
@@ -1214,6 +1348,7 @@ class CommandLike(object):
                 )
 
 
+# TODO: explain!
 cmdlikes = SingleKeyDefaultDict(CommandLike)
 
 
@@ -1222,16 +1357,19 @@ def resolve_cmdlikes():
     for cmdlike in cmdlikes.values():
         cmdlike.resolve()
 
+    # DOING: somewhere around here I think we also want to start resolving any subcmds?
+
 
 # TODO: refactor down some of this duplication (here and elsewhere)
 # keeping it painfully explicit for now to make it easier to
 # think/search between different cases here
 class RecordCommandlike(object):
-    solutions = word_objects = None
+    solutions = word_objects = invocations = None
 
     def __init__(self):
         self.solutions = dict()
         self.word_objects = dict()
+        self.invocations = dict()
 
     @classmethod
     def disable_alias_replacement(cls):
@@ -1245,11 +1383,31 @@ class RecordCommandlike(object):
         self.word_objects[pos] = word_object
         return pos
 
-    def record_general_cmd(self, word_object, word_text, position=None):
+    def look_for_sub_execution(self, word_object, word_text, cmd_object):
+        global decided_execers
+
+        # ex: (cmd_value.Argv argv:[echo blah] arg_spids:[8 10])
+        cmd_args = evaluator.EvalWordSequence2(cmd_object.words)
+        cmd_name = cmd_args.argv[0]
+        cmd_string = " ".join(cmd_args.argv)
+
+        if cmd_name in decided_execers:
+            assay = decided_execers[cmd_name]
+            wordnum = int(assay["wordnum"])
+            if assay["command"] == cmd_string:
+                pos = cmd_args.arg_spids[wordnum]
+                subcmd = cmd_args.argv[wordnum]
+                self.solutions[pos] = cmdlikes[subcmd].request_external_solution(self)
+
+    def record_general_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command found in general namespace."""
-        # This is where we have to act
+        # DOING: This is roughly where we have to act; I have a few thoughts:
+        # 1. because I'm requiring so much up-front submission, it may be possible to make half-decisions this early (i.e., we don't know for sure what kind of entity this command will resolve to, but we may have enough information (here? down in the cmdlike?) to realize this thing might exec if it *were* a command, and decide *now* whether to save the cmd_object and whether to do any additional work now on the off chance it lubricates some decision later
+        #    - I think the main case for this would be if it let you promptly push the new entity out into the solution stack as well, maintaining the integrity of the ~late resolution process (and keeping single-solves?)
+        # 2. Here or down in cmdlike, we need to map something to the cmd_object. I'm starting with pos, but I'm honestly not sure. It'll depend on exactly where we need it, and whether there's a sensible way to de-duplicate the checking work in the event that multiple invocations in multiple locations reduce to the same string?
         pos = self.get_word_position(word_object, position)
         self.solutions[pos] = cmdlikes[word_text].request_full_solution(self)
+        self.look_for_sub_execution(word_object, word_text, cmd_object)
 
     def record_alias_cmd(self, word_object, word_text, position=None):
         """Record command found in alias definition namespace."""
@@ -1261,15 +1419,17 @@ class RecordCommandlike(object):
         pos = self.get_word_position(word_object, position)
         self.solutions[pos] = cmdlikes[word_text].request_builtin_solution(self)
 
-    def record_command_cmd(self, word_object, word_text, position=None):
+    def record_command_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command argument to `command` builtin."""
         pos = self.get_word_position(word_object, position)
         self.solutions[pos] = cmdlikes[word_text].request_command_solution(self)
+        self.invocations[pos] = cmd_object
 
-    def record_external_cmd(self, word_object, word_text, position=None):
+    def record_external_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command argument to commands known to run externals."""
         pos = self.get_word_position(word_object, position)
         self.solutions[pos] = cmdlikes[word_text].request_external_solution(self)
+        self.invocations[pos] = cmd_object
 
     def record_external_source(
         self, word_object, word_text, replace_with=None, position=None
@@ -1297,6 +1457,9 @@ class RecordCommandlike(object):
         else:
             sol.no_change()
             self.resolved_source.add(word_text)
+
+
+evaluator = None
 
 
 class ResolvedScript(RecordCommandlike):
@@ -1349,13 +1512,29 @@ class ResolvedScript(RecordCommandlike):
         logger.debug("appending shebang: %r", shebang)
         return StringIO.StringIO((shebang if shebang else "") + fileob.read())
 
-    def __init__(self, script_path=None, shebang="", prologue=None, epilogue=None):
+    def __init__(
+        self,
+        script_path=None,
+        shebang="",
+        prologue=None,
+        epilogue=None,
+        # TODO: see note at call site
+        # lore=None,
+        # oracle=None,
+        # assay=None,
+        # assayer=None,
+    ):
+        global evaluator
         # generally, defer work until we know the script loaded
-        with (open(script_path) if script_path else sys.stdin) as script:
+        with (
+            open(script_path) if script_path else io.BytesIO(sys.stdin.read())
+        ) as script:
             if shebang:  # not allow_shebang:
                 script = self.replace_shebang(script, shebang)
 
             arena = alloc.Arena()
+
+            # opts = state.InitOpts()
 
             parse_ctx = parse_lib.ParseContext(
                 arena=arena,
@@ -1371,6 +1550,19 @@ class ResolvedScript(RecordCommandlike):
                 arena.PushSource(source.MainFile(script_path))
             else:
                 arena.PushSource(source.Stdin())
+
+            mem = state.Mem("", [], {"HOME": "/noplacelike"}, arena)
+            parse_opts, exec_opts, mutable_opts = state.MakeOpts(mem, None)
+            mem.exec_opts = exec_opts
+            # exec_opts = optview.Exec(opts, NO_OPTIONS_OVERLAY)
+
+            from oil.osh import split, word_eval
+
+            splitter = split.SplitContext(mem)
+            errfmt = ui.ErrorFormatter(arena)
+            evaluator = abs_eval = word_eval.CompletionWordEvaluator(
+                mem, exec_opts, mutable_opts, splitter, errfmt
+            )
 
             # set([ (scope, identifier), ... ])
             self.directives = ResolutionDirectives()
@@ -1648,7 +1840,7 @@ class ResolvedScript(RecordCommandlike):
                 )
                 return
         else:
-            self.record_general_cmd(w_ob1, word1)
+            self.record_general_cmd(w_ob1, word1, node)
 
         # If there's a second word, let's go ahead and prepare it.
         # We don't know we need it, but enough cases do that it's easier.
@@ -1783,10 +1975,10 @@ class ResolvedScript(RecordCommandlike):
                     # a step down a slippery slope I don't want to take
                     # without some better ~command handler
                     # TODO: not absolutely certain about resolution order here
-                    self.record_command_cmd(w_ob2, word2)
+                    self.record_command_cmd(w_ob2, word2, node)
                 elif word1 in ("sudo", "exec", "env"):
                     # TODO: not absolutely certain about resolution order here
-                    self.record_external_cmd(w_ob2, word2)
+                    self.record_external_cmd(w_ob2, word2, node)
                 elif word1 in (".", "source"):
                     # CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
                     target = None
@@ -1934,7 +2126,7 @@ class ResolvedScript(RecordCommandlike):
                                     else trg.parts[0].span_id
                                 )
 
-                            self.record_alias_cmd(w_ob, commandlike, pos)
+                            self.record_alias_cmd(w_ob, commandlike, position=pos)
                         else:
                             raise ResolutionError(
                                 "As far as I can tell, this just won't happen %r :]",
