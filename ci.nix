@@ -9,8 +9,8 @@ let
   binlore = callPackage (fetchFromGitHub {
     owner = "abathur";
     repo = "binlore";
-    rev = "73db2f951d7318a9a401583445b737728d52153e";
-    hash = "sha256-puUiXxmdV31Mh1MQmFdT+ukv4hkNujavMui2U46hYd8=";
+    rev = "7c9fa9f2710bd4f2919ef2be46f8dd745eec8cec";
+    hash = "sha256-ZKOPxVNfSyoSYqQydYP5vxG0BrE3gRNFGc65/VzOrBg=";
   }) { };
 
   /* TODO: wrapped copy of find so that we can eventually test
