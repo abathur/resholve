@@ -31,6 +31,12 @@ CASES
 resholve --interpreter $INTERP < absolute_path.sh
 CASES
 
+@test "Even nested-executable paths need exemptions" {
+  demo "absolute_path_nested.sh" <(status 5)
+} <<CASES
+resholve --interpreter $INTERP < absolute_path_nested.sh
+CASES
+
 @test "Source, among others, needs an exemption for arguments containing variables" {
   demo "source_var_pwd.sh" <(status 6)
 } <<CASES
@@ -115,5 +121,5 @@ us=$'\x1f'
     line 5 contains "/bin/file {} +  "
   })
 } <<CASES
-resholve --interpreter $INTERP --assay <(echo $(type -p find)${us}find __NO_COMMAND_SUB__ -name file -exec file {} +${us}yes${us}5 ; echo abspath${us}cmdname${us}args${us}no) < nested_execer.sh
+resholve --interpreter $INTERP < nested_execer.sh
 CASES

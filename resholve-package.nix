@@ -74,10 +74,10 @@ let
     if validateSolution value then
       # TODO/DOING: one of a few things MUST be true:
       # 1. resholve has a semantic way to pass separate files (and the code here figures out how to deliver)
-      # 2. we pass resholve a directory, and it bitches if the correct lorefiles aren't present
+      # 2. we pass resholve a directory (and it errors if the correct lorefiles aren't present?)
       # 3. binlore's format gets collapsed down into a single file, presumably with a leading type specifier on every line (bleh)
       # 4. ?
-      "RESHOLVE_LORE=${binlore.collect { drvs = value.inputs; } }/execers ${makeEnvs solution value} resholve --overwrite ${makeArgs value}"
+      "RESHOLVE_LORE=${binlore.collect { drvs = value.inputs; } } ${makeEnvs solution value} resholve --overwrite ${makeArgs value}"
     else throw "invalid solution"; # shouldn't trigger for now
 
   /* Build resholve invocation for each solution. */

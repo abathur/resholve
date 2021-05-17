@@ -1,18 +1,18 @@
-{ pkgs ? import <nixpkgs> { }
-, doCheck ? true
-}:
+{ pkgs ? import <nixpkgs> { } }:
 
 let
-  # binlore = pkgs.callPackage ../binlore { };
-  binlore = pkgs.callPackage (pkgs.fetchFromGitHub {
-    owner = "abathur";
-    repo = "binlore";
-    rev = "7c9fa9f2710bd4f2919ef2be46f8dd745eec8cec";
-    hash = "sha256-ZKOPxVNfSyoSYqQydYP5vxG0BrE3gRNFGc65/VzOrBg=";
-  }) { };
+  rSrc = ./.;
+  deps = pkgs.callPackage (rSrc + /deps.nix) { inherit rSrc; };
 in with pkgs; rec
 {
-  resholve = callPackage ./resholve.nix { inherit doCheck; };
-  resholvePackage =
-    callPackage ./resholve-package.nix { inherit resholve; inherit binlore; };
+  resholve = callPackage (rSrc + /resholve.nix) {
+    inherit rSrc;
+    inherit (deps) binlore;
+    inherit (deps.oil) oildev;
+    # oildev = deps.oil.oildev;
+  };
+  resholvePackage = callPackage (rSrc + /resholve-package.nix) {
+    inherit resholve;
+    inherit (deps) binlore;
+  };
 }

@@ -9,8 +9,12 @@ import sys
 import os
 import StringIO
 import io
+import copy
+import re
+import csv
 
-# TODO: one of the two below :)
+from contextlib import contextmanager, nested
+
 import configargparse as argparse
 import logging
 
@@ -130,11 +134,12 @@ def _import(name, *args):
 original_import = __builtins__.__import__
 __builtins__.__import__ = _import
 
-# NOTE:
-#   All of the below are imports from/for oil. Try to keep careful notes here on
-#   what is being used from each Oil module. Oil is still changing very
-#   quickly, and it's easier to track upstream changes with a succinct set of
-#   notes.
+"""
+NOTE:
+All of the below are imports from/for oil. Try to keep careful notes
+on what is used from each Oil module. Oil is still young.
+It's easier to track upstream reorg w/ succinct notes.
+"""
 
 # NOTE: not from oil, but just to support a rewritten variant
 # of oil code (find_dynamic_token)
@@ -151,6 +156,9 @@ from oil.core import state  # InitOpts
 from oil.core import ui  # PrettyPrintError
 
 from oil.osh import word_  # LeftMostSpanForWord, RightMostSpanForWord StaticEval
+from oil.osh import split  # SplitContext
+from oil.osh import word_eval  # CompletionWordEvaluator, StringWordEvaluator
+from oil.osh import sh_expr_eval  # ArithEvaluator
 
 # LookupSpecialBuiltin, LookupAssignBuiltin, LookupNormalBuiltin, NO_INDEX
 from oil.frontend import consts
@@ -173,15 +181,64 @@ from oil._devbuild.gen.syntax_asdl import (
 from oil.tools import osh2oil  # Cursor
 
 
-executables = dict()
-resolved_scripts = dict()
-
-
 def span_pair(word_object, arena):
     return (
         arena.GetLineSpan(word_.LeftMostSpanForWord(word_object)),
         arena.GetLineSpan(word_.RightMostSpanForWord(word_object)),
     )
+
+
+def get_token_len(token):
+    return len(token.val)
+
+
+def get_part_len(part):
+    if part.tag == word_part_e.CommandSub:
+        # skip the part itself, but assume it eats up 18 chars
+        # for "__NO_COMMAND_SUB__" (because Eval* replaces c_sub
+        # with this)
+        return 18
+    elif part.tag == word_part_e.DoubleQuoted:
+        total = len(part.left.val)
+        for subpart in part.parts:
+            total += get_part_len(subpart)
+        return total
+    elif part.tag == word_part_e.SingleQuoted:
+        total = len(part.left.val)
+        for token in part.tokens:
+            logger.debug("len token", token)
+            total += get_token_len(token)
+        return total
+    elif hasattr(part, "val"):
+        return len(part.val)
+    elif hasattr(part, "token"):
+        return get_token_len(part.token)
+    elif hasattr(part, "parts"):
+        total = 0
+        for subpart in part.parts:
+            total += get_part_len(subpart)
+        return total
+    raise Exception(part, dir(part))
+
+
+def get_word_len(word):
+    total = 0
+    for part in word.parts:
+        total += get_part_len(part)
+
+    if total == 0:
+        raise Exception()
+    return total
+
+
+def get_next_val(word):
+    start = cur = word
+    while hasattr(cur, "parts"):
+        cur = cur.parts[0]
+    if hasattr(cur, "val"):
+        return cur.val
+    elif hasattr(cur, "token"):
+        return cur.token.val
 
 
 class ResolutionDirectives(object):
@@ -287,7 +344,6 @@ def remap_fake_scope(scope):
         return scope
 
 
-# TODO: arg tests for all of these formats
 def directive_fake(value):
     global FAKE_DIRECTIVE_TYPES
     directives = parse_directive(value, remap_fake_scope)
@@ -359,6 +415,87 @@ def directive_keep(value):
             pass
             # can't do much to pre-validate these
     return directives
+
+
+class SuperSerial(csv.Dialect):
+    """
+    I'm using the unit separator for field separating but keeping \n
+    for row/record separation for now. I realize that's a little
+    inconsistent, but I feel like it's a good tradeoff between the
+    chance that the serialization format has to handle an executable
+    with the unit separator included, and keeping the format humane to
+    write/script when where/needed.
+    """
+
+    delimiter = str("\x1f")  # https://en.wikipedia.org/wiki/Unit_separator
+    quotechar = None
+    doublequote = False
+    skipinitialspace = False
+    lineterminator = "\n"
+    quoting = csv.QUOTE_NONE
+
+
+csv.register_dialect("superserial", SuperSerial)
+
+
+class LoreType(object):
+    """
+    Type for working with a "lore" directory.
+    """
+
+    lore_kinds = None
+
+    @staticmethod
+    def reader(f, fields):
+        return csv.DictReader(
+            f,
+            fields,
+            dialect="superserial",
+        )
+
+    @staticmethod
+    def execers(f):
+        return LoreType.reader(
+            f,
+            [
+                "verdict",  # can|cannot|might
+                "executable",  # abspath
+            ],
+        )
+
+    @staticmethod
+    def wrappers(f):
+        return LoreType.reader(
+            f,
+            [
+                "wrapper",  # abspath
+                "wrapped",  # abspath
+            ],
+        )
+
+    def __init__(self, lore_kinds):
+        """"""
+        self.lore_kinds = lore_kinds
+
+    def __call__(self, path):
+        try:
+            if os.path.isdir(path):
+                files = dict()
+
+                for kind in self.lore_kinds:
+                    f = open("{:}/{:}".format(path, kind))
+                    reader = getattr(self, kind)
+                    files[kind] = reader(f)
+                return files
+            else:
+                raise Exception("%s is not a directory" % path)
+        except Exception as e:
+            raise argparse.ArgumentTypeError(
+                "%s\nLore must be a "
+                "directory with a file named "
+                "'execers' (and optionally one named "
+                "'wrappers')." % e
+            )
 
 
 def make_arg_parser(module):
@@ -441,6 +578,18 @@ def make_arg_parser(module):
     )
     res.add_argument(
         "--lore",
+        type=LoreType(("execers", "wrappers")),
+        metavar="d",
+        help="lore directory",
+    )
+    res.add_argument(
+        "--execer-lore",
+        type=argparse.FileType("r"),
+        metavar="f",
+        help="lorefile TODO",
+    )
+    res.add_argument(
+        "--wrapper-lore",
         type=argparse.FileType("r"),
         metavar="f",
         help="lorefile TODO",
@@ -499,6 +648,9 @@ def make_arg_parser(module):
 
 parser = make_arg_parser(argparse)
 
+executables = dict()
+resolved_scripts = dict()
+
 
 def lookup(word):
     if word not in executables:
@@ -554,16 +706,15 @@ def lookup_source(word):
     raise NotImplementedError("lookup_source called outside of sourcePATH context")
 
 
-from contextlib import contextmanager
-
-
 @contextmanager
 def sourcePATH(script_map):
     global lookup_source
 
     def contextual_lookup_source(word):
         if word in script_map:
+            logger.debug("source in script map %r -> %r", word, script_map)
             return script_map[word]
+        logger.debug("source not in script map %r", word)
         return lookup(word)
 
     prev = lookup_source
@@ -572,53 +723,42 @@ def sourcePATH(script_map):
     lookup_source = prev
 
 
-import csv
-
-
-class serialization_format(csv.Dialect):
-    delimiter = str("\x1f")  # https://en.wikipedia.org/wiki/Unit_separator
-    quotechar = "z"  # something absurd to make it obvious if it leaks
-    doublequote = False
-    skipinitialspace = False
-    lineterminator = "\n"
-    quoting = csv.QUOTE_NONE
-
-
-csv.register_dialect("ascii", serialization_format)
-
 lore = dict()
 decided_execers = defaultdict(dict)
 
 
-def ingest_lore(lorefile):
-    reader = csv.DictReader(
-        lorefile,
-        # TODO: this isn't right, yet, or incomplete? wrappers not addressed
-        ["verdict", "executable"],  # can|cannot|might|unknown  # abspath
-        dialect="ascii",
-    )
-    for row in reader:
-        lore[row["executable"]] = row["verdict"]
+def ingest_lore(lorefiles):
+    global lore
+    logger.debug("ingesting lore %r", lorefiles)
+    logger.debug("ingesting lore:execers %r", lorefiles["execers"])
+    for row in lorefiles["execers"]:
+        logger.debug("ingesting lore:execers:row %r", row)
+        try:
+            lore[row["executable"]] = row["verdict"]
+        except Exception as e:
+            raise Exception(row, lore, e)
+
+    if "wrappers" not in lorefiles:
+        return
+
+    for row in lorefiles["wrappers"]:
+        if row["wrapper"] in lore and row["wrapped"] in lore:
+            # overwrite the wrapper's verdict with the wrapped executable's
+            lore[row["wrapper"]] = lore[row["wrapped"]]
 
 
 def ingest_assay(assayfile):
     reader = csv.DictReader(
         assayfile,
         [
-            "executable",  # abspath TODO: decide how wrappers affect this
+            "executable",  # abspath
             "command",  # ~basename $@
-            # let's see if a single command works and only sep from args
-            # if absolutely necessary?
-            # "arguments", # $@
             "verdict",  # yes|no|unknown
             # positions 0-indexed
             # let's try to work at the word level first?
-            "wordnum"
-            # "start",  # first char of sub-executable in args
-            # "end"  # start + len(sub-executable)
-            # ex: start=5 end=9 "xxxx yyyy zzzz"[start:end] -> "yyyy"
+            "wordnum",
         ],
-        dialect="ascii",
+        dialect="superserial",
     )
     for row in reader:
         # TODO: IDK what the right format is
@@ -626,6 +766,39 @@ def ingest_assay(assayfile):
         #     k: v for k, v in row.items() if k != "executable"
         # }
         decided_execers[row["command"].split()[0]] = {k: v for k, v in row.items()}
+
+
+# TODO: \s+ is probably appropriate in many of the places you have single spaces here, but I assume it'll also cause some lookbehind issues; KISS for now
+subcommand_re = {
+    # Caution: adding builtins here is almost certainly wrong;
+    # they have differing contextual resolution rules!
+    # coreutils
+    # "sort": re.compile(
+    #     r"(?<=sort ).*?(?:--compress-program (?P<resolve>['][^']*[']|[\"][^\"]*[\"]|\S*)).*"
+    # findutils
+    "find": re.compile(
+        r"(?<=find ).*(?:-(ok|exec)(dir)? )(?P<resolve>.*?)(?=\s*[;+]\s*)"
+    ),
+}
+
+"""
+I'm not planning to use these builtins after realizing they'd have to
+be functions--but they're a start towards documenting the regex format
+and idioms that will be common for external commands matched this way.
+
+I'll keep them here as a reference at least until there are enough
+external commands to crib from.
+"""
+unused_builtin_subcommand_re = {
+    "builtin": re.compile(r"(?<=builtin )(?P<resolve>.*)"),
+    # TODO: no rush, but maybe we can help the weird coproc
+    # situation with a handler that throws better errors
+    "coproc": re.compile(r"(?<=coproc )(?P<resolve>.*)"),
+    "command": re.compile(r"(?<=command (?!-(v|V) ))(?:-p )?(?P<resolve>.*)"),
+    "eval": re.compile(r"(?<=eval )(?P<resolve>.*)"),
+    # -a is probably wrong if NAME can be quoted?
+    "exec": re.compile(r"(?<=exec )(?:-(c|l|a \S+) )?(?P<resolve>.*)"),
+}
 
 
 def punshow():
@@ -659,6 +832,19 @@ def punshow():
 
     if args.lore:
         ingest_lore(args.lore)
+        global lore
+        logger.debug("lore: %r", lore)
+    elif args.execer_lore or args.wrapper_lore:
+        ingest_lore(
+            {
+                "execers": LoreType.execers(args.execer_lore)
+                if args.execer_lore
+                else tuple(),
+                "wrappers": LoreType.wrappers(args.wrapper_lore)
+                if args.wrapper_lore
+                else tuple(),
+            }
+        )
 
     if args.assay:
         ingest_assay(args.assay)
@@ -722,6 +908,9 @@ def punshow():
                 to_write.add(script)
 
         # cmdlikes are cross-source; try to resolve a single time
+        # with one big asterisk: all builtins that *might* lead to a
+        # source/alias during the first pass should be handled during
+        # resolve_script()
         resolve_cmdlikes()
 
         for script_path in to_write:
@@ -779,42 +968,47 @@ def find_dynamic_token(part):
     """
     UP_part = part
     with tagswitch(part) as case:
-        if case(word_part_e.ShArrayLiteral):
-            return cast(Token, UP_part).token
+        # TODO remove this try/except wrapper before this lands
+        try:
+            if case(word_part_e.ShArrayLiteral):
+                return cast(Token, UP_part).token
 
-        elif case(word_part_e.AssocArrayLiteral):
-            return cast(Token, UP_part).token
+            elif case(word_part_e.AssocArrayLiteral):
+                return cast(Token, UP_part).token
 
-        elif case(word_part_e.Literal):
-            return False
+            elif case(word_part_e.Literal):
+                return False
 
-        elif case(word_part_e.EscapedLiteral):
-            return False
+            elif case(word_part_e.EscapedLiteral):
+                return False
 
-        elif case(word_part_e.SingleQuoted):
-            return False
+            elif case(word_part_e.SingleQuoted):
+                return False
 
-        elif case(word_part_e.DoubleQuoted):
-            part = cast(double_quoted, UP_part)
-            for p in part.parts:
-                tok = find_dynamic_token(p)
-                if tok:
-                    return tok
+            elif case(word_part_e.DoubleQuoted):
+                part = cast(double_quoted, UP_part)
+                for p in part.parts:
+                    tok = find_dynamic_token(p)
+                    if tok:
+                        return tok
 
-            return False
+                return False
+            elif case(word_part_e.CommandSub):
+                return cast(Token, UP_part).left_token
 
-        elif case(
-            word_part_e.CommandSub,
-            word_part_e.SimpleVarSub,
-            word_part_e.BracedVarSub,
-            word_part_e.TildeSub,
-            word_part_e.ArithSub,
-            word_part_e.ExtGlob,
-            word_part_e.Splice,
-        ):
-            return cast(Token, UP_part).token
-        else:
-            raise AssertionError(part.tag_())
+            elif case(
+                word_part_e.SimpleVarSub,
+                word_part_e.BracedVarSub,
+                word_part_e.TildeSub,
+                word_part_e.ArithSub,
+                word_part_e.ExtGlob,
+                word_part_e.Splice,
+            ):
+                return cast(Token, UP_part).token
+            else:
+                raise AssertionError(part.tag_())
+        except Exception as e:
+            raise Exception("TOKEN DEBUG", UP_part, e)
 
 
 # For optview.Parse. Oil does [False] * option_i.ARRAY_SIZE and
@@ -918,6 +1112,9 @@ if they are a command) to queue them for resolution. On encounter, we can't,
 rule out the possibility that it's an alias defined 3 scripts down a source
 chain without parsing everything before we start resolving--so we queue.
 
+*(As of May 2021 there's a new wrinkle; we will try to parse/process all
+builtins that might lead to sourcing and such during the initial walk.)
+
 On each encounter, the visitor calls a context-specific record_ method from
 the RecordCommandlike mixin. Each of these methods corresponds to a known
 command resolution order--a sequence of the types of command this command-like
@@ -961,8 +1158,7 @@ class Solution(object):
     later can identify the correct replacement for each one.
     """
 
-    replacement = None
-    exception = None
+    exception = kind = replacement = None
 
     def __str__(self):
         if self.solved:
@@ -970,15 +1166,22 @@ class Solution(object):
         else:
             return "{:} (unsolved)".format(self.name)
 
+    def custom(self, kind, initial, replacement):
+        self.replacement = (initial, replacement)
+        self.kind = kind
+        return self
+
     @property
     def solved(self):
         return self.replacement is not None or self.exception is not None
 
-    def no_change(self):
+    def no_change(self, cmdkind):
         self.replacement = False
+        self.kind = cmdkind
 
-    def replace_name_with(self, name, replacement, external=False):
-        self.replacement = (name, replacement)
+    def replace_name_with(self, cmdkind, initial, replacement, external=False):
+        self.replacement = (initial, replacement)
+        self.kind = cmdkind
 
     def replace_in(self, current):
         return current.replace(*self.replacement)
@@ -1100,20 +1303,39 @@ class OrderedCommandResolver(object):
         # neither special builtins nor POSIX mode have special handling atm
         # just saving space for them in case...
         self.cro = (
-            self._true if ("alias", self.name) in relevant.fake else self.resolve_alias,
-            self._true
-            if ("keyword", self.name) in relevant.fake
-            else self.resolve_keyword,
-            self.resolve_special_builtin,
-            self._true
-            if ("function", self.name) in relevant.fake
-            else self.resolve_function,
-            self._true
-            if ("builtin", self.name) in relevant.fake
-            else self.resolve_builtin,
-            self._true
-            if ("external", self.name) in relevant.fake
-            else self.generate_external_resolver(relevant),
+            # TODO: I'm turning these into tuples with a cmdkind string
+            # but it might make sense to turn these into constants
+            (
+                "alias",
+                self._true
+                if ("alias", self.name) in relevant.fake
+                else self.resolve_alias,
+            ),
+            (
+                "keyword",
+                self._true
+                if ("keyword", self.name) in relevant.fake
+                else self.resolve_keyword,
+            ),
+            ("special_builtin", self.resolve_special_builtin),
+            (
+                "function",
+                self._true
+                if ("function", self.name) in relevant.fake
+                else self.resolve_function,
+            ),
+            (
+                "builtin",
+                self._true
+                if ("builtin", self.name) in relevant.fake
+                else self.resolve_builtin,
+            ),
+            (
+                "external",
+                self._true
+                if ("external", self.name) in relevant.fake
+                else self.generate_external_resolver(relevant),
+            ),
         )
 
     @property
@@ -1150,6 +1372,7 @@ class OrderedCommandResolver(object):
 
     TODO: in theory these can be cached, but I'm not sure it'll be
     meaningful. The expensive part, lookup(), is already cached.
+    (note that walk-time lookups for some builtins may affect this)
     """
 
     def resolve_alias(self):
@@ -1181,14 +1404,6 @@ class OrderedCommandResolver(object):
 
     def resolve_builtin(self):
         """
-        TODO: code this is based on once looked up builtins oil's way
-        but the list of builtins there are probably oil's:
-        if (
-            consts.LookupSpecialBuiltin(text) == consts.NO_INDEX
-            and consts.LookupAssignBuiltin(text) == consts.NO_INDEX
-            and consts.LookupNormalBuiltin(text) == consts.NO_INDEX
-        ):
-
         I'm not sure to what extent I want to support non-bash shells,
         but if there's a push to do so it may help to post this on SO
         or make little help-wanted issues.
@@ -1214,6 +1429,7 @@ class OrderedCommandResolver(object):
     def resolve_external(self):
         global lore
         executable = lookup(self.name)
+
         if not executable:
             # Types of ExceptionWithContext need other values in order
             # to pretty-print the error location that just aren't
@@ -1239,22 +1455,44 @@ class OrderedCommandResolver(object):
                     "wee-oo-wee-oo: resholve is now more pedantic--you have to submit lore for every executable it finds",
                     executable,
                     lore,
-                    # lore[executable]
                 )
-            else:
-                if lore[executable] == "cannot":
-                    logger.debug(
-                        "allowing safe-passage for executable declared 'cannot'"
-                    )
-                    # TODO: technically we could jettison position/token info for this executable now; idk if meaningful
-                    return executable
-                else:
-                    return executable
-                    # TODO: this is where we need to have recorded pos/token info, check assay, etc.
-                    # raise Exception(
-                    #     "wee-oo-wee-oo: resholve is now more pedantic--you'll have to triage whether or not every invocation of this executable could sub-exec.",
-                    #     executable,
-                    # )
+
+            return executable
+
+
+"""
+We have to handle a few builtins to be able to do much else:
+alias
+    it can obscure all of our other builtins/commands
+.|source
+    we need to know we have all functions/aliases defined to be confident about what's unresolved
+builtin|command|coproc|eval
+    we have to look into these in case they hold instances of the above
+
+TODO: the last of these can skip _alias_ defs, so it's also relevant
+(but these are rare in the wild, so not terribly urgent?)
+(command.CommandList
+  children: [
+    (C {<builtin>} {<source>} {<blah3>})
+    (C {(word_part.EscapedLiteral token:<Id.Lit_EscapedChar '\\s'>) <ource>} {<blah4>})
+  ]
+)
+
+CAUTION:
+We're flying about as close to the sun as we can without tiptoeing into
+symbolic execution. resholve's concept of this won't be robust to a
+rapidly-evolving runtime context.
+"""
+
+FIRST_PASS_ESSENTIALS = {
+    "alias",
+    "builtin",
+    "command",
+    "coproc",
+    "eval",
+    ".",
+    "source",
+}
 
 
 class CommandLike(object):
@@ -1264,15 +1502,55 @@ class CommandLike(object):
     TODO: explain!
     """
 
-    name = function = alias = path = None
+    name = function = alias = path = resolved = None
+
+    def __repr__(self):
+        return "CommandLike <%s>" % self.name
 
     def __init__(self, name):
         self.name = name
         self.known_sources = dict()
         self.known_exemptions = list()
+        self.invocations = set()
         self.order_to_source = defaultdict(set)
         self.order_to_solution = defaultdict(Solution)
         self.cros = MultiKeyDefaultDict(OrderedCommandResolver)
+
+    """
+    Chomp idiom added May 2021 to address some edge cases with the
+    previous process for iterating over commandlikes and invocations.
+
+    CommandLike resolution can now discover new commands/invocations
+    to resolve. My intent is to:
+    - ~chomp off an entire set of records
+    - create an empty set for new records
+    - yield the chomped records (to the code resolving them)
+    - repeat this process if the new set has records
+
+    See also: resolve_cmdlikes, CommandLike.{request_solution,resolve}
+    """
+    unresolved = set()  # intentional!
+
+    @classmethod
+    def chomp_cmdlikes(cls):
+        logger.debug("unresolved clen1 %r %r", len(cls.unresolved), cls.unresolved)
+        while len(cls.unresolved):
+            unresolved = cls.unresolved
+            cls.unresolved = set()
+            for cmdlike in unresolved:
+                yield cmdlike
+            logger.debug("unresolved clen2 %r %r", len(cls.unresolved), cls.unresolved)
+
+    def chomp_invocations(self):
+        logger.debug("unresolved ilen1 %r %r", len(self.invocations), self.invocations)
+        while len(self.invocations):
+            invocations = self.invocations
+            self.invocations = set()
+            for invocation in invocations:
+                yield invocation
+            logger.debug(
+                "unresolved ilen2 %r %r", len(self.invocations), self.invocations
+            )
 
     def scaffold_new_source(self, source):
         # only exemptions that match this commandlike's name
@@ -1293,8 +1571,18 @@ class CommandLike(object):
 
         return self.cros[(self, relevant)]
 
-    def request_solution(self, source, order):
+    def request_solution(self, source, order, cmd_object):
         self.order_to_source[order].add(source)
+        logger.debug(
+            "requesting the solution for %r with len=%r",
+            cmd_object,
+            len(cmd_object.words) if cmd_object else 0,
+        )
+        CommandLike.unresolved.add(self)
+        if cmd_object and len(cmd_object.words) > 1:
+            # if there's more than one word, track invocation
+            # so that we can check it for sub-executions later
+            self.invocations.add((source, cmd_object))
         return self.order_to_solution[order]
 
     def find_cro(self, source):
@@ -1302,43 +1590,114 @@ class CommandLike(object):
             return self.scaffold_new_source(source)
         return self.cros[(self, self.known_sources[source])]
 
-    def request_full_solution(self, source):
-        return self.request_solution(source, self.find_cro(source).full)
+    def request_full_solution(self, source, cmd_object=None):
+        return self.request_solution(source, self.find_cro(source).full, cmd_object)
 
-    def request_alias_solution(self, source):
-        return self.request_solution(source, self.find_cro(source).alias)
+    def request_alias_solution(self, source, cmd_object=None):
+        return self.request_solution(source, self.find_cro(source).alias, cmd_object)
 
-    def request_builtin_solution(self, source):
-        return self.request_solution(source, self.find_cro(source).builtin)
+    def request_builtin_solution(self, source, cmd_object=None):
+        return self.request_solution(source, self.find_cro(source).builtin, cmd_object)
 
-    def request_command_solution(self, source):
-        return self.request_solution(source, self.find_cro(source).command)
+    def request_command_solution(self, source, cmd_object=None):
+        return self.request_solution(source, self.find_cro(source).command, cmd_object)
 
-    def request_external_solution(self, source):
-        return self.request_solution(source, self.find_cro(source).external)
+    def request_external_solution(self, source, cmd_object=None):
+        return self.request_solution(source, self.find_cro(source).external, cmd_object)
 
     def resolve(self):
+        global FIRST_PASS_ESSENTIALS, lore
+        logger.debug("CALLING RESOLVE ON %r", self.name)
+        if self.resolved:
+            logger.debug(
+                "previously-resolved cmdlike %r: %r had its .resolve called again.",
+                self.name,
+                self,
+            )
         # find solutions for observed types
         for distinct_cro, solution in self.order_to_solution.items():
+            if not solution.solved:
+                # run each function, continue early on exception/true/string
+                for cmdkind, func in distinct_cro:
+                    logger.debug("resolve(%r): trying %r %r", self.name, cmdkind, func)
+                    try:
+                        # TODO: could cache these, but not sure it'll make much diff
+                        test = func()
+                    except ExceptionWithContext as e:
+                        solution.causes_exception(e)
+                        logger.debug("break because exception")
+                        break
 
-            # run each function, break early on exception/true/string
-            for func in distinct_cro:
-                try:
-                    # TODO: could cache these, but not sure it'll make much diff
-                    test = func()
-                except ExceptionWithContext as e:
-                    solution.causes_exception(e)
-                    break
+                    if test == True:
+                        solution.no_change(cmdkind)
+                        logger.debug("break because no change")
+                        break
+                    elif test:
+                        # only external can return more than just t/f
+                        solution.replace_name_with(
+                            cmdkind, self.path or self.name, test
+                        )
+                        for source in self.order_to_source[distinct_cro]:
+                            source.directives.keep.add((test,))
+                        logger.debug("break because replacement")
+                        break
 
-                if test == True:
-                    solution.no_change()
-                    break
-                elif test:
-                    # only external can return more than just t/f
-                    solution.replace_name_with(self.path or self.name, test)
-                    for source in self.order_to_source[distinct_cro]:
-                        source.directives.keep.add((test,))
-                    break
+            # TODO: these could be folded up into the for loop above?
+            if solution.solved:
+                if (
+                    solution.kind in ("builtin", "keyword")
+                    and self.name in FIRST_PASS_ESSENTIALS
+                ):
+                    pass  # should already be resolved!
+                elif solution.kind == "builtin":
+                    for source, cmd_object in self.chomp_invocations():
+                        # TODO: this is a little wasteful, but expedient
+                        # DOING: I wonder if the bit I'm trying to sort out here can also fix the wastefulness of this?
+                        # - it is wasteful because we really only need to look this up at most once per source + cmdlike (and often once per cmdlike)
+                        handler = getattr(
+                            source, "handle_builtin_{:}".format(self.name), None
+                        )
+                        if handler:
+                            args, name, text = source.get_subexec_context(cmd_object)
+                            if name == ".":  # remap
+                                # TODO: I *hope* this can be removed but
+                                # leave the emergency brake in for now
+                                name = "source"
+                                raise Exception(
+                                    "let's see; in theory these should all be picked by now..."
+                                )
+                            handler(cmd_object, args, name, text)
+                        else:
+                            logger.debug(
+                                "in theory this is fine--a builtin (%r) we don't need to handle specially",
+                                cmd_object,
+                            )
+
+                elif solution.kind == "external" and isinstance(
+                    solution.replacement, tuple
+                ):
+                    logger.debug(
+                        "compare replacement/path %r - %r - %r - %r",
+                        solution,
+                        solution.replacement,
+                        self.path,
+                        self.name,
+                    )
+                    executable = solution.replacement[1]
+
+                    logger.debug(
+                        "whimper %r %r %r",
+                        executable,
+                        lore[executable],
+                        self.invocations,
+                    )
+                    if lore[executable] != "cannot":
+                        # otherwise, walk down each execution
+                        # chain until we find a terminus
+                        for source, cmd_object in self.chomp_invocations():
+                            source.look_for_external_sub_execution(
+                                self.name, cmd_object
+                            )
 
             # TODO: rm if not seen for a while? Not sure how long... --Jun 27, 2020
             if not solution.solved:
@@ -1347,6 +1706,8 @@ class CommandLike(object):
                     % self.name
                 )
 
+        self.resolved = True
+
 
 # TODO: explain!
 cmdlikes = SingleKeyDefaultDict(CommandLike)
@@ -1354,10 +1715,24 @@ cmdlikes = SingleKeyDefaultDict(CommandLike)
 
 def resolve_cmdlikes():
     logger.info("Resolving command-likes")
-    for cmdlike in cmdlikes.values():
-        cmdlike.resolve()
+    for cmdlike in CommandLike.chomp_cmdlikes():
+        if cmdlike.resolved:
+            logger.debug(
+                "in resolve_cmdlikes, encountered previously-resolved cmdlike %r %r %r",
+                cmdlike.name,
+                cmdlike,
+                cmdlike.invocations,
+            )
+        else:
+            logger.debug(
+                "in resolve_cmdlikes, encountered first-time cmdlike %r %r %r",
+                cmdlike.name,
+                cmdlike,
+                cmdlike.invocations,
+            )
 
-    # DOING: somewhere around here I think we also want to start resolving any subcmds?
+        logger.debug("calling cmdlike.resolve(%r) from resolve_cmdlikes", cmdlike.name)
+        cmdlike.resolve()
 
 
 # TODO: refactor down some of this duplication (here and elsewhere)
@@ -1369,7 +1744,6 @@ class RecordCommandlike(object):
     def __init__(self):
         self.solutions = dict()
         self.word_objects = dict()
-        self.invocations = dict()
 
     @classmethod
     def disable_alias_replacement(cls):
@@ -1383,53 +1757,1073 @@ class RecordCommandlike(object):
         self.word_objects[pos] = word_object
         return pos
 
-    def look_for_sub_execution(self, word_object, word_text, cmd_object):
-        global decided_execers
-
+    def get_subexec_context(self, cmd_object):
         # ex: (cmd_value.Argv argv:[echo blah] arg_spids:[8 10])
         cmd_args = evaluator.EvalWordSequence2(cmd_object.words)
-        cmd_name = cmd_args.argv[0]
-        cmd_string = " ".join(cmd_args.argv)
+        logger.debug(
+            "get_subexec_context %r %r %r", cmd_object, cmd_args, cmd_args.argv
+        )
+        cmd_name = cmd_args.argv[0] or cmd_object.words[0].parts[0].val
+        cmd_text = " ".join(cmd_args.argv)
 
-        if cmd_name in decided_execers:
-            assay = decided_execers[cmd_name]
+        return cmd_args, cmd_name, cmd_text
+
+    def handle_builtin_alias(self, cmd_ob, args, name, text):
+        """
+        aliases seem simple at a blush, but the defs
+        can also be very complex...
+        alias a=b a="b" a='b' "a=b" 'a=b' a=$b a="$b" a='$b' "a=$b" 'a=$b' 'a=echo $b', etc.
+
+        code is ~v2/3 of trying to handle aliases.
+        - v1: try to spot alias identifiers to add to
+          allowed unresolved "commands"
+          # TODO: make sure the code's check order is aliases > functions > externals
+        - v2: try to extract alias/expansion pairs to
+          - allow unresolved commands
+          - make users triage externals in low-hanging-fruit
+            alias definitions (resolve? ignore?)
+          - TODO: do anything else with high-hanging fruit?
+        - v3: roughly v2 except:
+          - split out into own method
+          - ???
+
+        TODO: there may be a generalized handler for "varlikes" here, which
+        oil defines as <id>=<stuff> but I'll say is more like:
+        [<alias|declare|local|set>] [<<id>=<val>>...]
+        (mainly valuable if I decide to consider taking one more firm
+        step into dynamic-land by resolving through refs to simple vars)
+        """
+        logger.debug("alias cmd_ob: %r", cmd_ob)
+
+        for w_ob in cmd_ob.words[1:]:
+            w_ok, w_txt, _ = word_.StaticEval(w_ob)
+            # Caution: strings w/ varsubs pass static eval here
+            # may have to unwrap them first?
+            logger.debug(
+                "alias (ok? %r) split %r",
+                w_ok,
+                w_txt.strip("\"='").split("="),
+            )
+            if w_ok:
+                # not dynamic; more examples in tests/aliases.sh, but:
+                # 'd', 'echo $SOURCE_DATE_EPOCH'
+                alias, definition = w_txt.strip("\"='").split("=")
+                # TODO: maybe below deserves an explicit API
+                cmdlikes[alias].alias = True
+                commandlike = definition.split()[0]
+
+                pos = None
+
+                # Finding pos is a little tricky, so annotating the logic
+                # if the alias word has 2 parts, and the 2nd part is a token
+                #     pos = the 2nd part's span_id
+                # else
+                #     *so far* it seems like pos is always
+                #     the spid of the last part's first token OR part
+                if (
+                    w_ob.parts
+                    and len(w_ob.parts) == 2
+                    and w_ob.parts[1]
+                    and isinstance(w_ob.parts[1], Token)
+                ):
+                    logger.debug(
+                        "in any case, %r has a span_id of %r",
+                        w_ob.parts[1],
+                        w_ob.parts[1].span_id,
+                    )
+                    pos = w_ob.parts[1].span_id
+                else:
+                    trg = w_ob.parts[-1]
+                    logger.debug(
+                        "it should be the second spid of the last part; %r has a span_id of %r",
+                        trg,
+                        trg.tokens[0].span_id
+                        if hasattr(trg, "tokens")
+                        else trg.parts[0].span_id,
+                    )
+                    pos = (
+                        trg.tokens[0].span_id
+                        if hasattr(trg, "tokens")
+                        else trg.parts[0].span_id
+                    )
+
+                self.record_alias_cmd(w_ob, commandlike, position=pos)
+            # TODO: decide?
+            # elif EMIT_FEEDBACK_REQUESTS:
+            #     try:
+            #         raise FeedbackWantedWarning(
+            #             "You have a dynamic alias. Weigh in @ https://github.com/abathur/resholve/issues/XX :)",
+            #             word=w_ob,
+            #             status=8,  # TODO
+            #             arena=self.arena,
+            #         )
+            #     except FeedbackWantedWarning:
+            #         pass
+
+    def handle_first_pass_essentials(self, txt, cmd_ob):
+        global FIRST_PASS_ESSENTIALS, cmdlikes
+        subcmd = copy.deepcopy(cmd_ob)
+        subcmd.words.remove(subcmd.words[0])
+        logger.debug("handle_first_pass_essentials %r %r %r", txt, cmd_ob, subcmd)
+        if txt in FIRST_PASS_ESSENTIALS:
+            cmdlike = cmdlikes[txt]
+            if not cmdlike.alias and not cmdlike.function:
+                self.look_for_essential_builtin_sub_execution(txt, subcmd)
+                return True
+            else:
+                raise Exception("shadowed builtin", txt)
+        else:
+            return False
+
+    def handle_builtin_builtin(self, cmd_ob, args, name, text):
+        ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
+        if ok:
+            if not self.handle_first_pass_essentials(sw_txt, cmd_ob):
+                subcmd = copy.deepcopy(cmd_ob)
+                del subcmd.words[0]
+                self.record_builtin_cmd(sw_ob, sw_txt, subcmd)
+
+    # TODO: note migrated from elsewhere:
+    # we'll need a function handler for special case
+    # functionality like:
+    # - substituting command -v -> echo
+    # - possibly warning on and requiring an override for `-p`
+    def handle_builtin_command(self, cmd_ob, args, name, text):
+        ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
+        if ok:
+            if not self.handle_first_pass_essentials(sw_txt, cmd_ob):
+                subcmd = copy.deepcopy(cmd_ob)
+                del subcmd.words[0]
+                self.record_command_cmd(sw_ob, sw_txt, subcmd)
+
+    def handle_builtin_coproc(self, cmd_ob, args, name, text):
+        ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
+        if ok:
+            if not self.handle_first_pass_essentials(sw_txt, cmd_ob):
+                subcmd = copy.deepcopy(cmd_ob)
+                del subcmd.words[0]
+                self.record_command_cmd(sw_ob, sw_txt, subcmd)
+
+    def handle_builtin_source(self, cmd_ob, args, name, text):
+        """
+        CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
+        """
+        target = None
+
+        ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
+        logger.debug("handle_builtin_source %r %r %r %r", ok, sw_ob, sw_txt, _quoted)
+
+        if not ok:
+            logger.debug(
+                "Not trying to resolve/parse dynamic source statement. In theory, this should only happen when the dynamic token was exempted with a directive. We obviously can't resolve into the file, but we won't object to the statement",
+                cmd_ob,
+            )
+            return
+
+        if sw_txt.startswith("/") and os.path.isabs(sw_txt):
+            # Note: logic here tracks generate_external_resolver()
+            if ("source", sw_txt) in self.directives.keep or (
+                ".",
+                sw_txt,
+            ) in self.directives.keep:
+                # user said keep this abspath
+                self.record_external_source(sw_ob, sw_txt)
+                target = False
+            elif ("source", sw_txt,) in self.directives.fix or (
+                ".",
+                sw_txt,
+            ) in self.directives.fix:
+                # user said to resolve this abspath as if it were bare
+                relsw_txt = os.path.basename(sw_txt)
+                target = lookup_source(relsw_txt)
+                logger.debug(
+                    "Looked up source: %r -> %r -> %r",
+                    sw_txt,
+                    relsw_txt,
+                    target,
+                )
+            else:
+                # TODO: better message
+                raise ResolutionError(
+                    "Unexpected absolute source path (not supplied by a listed dependency). You should patch/substitute it.",
+                    word=sw_ob,
+                    status=5,
+                    arena=self.arena,
+                )
+        else:
+            target = lookup_source(sw_txt)
+            logger.debug("Looked up source: %r -> %r", sw_txt, target)
+
+        # it was already a valid absolute path
+        if target:
+            # lookup() seems to resolve relative filenames for files in the
+            # current directory, no matter what path is set to...
+            # TODO: I wonder if we can "fix" that by unsetting PWD or something?
+            if target == sw_txt:
+                # TODO: I guess these all need to get prefxed with $out?
+                # TODO: be skeptical of this (of what? above? below? yeesh.)
+                self.record_external_source(sw_ob, sw_txt)
+            # it resolved to a new location
+            elif target:
+                self.record_external_source(sw_ob, sw_txt, replace_with=target)
+        # It didn't resolve, or it was an invalid absolute path
+        elif target != False:
+            # in theory I could pass this exception to the new
+            # self.record_external_source, but this would mean we can't
+            # fail as soon. Failing soon seems better, no?
+            raise ResolutionError(
+                "Unable to resolve source target %r to a known file",
+                sw_txt,
+                word=sw_ob,
+                status=7,
+                arena=self.arena,
+            )
+
+    # TODO: look at that other eval/pass site and verify it is needed?
+    def handle_builtin_eval(self, cmd_ob, args, name, text):
+        w_ob1 = cmd_ob.words[0]
+        try:
+            ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
+        except ResolutionError as e:
+            logger.debug("allowing resolution error for eval %r", e)
+
+        if cmd_ob.words[1].parts[0].tag in (
+            word_part_e.SingleQuoted,
+            word_part_e.DoubleQuoted,
+        ):
+            if EMIT_FEEDBACK_REQUESTS:
+                try:
+                    raise FeedbackWantedWarning(
+                        "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholve/issues/2",
+                        w_ob1.parts[0].val,
+                        word=cmd_ob.words[1],
+                        status=66,
+                        arena=self.arena,
+                    )
+                except FeedbackWantedWarning:
+                    pass
+            return
+
+    def handle_builtin_exec(self, cmd_ob, args, name, text):
+        if len(cmd_ob.words) > 1:
+            # presumably a real command we need to recurse on
+            subcmd = args.argv[1] or cmd_ob.words[1].parts[0].val
+            pos = args.arg_spids[1]
+            cmdlike = cmdlikes[subcmd]
+
+            solution = None
+            if pos in self.solutions:
+                solution = self.solutions[pos]
+            else:
+                solution = self.solutions[pos] = cmdlike.request_external_solution(
+                    self, cmd_ob
+                )
+                self.word_objects[pos] = cmd_ob.words[1]
+
+            if not solution.solved:
+                cmdlike.resolve()
+
+        else:
+            # hopefully this is an exec with redirects;
+            # I assume we'll just back off
+            pass
+
+    def look_for_essential_builtin_sub_execution(self, outer, cmd_object):
+        global subcommand_re
+        args, name, text = self.get_subexec_context(cmd_object)
+
+        # TODO: I'm about to repeat this in resolve(); look for dedup
+        # later
+        if name == ".":  # remap
+            name = "source"
+
+        handler = getattr(self, "handle_builtin_{:}".format(name), None)
+        if handler:
+            logger.debug(
+                "name %r has subcommand handler: %r %r %r %r",
+                outer,
+                cmd_object,
+                args,
+                name,
+                text,
+            )
+            handler(cmd_object, args, name, text)
+
+        else:
+            # TODO: tentative
+            raise ResolutionError(
+                "It's an error not to handle this builtin",
+                word=cmd_object.words[0],
+                status=99,
+                arena=self.arena,
+            )
+
+    def _strip_varlikes(self, cmd_ob, args):
+        new_cmd = copy.deepcopy(cmd_ob)
+        new_args = copy.deepcopy(args)
+        logger.debug("WORDS BEFORE %r", new_cmd.words)
+        i = len(cmd_ob.words)
+        while i > 0:
+            i -= 1
+            if new_cmd.words[i].parts[0].id == Id.Lit_VarLike:
+                del new_cmd.words[i]
+                del new_args.argv[i]
+                del new_args.arg_spids[i]
+        logger.debug("WORDS AFTER %r", new_cmd.words)
+        return new_cmd, new_args, " ".join(new_args.argv)
+
+    def _handle_executable_flag(flag):
+        def temp(self, cmd_ob, args, name, text):
+            if len(cmd_ob.words) > 2:
+                logger.debug(
+                    "handle_executable_flag: %r %r %r %r", name, cmd_ob, args, text
+                )
+
+                pos = word = None
+                for i, arg in enumerate(args.argv):
+                    if arg.startswith(flag):
+                        if arg == flag:
+                            target = i + 1
+                            subcmd = (
+                                args.argv[target] or cmd_ob.words[target].parts[0].val
+                            )
+                            pos = args.arg_spids[target]
+                            cmdlike = cmdlikes[subcmd]
+                            word = cmd_ob.words[target]
+                        elif arg[len(flag)] == "=":
+                            # they might all be in one word :/
+                            subcmd = arg.split("=")[1]
+                            pos = cmd_ob.words[i].parts[-1].span_id
+                            cmdlike = cmdlikes[subcmd]
+                            # Note: this is a white lie; it's a token, not a word
+                            # I don't know if this will break elsewhere...
+                            word = cmd_ob.words[i].parts[-1]
+
+                if pos:
+                    logger.debug("%r %r %r", subcmd, pos, word)
+                    # presumably a real command we need to recurse on
+                    solution = None
+                    if pos in self.solutions:
+                        solution = self.solutions[pos]
+                    else:
+                        solution = self.solutions[
+                            pos
+                        ] = cmdlike.request_external_solution(self, cmd_ob)
+                        self.word_objects[pos] = word
+
+                    logger.debug(
+                        "while handling external flag for %r, recorded solution=%r at pos=%r",
+                        cmd_ob,
+                        solution,
+                        pos,
+                    )
+
+                    if not solution.solved:
+                        cmdlike.resolve()
+
+        return temp
+
+    def _handle_executable_ignoring_args(
+        ignore_positional, ignore_opts, break_double_dash=False
+    ):
+        """
+        flags = [
+            (string "arg", int flag args to consume)
+            i.e., 0 if it's just a flag, 1 if the flag has 1 arg
+            if there are required positional args before
+            the subcommand, the first arg should be
+            (commandname, int required positional args)
+            otherwise, (commandname, 0)
+        ]
+        """
+
+        def temp(self, cmd_ob, args, name, text):
+            logger.debug(
+                "handle_executable_ignoring_args: %r %r %r %r", name, cmd_ob, args, text
+            )
+
+            pos = word = None
+            i = 1  # skip command itself
+            drop = ignore_positional
+            while i < len(args.argv):
+                arg = args.argv[i]
+                if break_double_dash and arg == "--":
+                    i += 1
+                    break
+
+                for needle, skip in ignore_opts:
+                    distinct_equal_form = False
+                    if needle[-1] == "=":
+                        # special-case flags that end with =
+                        # assume both 0 and 1-arg forms
+                        distinct_equal_form = True
+                        needle = needle[0:-1]
+
+                    if arg.startswith(needle):
+                        logger.debug("found needle: %r %r %r", arg, needle, skip)
+                        if arg == needle:
+                            logger.debug("exact match")
+                            i += skip + 1
+                        elif arg[len(needle)] == "=":
+                            if distinct_equal_form:
+                                logger.debug("zero-arg alt '=' form")
+                                i += 1
+                            else:
+                                logger.debug("equal after")
+                                i += skip
+
+                        logger.debug("break inner loop")
+                        break
+                else:
+                    logger.debug("enter inner-loop's else")
+                    logger.debug("test for drop %r", drop)
+                    if drop > 1:
+                        drop -= 1
+                    elif drop == 1:
+                        drop -= 1
+                        i += 1
+                        logger.debug("drop == 1 break")
+                        break
+                    else:
+                        logger.debug("drop < 1 break")
+                        break
+
+                logger.debug("reach end of outer while loop")
+
+            word = cmd_ob.words[i]
+            ok, word_txt, quoted = word_.StaticEval(word)
+            if not ok and self.allow_dynamic_executable_word(cmd_ob.words[i]):
+                return  # no-op
+            subcmd = args.argv[i] or get_next_val(cmd_ob.words[i])
+            pos = args.arg_spids[i]
+            cmdlike = cmdlikes[subcmd]
+            logger.debug(
+                "WOMBLE subcmd=%r pos=%r word=%r cmdlike=%r:%r",
+                subcmd,
+                pos,
+                word,
+                cmdlike,
+                cmdlike.name,
+            )
+            if pos:
+                # presumably a real command we need to recurse on
+                new_cmd = copy.deepcopy(cmd_ob)
+                del new_cmd.words[0:i]
+                solution = None
+                if pos in self.solutions:
+                    solution = self.solutions[pos]
+                else:
+                    solution = self.solutions[pos] = cmdlike.request_external_solution(
+                        self, new_cmd
+                    )
+                    self.word_objects[pos] = word
+
+                logger.debug(
+                    "while handling ignored args for %r, recorded solution=%r at pos=%r",
+                    new_cmd,
+                    solution,
+                    pos,
+                )
+
+                if not solution.solved:
+                    cmdlike.resolve()
+
+        return temp
+
+    # sub-executing coreutils
+    # src/chroot.c:execvp
+    #   gnu: [OPTION] NEWROOT [COMMAND [ARG]...]
+    #   bsd: [-g group] [-G group,group,...] [-u user] newroot [command]
+    handle_external_chroot = _handle_executable_ignoring_args(
+        1,
+        (
+            # bsd
+            ("--g", 1),
+            ("--G", 1),
+            ("--u", 1),
+            # gnu
+            ("--groups", 1),
+            ("--userspec", 1),
+            ("--skip-chdir", 0),
+        ),
+    )
+    # src/env.c:execvp Usage: %s [OPTION]... [-] [NAME=VALUE]... [COMMAND [ARG]...]\n"),
+
+    # src/install.c:execlp --strip-program
+    handle_external_install = _handle_executable_flag("--strip-program")
+    # src/nice.c:execvp Usage: %s [OPTION] [COMMAND [ARG]...]
+    handle_external_nice = _handle_executable_ignoring_args(
+        0,
+        (
+            ("-n", 1),
+            ("--adjustment", 1),
+        ),
+    )
+    # src/nohup.c:execvp
+    # gnu: COMMAND [ARG]...\n\
+    # bsd: [--] utility [arguments]
+    handle_external_nohup = _handle_executable_ignoring_args(
+        0, tuple(), break_double_dash=True
+    )
+    # src/runcon.c:execvp Usage: %s CONTEXT COMMAND [args]\n\
+    handle_external_runcon_context = _handle_executable_ignoring_args(
+        1,
+        tuple(),
+    )
+    handle_external_runcon_flags = _handle_executable_ignoring_args(
+        0,
+        (
+            ("-c", 0),
+            ("--compute", 0),
+            ("-t", 1),
+            ("--type", 1),
+            ("-u", 1),
+            ("--user", 1),
+            ("-r", 1),
+            ("--role", 1),
+            ("-l", 1),
+            ("--range", 1),
+        ),
+    )
+
+    def handle_external_runcon(self, cmd_ob, args, name, text):
+        for flag in (
+            "-c",
+            "--compute",
+            "-t",
+            "--type",
+            "-u",
+            "--user",
+            "-r",
+            "--role",
+            "-l",
+            "--range",
+        ):
+            if (" " + flag) in text:
+                return self.handle_external_runcon_flags(cmd_ob, args, name, text)
+
+        return self.handle_external_runcon_context(cmd_ob, args, name, text)
+
+    # src/sort.c:execlp --compress-program
+    handle_external_sort = _handle_executable_flag("--compress-program")
+    # src/split.c:execl --filter=COMMAND
+    handle_external_split = _handle_executable_flag("--filter")
+    # src/stdbuf.c: OPTION... COMMAND
+    handle_external_stdbuf = _handle_executable_ignoring_args(
+        0,
+        (
+            ("-i", 1),
+            ("--input", 1),
+            ("-o", 1),
+            ("--output", 1),
+            ("-e", 1),
+            ("--error", 1),
+        ),
+    )
+    # src/timeout.c:Usage: %s [OPTION] DURATION COMMAND [ARG]...\n\
+    handle_external_timeout = _handle_executable_ignoring_args(
+        1,
+        (
+            ("--preserve-status", 0),
+            ("--foreground", 0),
+            ("-k", 1),
+            ("--kill-after", 1),
+            ("-s", 1),
+            ("--signal", 1),
+            ("-v", 0),
+            ("--verbose", 0),
+        ),
+    )
+
+    """
+    /usr/bin/env: illegal option -- h
+    usage: env [-iv] [-P utilpath] [-S string] [-u name]
+               [name=value ...] [utility [argument ...]]
+
+    Usage: env [OPTION]... [-] [NAME=VALUE]... [COMMAND [ARG]...]
+    Set each NAME to VALUE in the environment and run COMMAND.
+          --block-signal[=SIG]    block delivery of SIG signal(s) to COMMAND
+          --default-signal[=SIG]  reset handling of SIG signal(s) to the default
+          --ignore-signal[=SIG]   set handling of SIG signals(s) to do nothing
+          --list-signal-handling  list non default signal handling to stderr
+      -v, --debug          print verbose information for each processing step
+          --help     display this help and exit
+          --version  output version information and exit
+
+    A mere - implies -i.  If no COMMAND, print the resulting environment.
+
+    I think this implementation needs to end up doing a general ignore thing on most of these flags, a special ignore thing for varlikes?
+        TODO: but note, I guess the ability to ignore varlikes should be very common and very in-the-test-suite
+    """
+    handle_external_env_options = _handle_executable_ignoring_args(
+        0,
+        (
+            # bsd
+            ("-P", 1),
+            ("-S", 1),
+            ("-u", 1),
+            ("-v", 0),
+            # gnu
+            ("-i", 0),
+            ("--ignore-environment", 0),
+            ("-0", 0),
+            ("--null", 0),
+            ("-u", 1),
+            ("--unset", 1),
+            ("-C", 1),
+            ("--chdir", 1),
+            ("-S", 1),
+            ("--split-string", 1),
+            ("--block-signal", 1),
+            ("--default-signal", 1),
+            ("--ignore-signal", 1),
+            ("--list-signal-handling", 1),
+            ("-v", 0),
+            ("--debug", 0),
+        ),
+    )
+
+    def handle_external_env(self, cmd_ob, args, name, text):
+        new_ob, new_args, new_text = self._strip_varlikes(cmd_ob, args)
+        logger.debug("replaced %r %r %r===%r", cmd_ob, new_ob, name, new_args.argv[0])
+        return self.handle_external_env_options(
+            new_ob, new_args, new_args.argv[0], new_text
+        )
+
+    handle_external_sudo_options = _handle_executable_ignoring_args(
+        0,
+        (
+            # sudo -l form
+            ("-l", 0),
+            ("--list", 0),
+            ("-A", 0),
+            ("--askpass", 0),
+            ("-k", 0),
+            ("--reset-timestamp", 0),
+            ("-n", 0),
+            ("--non-interactive", 0),
+            ("-S", 0),
+            ("--stdin", 0),
+            ("-g", 1),
+            ("--group", 1),
+            ("-h", 1),
+            ("--host", 1),
+            ("-p", 1),
+            ("--prompt", 1),
+            ("-U", 1),
+            ("--other-user", 1),
+            ("-u", 1),
+            ("--user", 1),
+            # extra from sans-l form
+            ("-b", 0),
+            ("--background", 0),
+            ("-E", 0),
+            ("--preserve-env=", 0),
+            ("-H", 0),
+            ("--set-home", 1),
+            ("-n", 0),
+            ("-P", 0),
+            ("--preserve-groups", 0),
+            ("-C", 1),
+            ("--close-from", 1),
+            ("-T", 1),
+            ("--command-timeout", 1),
+            ("-i", 0),
+            ("--login", 0),
+            ("-s", 0),
+            ("--shell", 0),
+            # untouched: -B/--bell
+        ),
+        break_double_dash=True,
+    )
+
+    def handle_external_sudo(self, cmd_ob, args, name, text):
+        """
+        note that a few of these shouldn't get resolved at all
+        NO: sudo -h | -K | -k | -V
+        NO: sudo -v [-AknS] [-g group] [-h host] [-p prompt] [-u user]
+        NO: sudo -e [-AknS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] file ...
+        YES: sudo -l [-AknS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
+        YES: sudo [-AbEHknPS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
+        """
+        # 1. weed out sudo forms that don't need resolving
+        # note: some of these long forms aren't known correct
+        #       because sudo re-uses a lot of flags
+        if len(args.argv) > 1 and args.argv[1] not in (
+            "-h",
+            "--help",
+            "-K",
+            "--remove-timestamp",
+            "-k",
+            "--reset-timestamp",
+            "-V",
+            "--version",
+            "-v",
+            "--validate",
+            "-e",
+            "--edit",
+        ):
+            # supposedly -l form is the only one that supports vars
+            if args.argv[1] == "-l":
+                return self.handle_external_sudo_options(cmd_ob, args, name, text)
+            else:
+                # 2. we need to special-case `--preserve-env=` because there's a
+                #    zero-arg form without the =
+                new_ob, new_args, new_text = self._strip_varlikes(cmd_ob, args)
+                logger.debug(
+                    "replaced %r %r %r===%r", cmd_ob, new_ob, name, new_args.argv[0]
+                )
+                return self.handle_external_sudo_options(
+                    new_ob, new_args, new_args.argv[0], new_text
+                )
+
+    handle_external_xargs = _handle_executable_ignoring_args(
+        0,
+        (
+            # gnu
+            ("-0", 0),
+            ("--null", 0),
+            ("-a", 1),
+            ("--arg-file", 1),
+            ("-d", 1),
+            ("--delimiter", 1),
+            ("-E", 1),
+            ("-e=", 1),
+            ("--eof=", 0),  # not certain
+            ("-I", 1),
+            ("-i=", 1),
+            ("--replace=", 1),
+            ("-L", 1),
+            ("--max-lines", 1),
+            ("-l", 1),  # TODO: this one probably needs special support
+            ("-n", 1),
+            ("--max-args", 1),
+            ("-o", 0),
+            ("--open-tty", 0),
+            ("-P", 1),
+            ("--max-procs", 1),
+            ("-p", 0),
+            ("--interactive", 0),
+            ("--process-slot-var", 1),
+            ("-r", 0),
+            ("--no-run-if-empty", 0),
+            ("-s", 1),
+            ("--max-chars", 1),
+            ("--show-limits", 0),
+            ("-t", 0),
+            ("--verbose", 0),
+            ("-x", 0),
+            ("--exit", 0),
+            ("--help", 0),  # TODO: not really sure if help/vers are needed
+            ("--version", 0),
+            # bsd seems to have at least one extra
+            ("-J", 1),
+        ),
+    )
+
+    handle_external_rlwrap = _handle_executable_ignoring_args(
+        0,
+        (
+            ("-a", 1),
+            ("--always-readline", 1),
+            ("-A", 0),
+            ("--ansi-colour-aware", 0),
+            ("-b", 1),
+            ("--break-chars", 1),
+            ("-c", 0),
+            ("--complete-filenames", 0),
+            ("-C", 1),
+            ("--command-name", 1),
+            ("-D", 1),
+            ("--history-no-dupes", 1),
+            ("-e", 1),
+            ("--extra-char-after-completion", 1),
+            ("-f", 1),
+            ("--file", 1),
+            ("-g", 1),
+            ("--forget-matching", 1),
+            ("-h", 0),
+            ("--help", 0),
+            ("-H", 1),
+            ("--history-filename", 1),
+            ("-i", 0),
+            ("--case-insensitive", 0),
+            ("-I", 0),
+            ("--pass-sigint-as-sigterm", 0),
+            ("-l", 1),
+            ("--logfile", 1),
+            ("-m", 1),
+            ("--multi-line", 1),
+            ("-M", 1),
+            ("--multi-line-ext", 1),
+            ("-n", 0),
+            ("--no-warnings", 0),
+            ("-N", 0),
+            ("--no-children", 0),
+            ("-o", 0),
+            ("--one-shot", 0),
+            ("-O", 1),
+            ("--only-cook", 1),
+            ("-p", 1),
+            ("--prompt-colour", 1),
+            ("-P", 1),
+            ("--pre-given", 1),
+            ("-q", 1),
+            ("--quote-characters", 1),
+            ("-r", 0),
+            ("--remember", 0),
+            ("-R", 0),
+            ("--renice", 0),
+            ("-s", 1),
+            ("--histsize", 1),
+            ("-S", 1),
+            ("--substitute-prompt", 1),
+            ("-t", 1),
+            ("--set-term-name", 1),
+            ("-U", 0),
+            ("--mirror-arguments", 0),
+            ("-v", 0),
+            ("--version", 0),
+            ("-w", 1),
+            ("--wait-before-prompt", 1),
+            ("-W", 0),
+            ("--polling", 0),
+            # TODO: these last two may need their own
+            # resolution? unsure.
+            ("-z", 1),
+            ("--filter", 1),
+        ),
+    )
+    handle_external_sqlite3 = _handle_executable_flag("--cmd")
+
+    def look_for_external_sub_execution(self, outer, cmd_object):
+        global decided_execers, lore
+        args, name, text = self.get_subexec_context(cmd_object)
+
+        logger.debug(
+            "look_for_external_sub_execution0: %r %r outer=%r name=%r %r",
+            cmd_object,
+            args,
+            outer,
+            name,
+            text,
+        )
+
+        if len(args.argv) >= 1:
+            # subcmd = copy.deepcopy(cmd_object)
+            # fw_ob = subcmd.words[0]
+            # subcmd.words.remove(fw_ob)
+
+            # logger.debug(
+            #     "sub_exec on %r -> %r",
+            #     cmd_object,
+            #     subcmd,
+            # )
+
+            pos = args.arg_spids[0]
+            subcmd_txt = args.argv[0] or cmd_object.words[0].parts[0].val
+            cmdlike = cmdlikes[subcmd_txt]
+
+            solution = None
+            if pos in self.solutions:
+                solution = self.solutions[pos]
+            else:
+                solution = self.solutions[pos] = cmdlike.request_external_solution(
+                    self, cmd_object
+                )
+                self.word_objects[pos] = cmd_object.words[0]
+                # TODO: not sure *this* is right;
+                # before we were basically popping off word 0 every time,
+                # but that's only ~right for builtin <x> style subexec and
+                # not for find -exec <x> style...
+
+            logger.debug(
+                "while seeking external subexec for %r, recorded solution=%r at pos=%r cmdlike=%r",
+                cmd_object,
+                solution,
+                pos,
+                cmdlike.name,
+            )
+
+            if not solution.solved:
+                cmdlike.resolve()
+
+            if solution.exception:
+                return
+
+            replacement = solution.replacement[1] if solution.replacement else None
+            if len(args.argv) == 1 or (
+                replacement and replacement in lore and lore[replacement] == "cannot"
+            ):
+                logger.debug("allowing safe-passage for executable declared 'cannot'")
+                return
+
+        logger.debug(
+            "look_for_external_sub_execution1: %r %r outer=%r name=%r %r",
+            cmd_object,
+            args,
+            outer,
+            name,
+            text,
+        )
+
+        if outer in decided_execers:
+            assay = decided_execers[outer]
             wordnum = int(assay["wordnum"])
-            if assay["command"] == cmd_string:
-                pos = cmd_args.arg_spids[wordnum]
-                subcmd = cmd_args.argv[wordnum]
-                self.solutions[pos] = cmdlikes[subcmd].request_external_solution(self)
+            if assay["command"] == text:
+                pos = args.arg_spids[wordnum]
+                subcmd_txt = (
+                    args.argv[wordnum] or cmd_object.words[wordnum].parts[0].val
+                )
+                # contra to the normal process--we'll register and
+                # then immediately resolve this (if it isn't already)
+                cmdlike = cmdlikes[subcmd_txt]
+
+                solution = None
+                if pos in self.solutions:
+                    solution = self.solutions[pos]
+                else:
+                    solution = self.solutions[pos] = cmdlike.request_external_solution(
+                        self, cmd_object
+                    )
+                    self.word_objects[pos] = cmd_object.words[wordnum]
+
+                logger.debug(
+                    "look_for_external_sub_execution2: %r %r %r %r %r",
+                    cmdlike,
+                    solution,
+                    pos,
+                    subcmd_txt,
+                    solution.solved,
+                )
+                if not solution.solved:
+                    cmdlike.resolve()
+
+                logger.debug(
+                    "look_for_external_sub_execution3: %r %r %r %r %r",
+                    cmdlike,
+                    solution,
+                    pos,
+                    subcmd_txt,
+                    solution.solved,
+                )
+                if solution.solved:
+                    return
+
+        handler = getattr(self, "handle_external_{:}".format(name), None)
+        if handler:
+            logger.debug(
+                "calling %r(ob=%r, args=%r, name=%r, text=%r)",
+                handler,
+                cmd_object,
+                args,
+                name,
+                text,
+            )
+            handler(cmd_object, args, name, text)
+            return
+        elif outer in subcommand_re:
+            logger.debug("name %r has subcommand regex", outer)
+            logger.debug("about to search %r for %r", text, subcommand_re[outer])
+            match = subcommand_re[outer].search(text)
+            if match:
+                # TODO: subcmd_txt is currently unused here and in prune
+                # but not quite comfortable throwing it out the window yet
+                # kill if still here after June 2021
+                subcmd_txt = match.group("resolve")
+                start, end = match.span("resolve")
+
+                # copy the command and knock out words/tokens that the
+                # matcher didn't match
+                subcmd = copy.deepcopy(cmd_object)
+                self.prune_unmatched(subcmd, subcmd_txt, start, end)
+
+                self.look_for_external_sub_execution(
+                    # TODO: I don't like all of the repeat fw-finding logic
+                    # is there a smarter way?
+                    subcmd.words[0].parts[0].val,
+                    subcmd,
+                )
+
+            # TODO: we're basically trusting the matcher to not suck, here
+            # which may be fine, or maybe we should be more pedantic?
+            return
+
+        raise Exception(
+            "wee-oo-wee-oo: resholve is now more pedantic--you'll have to triage whether or not every invocation of this executable could sub-exec.",
+            cmd_object,
+            text,
+        )
+
+    def prune_unmatched(self, cmd_object, subcmd_txt, start, end):
+        """
+        Walk the command's words to knock out the parts before/after
+        the matched range.
+
+        TODO: think about working from the end to avoid the list
+        alloc and loop?
+        """
+        pos = 0
+        unmatched_words = list()
+        for word in cmd_object.words:
+            pos += get_word_len(word)
+
+            if pos <= start:
+                pos += 1  # 1 for space between words
+                unmatched_words.append(word)
+                if pos == start:
+                    continue
+
+            # TODO unclear how real the threat of overflow that would require
+            # weighing at the sub-word/part level is?
+            elif pos <= end:
+                pos += 1  # 1 for space between words
+            elif pos > end:
+                unmatched_words.append(word)
+                pos += 1  # 1 for space between words
+
+        logger.debug(
+            "prune_unmatched is removing %r from %r", unmatched_words, cmd_object
+        )
+        for word in unmatched_words:
+            cmd_object.words.remove(word)
+
+        logger.debug("prune_unmatched leaves: %r", cmd_object)
 
     def record_general_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command found in general namespace."""
-        # DOING: This is roughly where we have to act; I have a few thoughts:
-        # 1. because I'm requiring so much up-front submission, it may be possible to make half-decisions this early (i.e., we don't know for sure what kind of entity this command will resolve to, but we may have enough information (here? down in the cmdlike?) to realize this thing might exec if it *were* a command, and decide *now* whether to save the cmd_object and whether to do any additional work now on the off chance it lubricates some decision later
-        #    - I think the main case for this would be if it let you promptly push the new entity out into the solution stack as well, maintaining the integrity of the ~late resolution process (and keeping single-solves?)
-        # 2. Here or down in cmdlike, we need to map something to the cmd_object. I'm starting with pos, but I'm honestly not sure. It'll depend on exactly where we need it, and whether there's a sensible way to de-duplicate the checking work in the event that multiple invocations in multiple locations reduce to the same string?
         pos = self.get_word_position(word_object, position)
-        self.solutions[pos] = cmdlikes[word_text].request_full_solution(self)
-        self.look_for_sub_execution(word_object, word_text, cmd_object)
+        self.solutions[pos] = cmdlikes[word_text].request_full_solution(
+            self, cmd_object
+        )
 
     def record_alias_cmd(self, word_object, word_text, position=None):
         """Record command found in alias definition namespace."""
         pos = self.get_word_position(word_object, position)
-        self.solutions[pos] = cmdlikes[word_text].request_alias_solution(self)
+        self.solutions[pos] = cmdlikes[word_text].request_alias_solution(
+            self,
+        )
 
-    def record_builtin_cmd(self, word_object, word_text, position=None):
+    def record_builtin_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command argument to `builtin` builtin :)"""
         pos = self.get_word_position(word_object, position)
-        self.solutions[pos] = cmdlikes[word_text].request_builtin_solution(self)
+        self.solutions[pos] = cmdlikes[word_text].request_builtin_solution(
+            self, cmd_object
+        )
 
     def record_command_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command argument to `command` builtin."""
         pos = self.get_word_position(word_object, position)
-        self.solutions[pos] = cmdlikes[word_text].request_command_solution(self)
-        self.invocations[pos] = cmd_object
+        self.solutions[pos] = cmdlikes[word_text].request_command_solution(
+            self, cmd_object
+        )
 
     def record_external_cmd(self, word_object, word_text, cmd_object, position=None):
         """Record command argument to commands known to run externals."""
         pos = self.get_word_position(word_object, position)
-        self.solutions[pos] = cmdlikes[word_text].request_external_solution(self)
-        self.invocations[pos] = cmd_object
+        self.solutions[pos] = cmdlikes[word_text].request_external_solution(
+            self, cmd_object
+        )
 
     def record_external_source(
         self, word_object, word_text, replace_with=None, position=None
@@ -1449,14 +2843,35 @@ class RecordCommandlike(object):
         CommandLike, we add it to resolved_source so that it's easy to parse
         each in a later step.
         """
+        global resolved_scripts
+        source = None
         pos = self.get_word_position(word_object, position)
         sol = self.solutions[pos] = Solution()
         if replace_with:
-            sol.replace_name_with(word_text, replace_with)
-            self.resolved_source.add(replace_with)
+            # TODO: see note about constant cmdkind
+            sol.replace_name_with("source", word_text, replace_with)
+            source = replace_with  # TODO: self.resolved_source.add(replace_with)
         else:
-            sol.no_change()
-            self.resolved_source.add(word_text)
+            # TODO: see note about constant cmdkind
+            sol.no_change("source")
+            source = word_text
+
+        logger.info("Resolving source")
+
+        if (
+            source not in resolved_scripts
+            and ("source", source) not in self.directives.fake
+        ):
+            logger.info("Parsing sourced script %r", source)
+            resolved = self.__class__(source)
+            resolved_scripts[source] = resolved
+
+        self.directives.keep.add(
+            (
+                "source",
+                source,
+            )
+        )
 
 
 evaluator = None
@@ -1466,20 +2881,6 @@ class ResolvedScript(RecordCommandlike):
     """
     Represent each individual script that we resolve.
     """
-
-    # We need to extract more info after hitting some firstwords
-    # This list is just for noticing if something is breaking expectations
-    WATCH_FIRSTWORDS = {
-        "sudo",
-        "command",
-        "eval",
-        "exec",
-        ".",
-        "source",
-        "alias",
-        "env",
-        "coproc",
-    }
 
     @staticmethod
     def _make_parser(parse_ctx, script, arena):
@@ -1551,18 +2952,22 @@ class ResolvedScript(RecordCommandlike):
             else:
                 arena.PushSource(source.Stdin())
 
-            mem = state.Mem("", [], {"HOME": "/noplacelike"}, arena)
+            # Note: dict below is for envs, i.e. {"HOME": "/noplacelike"}
+            mem = state.Mem("", list(), dict(), arena)
             parse_opts, exec_opts, mutable_opts = state.MakeOpts(mem, None)
             mem.exec_opts = exec_opts
             # exec_opts = optview.Exec(opts, NO_OPTIONS_OVERLAY)
 
-            from oil.osh import split, word_eval
-
             splitter = split.SplitContext(mem)
             errfmt = ui.ErrorFormatter(arena)
-            evaluator = abs_eval = word_eval.CompletionWordEvaluator(
+            # TODO: ask andy about these
+            evaluator = word_eval.CompletionWordEvaluator(
                 mem, exec_opts, mutable_opts, splitter, errfmt
             )
+            evaluator.arith_ev = sh_expr_eval.ArithEvaluator(
+                mem, exec_opts, parse_ctx, errfmt
+            )
+            evaluator.arith_ev.word_ev = evaluator
 
             # set([ (scope, identifier), ... ])
             self.directives = ResolutionDirectives()
@@ -1585,12 +2990,12 @@ class ResolvedScript(RecordCommandlike):
         self.prologue = prologue
         self.epilogue = epilogue
 
-        self.resolved_source = set()  # ResolvedSource objects
+        # self.resolved_source = set()  # ResolvedSource objects TODO: rm?
 
         # "resolve"
         try:
             self.Visit(node)
-            self.resolve_sources()
+            self.handle_potential_redefiners()
         except ResolutionError as e:
             e.print_if_needed()
             raise e
@@ -1736,15 +3141,32 @@ class ResolvedScript(RecordCommandlike):
         for location in replacements:
             solution = self.solutions[location]
 
+            logger.debug("handling replacements: %r", location)
+
             e = solution.exception
-            if solution.replacement:
+            if e:
+                e.word = self.word_objects[location]
+                e.span_id = location
+                e.arena = self.arena
+                raise e
+            elif solution.replacement:
+                logger.debug("pre-replacement %r", location)
                 cursor.PrintUntil(location)
 
+                logger.debug("printed up to %r", location)
                 span = self.arena.GetLineSpan(location)
 
                 line = self.arena.GetLine(span.line_id)
                 current = line[span.col : span.col + span.length]
+                logger.debug(
+                    "identified span=%r, line=%r, current=%r, replacement=%r",
+                    span,
+                    line,
+                    current,
+                    solution.replace_in(current),
+                )
                 to.write(solution.replace_in(current))
+                logger.debug("replacement written and skipping to %r", location + 1)
 
                 # we already wrote this one; leapfrog
                 cursor.SkipUntil(location + 1)
@@ -1765,376 +3187,204 @@ class ResolvedScript(RecordCommandlike):
         self.arena.PopSource()
         return self
 
-    def resolve_sources(self):
-        global resolved_scripts
-        logger.info("Resolving sources")
-        for res_source in self.resolved_source:
-            if (
-                res_source not in resolved_scripts
-                and ("source", res_source) not in self.directives.fake
-            ):
-                logger.info("Parsing sourced script %r", res_source)
-                resolved = self.__class__(res_source)
-                resolved_scripts[res_source] = resolved
-            self.directives.keep.add(
-                (
-                    "source",
-                    res_source,
+    # so, let's abstract
+    def allow_dynamic_token(self, token, word_ob, fw_txt=None):
+        # number subs are probably okayish?
+        if fw_txt == "eval":
+            # TODO: not sure this is at the right level...
+            logger.info(
+                "allowing eval with dynamic argument? %r",
+                token,
+            )
+            return True
+        elif token.id == Id.Left_Backtick:
+            logger.info(
+                "allowing left backtick; should be a command-sub separately visited? %r",
+                token,
+            )
+            return True
+        elif token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
+            logger.info(
+                "allowing dynamic command (first-word variable) with positional ($1, $@, $*) varsub %r:%r",
+                fw_txt,
+                token.val,
+            )
+            return True
+        else:
+            # extract a name normalized
+            # across braced and unbraced subs
+            token_name = None
+            if token.id == Id.VSub_Name:
+                # add $ prefix
+                token_name = "${:}".format(token.val)
+            elif token.id == Id.VSub_DollarName:
+                # it already has $ prefixed
+                token_name = token.val
+            elif token.id == Id.Lit_TildeLike:
+                # try to get the text
+                # confidence in approach: medium
+                left, right = span_pair(word_ob, self.arena)
+                line = self.arena.GetLine(left.line_id)
+                start = left.col
+                end = right.col + right.length
+                token_name = line[start:end]
+
+            # start making real decisions
+            if fw_txt:
+                # TODO: eval utility/accuracy of these commends
+                # TODO: practice below mostly considers part vars like
+                # $HOME/blah or $PREFIX/blah, but there are other
+                # patterns a more sophisticated version could address.
+                # At the moment those would need to be manually
+                # patched. I'd like to follow this definition back to
+                # the vardef and register it for substitution if it's
+                # a simple string, flatten here and reconsider.
+
+                # Letting ${name}-style subs through only if they're in
+                # a list of allowed names. (goal: require conscious
+                # exceptions, but make them easy to add)
+                if (
+                    fw_txt,
+                    token_name,
+                ) in self.directives.keep:
+                    logger.debug(
+                        "allowing dynamic argument %r:%r",
+                        fw_txt,
+                        token_name,
+                    )
+                    return True
+
+                raise ResolutionError(
+                    "Can't resolve %r with a dynamic argument",
+                    fw_txt,
+                    token=token,
+                    status=6,
+                    arena=self.arena,
                 )
+            else:
+                if (token_name,) in self.directives.keep:
+                    # skip exempted name
+                    logger.info(
+                        "allowing exempted dynamic command %r",
+                        token_name,
+                    )
+                    return True
+
+                logger.debug("ffs %r %r %r %r", token, fw_txt, token_name, word_ob)
+                raise ResolutionError(
+                    # TODO: multiple copies of this message, speciate
+                    "Can't resolve dynamic command",
+                    token=token,
+                    status=9,
+                    arena=self.arena,
+                )
+
+        return False  # TODO: this is meaningless if I raise everywhere I don't return True?
+
+    def allow_dynamic_executable_word(
+        self, word_ob, fw_txt=None
+    ):  # verify cutting cmd_ob
+        """
+        Handle a word that didn't pass StaticEval
+        """
+        dynamic = None
+        for part in word_ob.parts:
+            if part.tag == word_part_e.CommandSub:
+                logger_debug(
+                    "allow_dynamic_executable_word: skip dynamic-token in command-sub; cmd visitor should handle inside..."
+                )
+                return True
+
+            dynamic = find_dynamic_token(part)
+            if dynamic and not self.allow_dynamic_token(dynamic, word_ob, fw_txt):
+                raise ResolutionError(
+                    # TODO: multiple copies of this message, speciate
+                    "Can't resolve dynamic command",
+                    word=word_ob,
+                    token=dynamic,
+                    status=9,
+                    arena=self.arena,
+                )
+            else:
+                return True
+
+        if dynamic is None:
+            # this can be logged if it is real, but I'm making it an exception for now to validate whether it is real?
+            raise Exception(
+                "Couldn't statically evaluate 1st word object %r, but also failed to find a dynamic token?!",
+                word_ob,
             )
 
-    def _visit_command_Simple(self, node):
-        if not node.words:
+        return False
+
+    def _require_second_word(self, fw_txt, cmd_ob):
+        """
+        returns ok (bool static/dynamic), sw_ob, sw_text if static, bool quoted
+        """
+        if len(cmd_ob.words) > 1:
+            word_ob = cmd_ob.words[1]
+            ok, word_txt, quoted = word_.StaticEval(word_ob)
+            if not ok:
+                logger.info("   Command is dynamic, %r", cmd_ob)
+                self.allow_dynamic_executable_word(word_ob, fw_txt)
+
+            return ok, word_ob, word_txt, quoted
+
+    def handle_potential_redefiners(self):
+        logger.info(
+            "TODO: this is where we'd process some builtins that might be modifying our execution context (enable, unset, unalias?)"
+        )
+
+    def _visit_command_Simple(self, cmd_ob):
+        global FIRST_PASS_ESSENTIALS
+        if not cmd_ob.words:
             return
 
-        w_ob1 = node.words[0]
-        ok1, word1, _ = word_.StaticEval(w_ob1)
-        if not ok1:
-            for part in w_ob1.parts:
-                bad_token = find_dynamic_token(part)
-                if bad_token:
-                    # number subs are probably okayish?
-                    if bad_token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
-                        logger.info(
-                            "allowing dynamic command (first-word variable) with positional ($1, $@, $*) varsub %r:%r",
-                            word1,
-                            bad_token.val,
-                        )
-                        return
-                    else:
-                        # normalize across braced and unbraced subs
-                        bad_token_name = None
-                        if bad_token.id == Id.VSub_Name:
-                            # add $ prefix
-                            bad_token_name = "${:}".format(bad_token.val)
-                        elif bad_token.id == Id.VSub_DollarName:
-                            # it already has $ prefixed
-                            bad_token_name = bad_token.val
-                        elif bad_token.id == Id.Lit_TildeLike:
-                            # try to get the text
-                            # confidence in approach: medium
-                            left, right = span_pair(w_ob1, self.arena)
-                            line = self.arena.GetLine(left.line_id)
-                            start = left.col
-                            end = right.col + right.length
-                            bad_token_name = line[start:end]
+        fw_ob = cmd_ob.words[0]
+        ok, fw_txt, quoted = word_.StaticEval(fw_ob)
 
-                        if (bad_token_name,) in self.directives.keep:
-                            # skip exempted name
-                            logger.info(
-                                "allowing exempted dynamic command %r",
-                                bad_token_name,
-                            )
-                            return
-
-                        raise ResolutionError(
-                            "Can't resolve dynamic command",
-                            word=w_ob1,
-                            token=bad_token,
-                            status=9,
-                            arena=self.arena,
-                        )
-            else:
+        if not ok:
+            self.allow_dynamic_executable_word(fw_ob, fw_txt)
+        else:
+            self.record_general_cmd(fw_ob, fw_txt, cmd_ob)
+            # handle essential builtins immediately
+            if fw_txt in FIRST_PASS_ESSENTIALS:
+                cmdlike = cmdlikes[fw_txt]
                 logger.debug(
-                    "Couldn't statically evaluate 1st word object of command: %r", w_ob1
+                    "FIRST_PASS_ESSENTIAL (%r): %r %r", fw_txt, cmdlike, cmd_ob
                 )
-                return
-        else:
-            self.record_general_cmd(w_ob1, word1, node)
-
-        # If there's a second word, let's go ahead and prepare it.
-        # We don't know we need it, but enough cases do that it's easier.
-        if len(node.words) > 1:
-            w_ob2 = node.words[1]
-            ok2, word2, _ = word_.StaticEval(w_ob2)
-            # we don't care if it succeeded, yet
-        else:
-            if word1 in self.WATCH_FIRSTWORDS:
-                # just a chance to bail out on a broken script
-                # may not be worth the code...
-                raise Exception(
-                    "Trying to handle {:} but it lacks a required argument".format(
-                        word1
-                    ),
-                    node,
-                )
-
-        # CAUTION: some prefixable commands/builtins are ~infinitely nestable.
-        # "builtin builtin builtin builtin builtin command whoami" is perfectly valid.
-        # The current code won't see the dep on an external command 'whoami'.
-
-        # TODO: Does it make sense to use the presence of builtin/command etc
-        # as smells that trigger extra scrutinty? i.e., "builtin source" may
-        # be a reasonable smell that the script or something it sources overrides
-        # source?
-
-        # TODO: should builtin be here? Currently not because we don't want to replace them...
-        if word1 in self.WATCH_FIRSTWORDS:
-            logger.info("Visiting command: %s %s", word1, word2)
-            if word1 == "eval" and w_ob2.parts[0].tag in (
-                word_part_e.SingleQuoted,
-                word_part_e.DoubleQuoted,
-            ):
-                if EMIT_FEEDBACK_REQUESTS:
+                # TODO: write a test to verify this behavior
+                if not cmdlike.alias and not cmdlike.function:
+                    return self.look_for_essential_builtin_sub_execution(fw_txt, cmd_ob)
+                elif EMIT_FEEDBACK_REQUESTS:
                     try:
                         raise FeedbackWantedWarning(
-                            "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholve/issues/2",
-                            w_ob1.parts[0].val,
-                            word=w_ob2,
-                            status=66,
+                            "Essential builtin overridden by %s %r. Weigh in @ https://github.com/abathur/resholve/issues/27 :)",
+                            "function" if cmdlike.function else "alias",
+                            fw_txt,
+                            word=fw_ob,
+                            status=66,  # TODO
                             arena=self.arena,
                         )
                     except FeedbackWantedWarning:
                         pass
-                return
-            elif not ok2:
-                logger.info("   Command is dynamic, %r", node)
-                if word1 == "alias":
-                    logger.debug("dynamic alias :( %r", node)
-                    cmdlikes[word1].alias = True
-                # DEBUG: print(node)
-                for part in w_ob2.parts:
-                    bad_token = find_dynamic_token(part)
-                    if bad_token:
-                        # normalize across braced and unbraced subs
-                        # TODO: dedup
-                        bad_token_name = None
-                        if bad_token.id == Id.VSub_Name:
-                            # add $ prefix
-                            bad_token_name = "${:}".format(bad_token.val)
-                        elif bad_token.id == Id.VSub_DollarName:
-                            # it already has $ prefixed
-                            bad_token_name = bad_token.val
-
-                        # Letting $1-style subs through for now.
-                        #
-                        # In practice, these could be paths we want to
-                        # resolve, *or* be perfectly fine as is.
-                        if bad_token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
-                            logger.debug(
-                                "allowing dynamic command with positional ($1, $@, $*) varsub %r:%r",
-                                word1,
-                                bad_token_name,
-                            )
-                            return
-                        # TODO: practice below mostly considers part vars like
-                        # $HOME/blah or $PREFIX/blah, but there are other
-                        # patterns a more sophisticated version could address.
-                        # At the moment those would need to be manually
-                        # patched. I'd like to follow this definition back to
-                        # the vardef and register it for substitution if it's
-                        # a simple string, flatten here and reconsider.
-
-                        # Letting ${name}-style subs through only if they're in
-                        # a list of allowed names. (goal: require conscious
-                        # exceptions, but make them easy to add)
-                        elif (
-                            bad_token.id == Id.VSub_Name
-                            and (word1, bad_token_name) in self.directives.keep
-                        ):
-                            logger.debug(
-                                "allowing dynamic command with exempted named ${varsub} %r:%r",
-                                word1,
-                                bad_token_name,
-                            )
-                            return
-                        # Letting $name-style subs through only if they're in
-                        # a list of allowed names. (goal: require conscious
-                        # exceptions, but make them easy to add)
-                        elif (
-                            bad_token.id == Id.VSub_DollarName
-                            # [1:] to leave off the $
-                            and (word1, bad_token_name) in self.directives.keep
-                        ):
-                            logger.debug(
-                                "allowing dynamic command with exempted named $varsub %r:%r",
-                                word1,
-                                bad_token_name,
-                            )
-                            return
-                        else:
-                            raise ResolutionError(
-                                "Can't resolve %r with a dynamic argument",
-                                w_ob1.parts[0].val,
-                                word=w_ob2,
-                                token=bad_token,
-                                status=6,
-                                arena=self.arena,
-                            )
-
-                raise Exception(
-                    "Not sure. I thought 'ok' was only False when we hit a dynamic token, but we just searched for a dynamic token and didn't find one. Reconsider everything you know.",
-                    part,
-                    w_ob2,
-                )
+                    # TODO: keep or dispose per feedback on above
+                    # raise ResolutionError(
+                    #     "I'm not sure if this is really an error but: essential builtin %r is shadowed by a %r :)",
+                    #     fw_txt,
+                    #     "function" if cmdlike.function else "alias",
+                    #     word=fw_ob,
+                    #     status=100,  # TODO
+                    #     arena=self.arena,
+                    # )
+            # queue all other commands for the general
+            # batch resolution cycle
+            # TODO: if this change sticks, it is worth
+            # auditing for places where first-pass may
+            # accidentally record_ instead of resolve?
             else:
-                logger.info("   Command is static")
-                # No magic
-                if word1 in ("command", "eval", "coproc"):
-                    # TODO: could skip command -p/-v/-V here, but that's
-                    # a step down a slippery slope I don't want to take
-                    # without some better ~command handler
-                    # TODO: not absolutely certain about resolution order here
-                    self.record_command_cmd(w_ob2, word2, node)
-                elif word1 in ("sudo", "exec", "env"):
-                    # TODO: not absolutely certain about resolution order here
-                    self.record_external_cmd(w_ob2, word2, node)
-                elif word1 in (".", "source"):
-                    # CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
-                    target = None
-                    if word2.startswith("/") and os.path.isabs(word2):
-                        # Note: logic here tracks generate_external_resolver()
-                        if ("source", word2) in self.directives.keep or (
-                            ".",
-                            word2,
-                        ) in self.directives.keep:
-                            # user said keep this abspath
-                            self.record_external_source(w_ob2, word2)
-                            target = False
-                        elif ("source", word2,) in self.directives.fix or (
-                            ".",
-                            word2,
-                        ) in self.directives.fix:
-                            # user said to resolve this abspath as if it were bare
-                            relword2 = os.path.basename(word2)
-                            target = lookup_source(relword2)
-                            logger.debug(
-                                "Looked up source: %r -> %r -> %r",
-                                word2,
-                                relword2,
-                                target,
-                            )
-                        else:
-                            # TODO: better message
-                            raise ResolutionError(
-                                "Unexpected absolute source path (not supplied by a listed dependency). You should patch/substitute it.",
-                                word=w_ob2,
-                                status=5,
-                                arena=self.arena,
-                            )
-                    else:
-                        target = lookup_source(word2)
-                        logger.debug("Looked up source: %r -> %r", word2, target)
-
-                    # it was already a valid absolute path
-                    if target:
-                        # lookup() seems to resolve relative filenames for files in the
-                        # current directory, no matter what path is set to...
-                        if target == word2:
-                            # TODO: I guess these all need to get prefxed with $out?
-                            # TODO: be skeptical of this
-                            self.record_external_source(w_ob2, word2)
-                        # it resolved to a new location
-                        elif target:
-                            self.record_external_source(
-                                w_ob2, word2, replace_with=target
-                            )
-                    # It didn't resolve, or it was an invalid absolute path
-                    elif target != False:
-                        # in theory I could pass this exception to the new
-                        # self.record_external_source, but this would mean we can't
-                        # fail as soon. Failing soon seems better, no?
-                        raise ResolutionError(
-                            "Unable to resolve source target %r to a known file",
-                            word2,
-                            word=w_ob2,
-                            status=7,
-                            arena=self.arena,
-                        )
-                # TODO: there may a generalized handler for "varlikes" here, which
-                # oil defines as <id>=<stuff> but I'll say is more like:
-                # [<alias|declare|local|set>] [<<id>=<val>>...]
-                elif word1 == "alias":
-                    # TODO: past time to extract some of these subtrees
-                    # into function so we can just call self.visit_alias(node)
-                    # or whatever. But do it in a single refactor--not now.
-                    #
-                    # aliases seem simple at a blush, but the defs
-                    # can also be very complex...
-                    # alias a=b a="b" a='b' "a=b" 'a=b' a=$b a="$b" a='$b' "a=$b" 'a=$b' 'a=echo $b', etc.
-                    #
-                    # code is ~v2 of trying to handle aliases.
-                    # - v1: try to spot alias identifiers to add to
-                    #   allowed unresolved "commands"
-                    #   # TODO: make sure the code's check order is aliases > functions > externals
-                    # - v2: try to extract alias/expansion pairs to
-                    #   - allow unresolved commands
-                    #   - make users triage externals in low-hanging-fruit
-                    #     alias definitions (resolve? ignore?)
-                    #   - TODO: do anything else with high-hanging fruit?
-                    logger.debug("alias node: %r", node)
-
-                    for w_ob in node.words[1:]:
-                        w_ok, w_text, _ = word_.StaticEval(w_ob)
-                        # TODO: for reasons I don't quite understand yet strings w/
-                        # varsubs pass static eval here; may have to unwrap them first?
-                        logger.debug(
-                            "alias (ok? %r) split %r",
-                            w_ok,
-                            w_text.strip("\"='").split("="),
-                        )
-                        if w_ok:
-                            # not dynamic
-                            # example values from tests/aliases.sh:
-                            # 'a', 'echo'
-                            # 'b', 'ls'
-                            # 'c', 'echo blah'
-                            # 'c1', 'echo blah'
-                            # 'd', 'echo $SOURCE_DATE_EPOCH'
-                            # 'd1', 'echo $SOURCE_DATE_EPOCH'
-                            # 'e', 'a'
-                            # 'f', 'b'
-                            # 'g', 'have_fun'
-                            # 'h', 'delay_definition'
-                            alias, definition = w_text.strip("\"='").split("=")
-                            # TODO: maybe below deserves an explicit API
-                            cmdlikes[alias].alias = True
-                            commandlike = definition.split()[0]
-
-                            pos = None
-
-                            # Finding pos is a little tricky, so annotating the logic
-                            # if the alias word has 2 parts, and the 2nd part is a token
-                            #     pos = the 2nd part's span_id
-                            # else
-                            #     *so far* it seems like pos is always
-                            #     the spid of the last part's first token OR part
-                            if (
-                                w_ob.parts
-                                and len(w_ob.parts) == 2
-                                and w_ob.parts[1]
-                                and isinstance(w_ob.parts[1], Token)
-                            ):
-                                logger.debug(
-                                    "in any case, %r has a span_id of %r",
-                                    w_ob.parts[1],
-                                    w_ob.parts[1].span_id,
-                                )
-                                pos = w_ob.parts[1].span_id
-                            else:
-                                trg = w_ob.parts[-1]
-                                logger.debug(
-                                    "it should be the second spid of the last part; %r has a span_id of %r",
-                                    trg,
-                                    trg.tokens[0].span_id
-                                    if hasattr(trg, "tokens")
-                                    else trg.parts[0].span_id,
-                                )
-                                pos = (
-                                    trg.tokens[0].span_id
-                                    if hasattr(trg, "tokens")
-                                    else trg.parts[0].span_id
-                                )
-
-                            self.record_alias_cmd(w_ob, commandlike, position=pos)
-                        else:
-                            raise ResolutionError(
-                                "As far as I can tell, this just won't happen %r :]",
-                                word2,
-                                word=w_ob2,
-                                status=8,
-                                arena=self.arena,
-                            )
+                pass  # TODO RM
+                # self.record_general_cmd(fw_ob, fw_txt, cmd_ob)
 
     def _visit_command_ShFunction(self, node):
         cmdlikes[node.name].function = True
@@ -2155,7 +3405,7 @@ class ResolvedScript(RecordCommandlike):
         self._Visit(node)
         self.VisitChildren(node)
 
-    # borrowed from Visitor in tools/deps.py
+    # borrowed from Visitor in oil/tools/deps.py
     # seems like a lot to import for...
     def VisitChildren(self, node):
         """

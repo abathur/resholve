@@ -2,33 +2,14 @@
 , callPackage
 , python27Packages
 , installShellFiles
-, file
-, findutils
-, gettext
-, bats
+, rSrc
 , bash
-, doCheck ? true
+, oildev
+, binlore
 }:
 let
   version = "0.5.1";
-  rSrc = ./.;
-  deps = callPackage ./deps.nix {
-    /*
-    resholve needs to patch Oil, but trying to avoid adding
-    them all *to* nixpkgs, since they aren't specific to
-    nix/nixpkgs.
-    */
-    oilPatches = [
-      "${rSrc}/0001-add_setup_py.patch"
-      "${rSrc}/0002-add_MANIFEST_in.patch"
-      "${rSrc}/0003-fix_codegen_shebang.patch"
-      "${rSrc}/0004-disable-internal-py-yajl-for-nix-built.patch"
-      "${rSrc}/0005_revert_libc_locale.patch"
-      "${rSrc}/0006_disable_failing_libc_tests.patch"
-      "${rSrc}/0007_restore_root_init_py.patch"
-    ];
-  };
-  resolveTimeDeps = [ file findutils gettext ];
+  # rSrc = ./.;
 in
 python27Packages.buildPythonApplication {
   pname = "resholve";
@@ -38,7 +19,7 @@ python27Packages.buildPythonApplication {
 
   nativeBuildInputs = [ installShellFiles ];
 
-  propagatedBuildInputs = [ deps.oildev python27Packages.ConfigArgParse ];
+  propagatedBuildInputs = [ oildev python27Packages.ConfigArgParse ];
 
   patchPhase = ''
     for file in resholve; do
@@ -49,23 +30,6 @@ python27Packages.buildPythonApplication {
   installPhase = ''
     install -Dm755 resholve $out/bin/resholve
     installManPage resholve.1
-  '';
-
-  inherit doCheck;
-  checkInputs = [ bats ];
-  RESHOLVE_PATH = "${lib.makeBinPath [ file findutils gettext ]}";
-
-  checkPhase = ''
-    us=$'\x1f'
-    echo can''${us}${findutils}/bin/find >> $PWD/lore
-    echo cannot''${us}${file}/bin/file >> $PWD/lore
-    for each in gettext ngettext envsubst; do
-      echo cannot''${us}${gettext}/bin/$each >> $PWD/lore
-    done
-    # explicit interpreter for test suite
-    export INTERP="${bash}/bin/bash" PATH="$out/bin:$PATH" RESHOLVE_LORE=$PWD/lore
-    patchShebangs .
-    ./test.sh
   '';
 
   # Do not propagate Python; may be obsoleted by nixos/nixpkgs#102613
@@ -80,5 +44,6 @@ python27Packages.buildPythonApplication {
     license = with licenses; [ mit ];
     maintainers = with maintainers; [ abathur ];
     platforms = platforms.all;
+    passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc; inherit binlore; };
   };
 }

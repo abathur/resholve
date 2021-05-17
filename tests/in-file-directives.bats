@@ -10,6 +10,8 @@ load helpers
 @test "modern resholve versions reject v1 files" {
   require <({
     status 2
+    line 1 ends "with *native* directive fmt v2 parsing directive fmt v1"
+    line -1 contains "error:  While parsing resholve directives already in this script, I encountered an 'allow' directive from resholve(d)'s pre-history. The program no longer supports this directive format--you'll have to re-resholve this script with a modern version."
   })
 } <<CASES
 resholve --interpreter $INTERP directives_v1_shunit2.sh

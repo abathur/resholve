@@ -229,7 +229,7 @@ CASES
 # The 3rd case previously confirmed that envvars were merged with flags and
 # in-doc directives. I moved 'source:\$HOME' from RESHOLVE_KEEP into --keep
 
-@test "Don't resolve aliases without '--fix aliases'" {
+@test "don't resolve aliases without '--fix aliases'" {
   require <({
     status 0
     line 4 !contains "/nix/store"
@@ -250,7 +250,7 @@ CASES
 resholve --interpreter $INTERP < alias_riddle.sh
 CASES
 
-@test "Inject before and after script" {
+@test "inject before and after script" {
   require <({
     status 0
     line 6 equals "# begin prologue inserted by resholve"
@@ -259,4 +259,24 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP --prologue <(echo "declare BEFORE") --epilogue <(echo "declare AFTER") < find_beginning_and_end.sh
 resholve --interpreter $INTERP --prologue <(echo "declare BEFORE")  --epilogue <(echo "declare AFTER") < find_beginning_and_end2.sh
+CASES
+
+@test "fail with bad lore argument" {
+  unset RESHOLVE_LORE
+  require <({
+    status 2
+    line -2 begins "resholve: error: argument --lore:"
+    line -1 contains "Lore must be a directory with a file named"
+  })
+} <<CASES
+resholve --interpreter $INTERP --lore find_beginning_and_end.sh
+CASES
+#resholve --interpreter $INTERP --lore .
+
+@test "accept good lore argument" {
+  require <({
+    status 0
+  })
+} <<CASES
+resholve --interpreter $INTERP --lore $EMPTY_LORE
 CASES

@@ -1,184 +1,23 @@
-{ pkgs ? import <nixpkgs> { } }:
+{ pkgs ? import <nixpkgs> { }, rSrc ? ./. }:
 
 with pkgs;
 let
+  deps = pkgs.callPackage (rSrc + /deps.nix) { inherit rSrc; };
   inherit (callPackage ./default.nix { })
     resholve resholvePackage;
+  inherit (callPackage ./test.nix {
+    inherit resholve resholvePackage;
+    inherit rSrc;
+    inherit (deps) binlore;
+    runDemo = true;
+  })
+    module1 module2 module3 cli;
 
-  # binlore = pkgs.callPackage ../binlore { };
-  binlore = callPackage (fetchFromGitHub {
-    owner = "abathur";
-    repo = "binlore";
-    rev = "7c9fa9f2710bd4f2919ef2be46f8dd745eec8cec";
-    hash = "sha256-ZKOPxVNfSyoSYqQydYP5vxG0BrE3gRNFGc65/VzOrBg=";
-  }) { };
-
-  /* TODO: wrapped copy of find so that we can eventually test
-  our ability to see through wrappers. Unused for now. */
-  wrapfind = runCommand "wrapped-find" { } ''
-    source ${makeWrapper}/nix-support/setup-hook
-    makeWrapper ${findutils}/bin/find $out/bin/wrapped-find
-  '';
-  /* TODO:
-  unrelated, but is there already a function (or would
-  there be demand for one?) along the lines of:
-  wrap = { drv, executable(s?), args ? { } }: that:
-  - generates a sane output name
-  - sources makewrapper
-  - retargets real executable if already wrapped
-  - wraps the executable
-
-  I wonder because my first thought here was overrideAttrs,
-  but I realized rebuilding just for a custom wrapper is an
-  ongoing waste of time. If it is a common pattern in the
-  wild, it would be a nice QoL improvement.
-  */
-
-  shunit2 = with pkgs.shunit2;
-    resholvePackage {
-      inherit pname src version installPhase;
-      solutions = {
-        shunit = {
-          interpreter = "none";
-          scripts = [ "bin/shunit2" ];
-          inputs = [ coreutils gnused gnugrep findutils ];
-          # resholve's Nix API is analogous to the CLI flags
-          # documented in 'man resholve'
-          fake = {
-            # "missing" functions shunit2 expects the user to declare
-            function = [
-              "oneTimeSetUp"
-              "oneTimeTearDown"
-              "setUp"
-              "tearDown"
-              "suite"
-              "noexec"
-            ];
-            # shunit2 is both bash and zsh compatible, and in
-            # some zsh-specific code it uses this non-bash builtin
-            builtin = [ "setopt" ];
-          };
-          fix = {
-            # stray absolute path; make it resolve from coreutils
-            "/usr/bin/od" = true;
-          };
-          keep = {
-            # dynamically defined in shunit2:_shunit_mktempFunc
-            eval = [ "shunit_condition_" "_shunit_test_" ];
-
-            # variables invoked as commands; long-term goal is to
-            # resolve the *variable*, but that is complexish, so
-            # this is where we are...
-            "$__SHUNIT_CMD_ECHO_ESC" = true;
-            "$_SHUNIT_LINENO_" = true;
-            "$SHUNIT_CMD_TPUT" = true;
-          };
-        };
-      };
-    };
-  test_module1 = resholvePackage {
-    pname = "testmod1";
-    version = "unreleased";
-
-    src = lib.cleanSource tests/nix/libressl/.;
-
-    installPhase = ''
-      mkdir -p $out/{bin,submodule}
-      install libressl.sh $out/bin/libressl.sh
-      install submodule/helper.sh $out/submodule/helper.sh
-    '';
-
-    solutions = {
-      libressl = {
-        # submodule to demonstrate
-        scripts = [ "bin/libressl.sh" "submodule/helper.sh" ];
-        interpreter = "none";
-        inputs = [ jq test_module2 libressl.bin ];
-      };
-    };
-
-    is_it_okay_with_arbitrary_envs = "shonuff";
-  };
-  test_module2 = resholvePackage {
-    pname = "testmod2";
-    version = "unreleased";
-
-    src = lib.cleanSource tests/nix/openssl/.;
-
-    installPhase = ''
-      mkdir -p $out/bin
-      install openssl.sh $out/bin/openssl.sh
-      install profile $out/profile
-    '';
-
-    solutions = {
-      openssl = {
-        fix = {
-          aliases = true;
-        };
-        scripts = [ "bin/openssl.sh" ];
-        interpreter = "none";
-        inputs = [ shunit2 openssl.bin ];
-      };
-      profile = {
-        scripts = [ "profile" ];
-        interpreter = "none";
-        inputs = [ ];
-      };
-    };
-  };
-  test_module3 = resholvePackage {
-    pname = "testmod3";
-    version = "unreleased";
-
-    src = lib.cleanSource tests/nix/future_perfect_tense/.;
-
-    installPhase = ''
-      mkdir -p $out/bin
-      install conjure.sh $out/bin/conjure.sh
-    '';
-
-    solutions = {
-      conjure = {
-        scripts = [ "bin/conjure.sh" ];
-        interpreter = "${bash}/bin/bash";
-        inputs = [ test_module1 ];
-      };
-    };
-  };
-  resolveTimeDeps = [ file findutils gettext ];
-
-in
-stdenv.mkDerivation {
-  name = "resholve-ci";
-  src = builtins.filterSource
-    (path: type:
-      type != "directory" || baseNameOf path
-      == "tests") ./.;
-  installPhase = ''
-    mkdir $out
-    cp *demo.txt $out/
-  '';
-  doCheck = true;
-  buildInputs = [ resholve bat ansifilter ];
-  propagatedBuildInputs = [ test_module3 ];
-  checkInputs = [ bats ];
-
-  RESHOLVE_PATH = "${lib.makeBinPath resolveTimeDeps}";
-  RESHOLVE_LORE = "${binlore.collect { drvs = resolveTimeDeps; } }/execers";
-
-  # explicit interpreter for demo suite; maybe some better way...
-  INTERP = "${bash}/bin/bash";
-
-  checkPhase = ''
-    patchShebangs .
-    printf "\033[33m============================= resholve demo ===================================\033[0m\n"
-    ./demo |& tee demo.ansi
-
-    printf "\033[33m============================= resholve Nix demo ===============================\033[0m\n"
-    env -i $(type -p conjure.sh) |& tee nix-demo.ansi
-    bat --paging=never --color=always $(type -p conjure.sh ${test_module2}/bin/openssl.sh ${test_module1}/bin/libressl.sh) |& tee -a nix-demo.ansi
-    ansifilter -o demo.txt --text demo.ansi
-    ansifilter -o nix-demo.txt --text nix-demo.ansi
-  '';
-}
+in runCommand "resholve-ci" { } ''
+  mkdir $out
+  printf "\033[33m============================= resholve Nix demo ===============================\033[0m\n"
+  env -i ${module3}/bin/conjure.sh |& tee nix-demo.ansi
+  ${bat}/bin/bat --paging=never --color=always ${module3}/bin/conjure.sh ${module2}/bin/openssl.sh ${module1}/bin/libressl.sh |& tee -a nix-demo.ansi
+  ${ansifilter}/bin/ansifilter -o $out/demo.txt --text ${cli}/demo.ansi
+  ${ansifilter}/bin/ansifilter -o $out/nix-demo.txt --text nix-demo.ansi
+''

@@ -27,29 +27,6 @@ CASES
 resholve --interpreter $INTERP --keep '\$GIT_PROGRAM \$LS_PROGRAM \$STAT_HERE \$STAT_ELSEWHERE' variable_as_command.sh
 CASES
 
-@test "Resolve aliases when specified" {
-  require <({
-    status 0
-    line 4 !contains "/nix/store"
-    line 5 contains 'find="/nix/store'
-    line 5 contains 'find2="/nix/store'
-    line 7 !contains "/nix/store"
-    line 9 !contains "/nix/store"
-    line 10 contains "/nix/store"
-    line 11 !contains "/nix/store"
-    line 12 contains "/nix/store"
-    line 13 begins "### resholve directives (auto-generated)"
-    # can't assert the ends; these get sorted
-    # and the hash makes unstable :(
-    line 14 equals "# resholve: fix aliases"
-    line 15 begins "# resholve: keep /nix/store/"
-    line 16 begins "# resholve: keep /nix/store/"
-  })
-} <<CASES
-resholve --interpreter $INTERP --fix aliases < alias_riddle.sh
-RESHOLVE_FIX=aliases resholve --interpreter $INTERP < alias_riddle.sh
-CASES
-
 @test "can resolve a simple coproc" {
   require <({
     status 0
@@ -154,13 +131,57 @@ CASES
 resholve --interpreter $INTERP --fix '/usr/bin/file' < abspath_command.sh
 CASES
 
+
 us=$'\x1f'
-@test "resolve commands in args to execing executables" {
+
+@test "resolve fails without lore" {
   require <({
-    status 0
-    line 5 contains '/bin/find $(type -p file) -name file -exec /nix/store/'
-    line 5 contains "/bin/file {} +  "
+    status 1
+    line -1 contains 'resholve is now more pedantic--you have to submit lore for every executable it finds'
   })
 } <<CASES
-resholve --interpreter $INTERP --assay <(echo $(type -p find)${us}find __NO_COMMAND_SUB__ -name file -exec file {} +${us}yes${us}5 ; echo abspath${us}cmdname${us}args${us}no) < nested_execer.sh
+RESHOLVE_LORE=$EMPTY_LORE resholve --interpreter $INTERP --assay <(echo $(type -p find)${us}find __NO_COMMAND_SUB__ -name file -exec file {} +${us}yes${us}5 ; echo abspath${us}cmdname${us}args${us}no) < nested_execer.sh
+CASES
+
+@test "resolve fails without assay" {
+  require <({
+    status 1
+    line -1 contains 'resholve is now more pedantic--you have to submit lore for every executable it finds'
+  })
+} <<CASES
+RESHOLVE_LORE=$EMPTY_LORE resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p xargs)) < nested_execer.sh
+CASES
+
+@test "resolve commands mixed with varlike assignments" {
+  require <({
+    status 0
+    line 2 begins 'HOME=oops LC_ALL=c /nix/store/'
+    line 2 ends '/bin/file heh'
+    line 3 begins 'find=find /nix/store/'
+    line 3 contains '/bin/env LC_ALL=c HOME=yeah /nix/store/'
+    line 3 contains '/bin/find /nix/store -name find -exec /nix/store/'
+    line 3 ends '/bin/file {} + -executable'
+  })
+} <<CASES
+RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP < varlike_in_invocation.sh
+CASES
+
+builtin_overridden="FEEDBACK WANTED: Essential builtin overridden by"
+@test "verify warnings are thrown for overridden builtins" {
+  require <({
+    status 0
+    line 3 contains "builtin_overridden.sh:6: $builtin_overridden alias"
+    line 6 contains "builtin_overridden.sh:7: $builtin_overridden function"
+  })
+} <<CASES
+resholve --interpreter $INTERP builtin_overridden.sh
+CASES
+
+@test "Buffalo buffalo Buffalo buffalo buffalo buffalo Buffalo buffalo" {
+  require <({
+    status 0
+    line 2 contains '/bin/find . -name buffalo -exec /nix/store/'
+  })
+} <<CASES
+RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_FINDUTILS" resholve --interpreter $INTERP < buffalo.sh
 CASES
