@@ -1289,9 +1289,6 @@ class OrderedCommandResolver(object):
                 return self.resolve_external
             else:
                 return self._unexpected_absolute_path
-        # if self.name isn't absolute, see if ('external', self.name) is in fake directives?
-        elif ("external", self.name) in relevant.fake:
-            return self._true
 
         return self.resolve_external
 
