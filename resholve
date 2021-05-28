@@ -13,6 +13,7 @@ import copy
 import re
 import csv
 
+from subprocess import Popen, PIPE
 from contextlib import contextmanager, nested
 
 import configargparse as argparse
@@ -2433,6 +2434,152 @@ class RecordCommandlike(object):
         ),
         break_double_dash=True,
     )
+
+    def _find_sed_e_cmd(self, expr):
+        """
+        '{ s/a/b/ ; s/b/c/e ; }'
+        sed: -e expression #1, char 20: e/r/w commands disabled in sandbox mode
+        1
+        --expression='s/a/b/' -e 's/b/c/e'
+        sed: -e expression #2, char 7: e/r/w commands disabled in sandbox mode
+        1
+
+        -e 'e echo'
+        'sed: -e expression #1, char 1: e/r/w commands disabled in sandbox mode\n'
+        """
+        sed = lookup("sed")
+        if not sed:
+            raise ResolutionError(
+                "Somehow I ended up trying to look for a sed `e` command in %r when sed isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
+                expr,
+            )
+        p = Popen(
+            [sed, "--sandbox", expr],
+            shell=False,
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
+            close_fds=True,
+        )
+        stdout, stderr = p.communicate(input="something cute")
+        #
+        if p.returncode == 1 and "commands disabled in sandbox mode" in stderr:
+            # gnused e/r/w command present
+            # ['sed', '', '-e', 'expression', '#1,', 'char', '1', '', 'e/r/w', 'commands', 'disabled', 'in', 'sandbox', 'mode', '']
+            badchar = int(re.split(r"\s|:", stderr)[6])
+            badchar -= 1  # adjust 1 -> 0 index
+
+            # trying to work around the issue shown in https://gist.github.com/abathur/ca0c6ca342da292f4361acd826740691
+            # my best-guess is that the error, for s cmds, can't trigger until
+            # the s-cmd ends? And since s supports internal spaces,
+            # that isn't until a brace or a semicolon or the end of the arg?
+            # in any case; walk back
+            while expr[badchar] in (";", " "):
+                badchar -= 1
+
+            if expr[badchar] == "e":
+                return True
+                # TODO: maybe later we can do something smarter
+
+        return False
+
+    SED_SKIP_SHORT = (
+        "-a",  # BSD-only
+        "-l",  # BSD-only
+        "-n",
+        "-E",
+        "-r",
+        "-s",
+        "-u",
+        "-h",
+        "-z",
+        "-v",
+    )
+    SED_SKIP_LONG = (
+        "--quiet",
+        "--silent",
+        "--debug",
+        "--follow-symlinks",
+        "--posix",
+        "--regexp-extended",
+        "--separate",
+        "--sandbox",
+        "--unbuffered",
+        "--help",
+        "--null-data",
+        "--version",
+    )
+
+    def handle_external_sed(self, cmd_ob, args, name, text):
+        """
+        We want to check sed expressions on the CLI. They can
+        either come after an -e/--expression flag, or they can
+        be the first ~positional argument as long as -e or -f
+        or --expression or --file weren't used.
+
+        Let's
+        """
+        error_desc = (
+            "I don't quite know how to handle sed `e` "
+            "commands yet--sorry :(\n\n"
+            "I could use your feedback on this at:\n"
+            "https://github.com/abathur/resholve/issues/28"
+        )  # TODO
+        logger.debug("trying external sed %r", cmd_ob)
+        i = 1
+        found_expr = False
+        while i < len(args.argv):
+            arg = args.argv[i]
+            logger.debug("trying arg[%d]: %r", i, arg)
+            if arg[0] == "-":
+                if arg[1] in ("e", "f"):
+
+                    if self._find_sed_e_cmd(args.argv[i + 1]):
+                        raise ResolutionError(
+                            error_desc,
+                            word=cmd_ob.words[i + 1],
+                            status=16,  # TODO
+                            arena=self.arena,
+                        )
+                    found_expr = True
+                    i += 2
+                elif arg[1] == "-":
+                    if arg.startswith("--expression") or arg.startswith("--file"):
+                        if self._find_sed_e_cmd(args.argv[i + 1]):
+                            raise ResolutionError(
+                                error_desc,
+                                word=cmd_ob.words[i + 1],
+                                status=16,  # TODO
+                                arena=self.arena,
+                            )
+                        found_expr = True
+                    elif arg.split("=")[0] in self.SED_SKIP_LONG:
+                        i += 1
+                    elif arg.startswith("--inplace"):
+                        i += 2 if "=" in arg else 1
+                    elif arg.startswith("--line-length"):
+                        i += 2 if "=" in arg else 1
+                elif arg in self.SED_SKIP_SHORT:
+                    i += 1
+                elif arg.startswith("-i "):
+                    i += 2
+                elif arg.startswith("-i"):
+                    i += 1
+
+                continue
+
+            # goal: if we ever get to the end of this loop,
+            # assume we've found positional arg 1
+            if not found_expr:
+                if self._find_sed_e_cmd(args.argv[i]):
+                    raise ResolutionError(
+                        error_desc,
+                        word=cmd_ob.words[i],
+                        status=16,  # TODO
+                        arena=self.arena,
+                    )
+
+            break
 
     def handle_external_sudo(self, cmd_ob, args, name, text):
         """
