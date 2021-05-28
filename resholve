@@ -742,7 +742,7 @@ def ingest_lore(lorefiles):
         return
 
     for row in lorefiles["wrappers"]:
-        if row["wrapper"] in lore and row["wrapped"] in lore:
+        if row["wrapped"] in lore:
             # overwrite the wrapper's verdict with the wrapped executable's
             lore[row["wrapper"]] = lore[row["wrapped"]]
 
