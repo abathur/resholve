@@ -94,7 +94,7 @@ CONTROLLING RESOLUTION
          ~/path
             ignore a specific home‐relative_path
 
-         Ex: −−keep ’which:git;ls .:$HOME $LS:exa /etc/bashrc ~/.bashrc’
+         Ex: −−keep ’which:git;ls source:$HOME $LS:exa /etc/bashrc ~/.bashrc’
 
 ENVIRONMENT
      Most options can also be passed via environment variables. For example,
