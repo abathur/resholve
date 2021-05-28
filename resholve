@@ -1913,7 +1913,7 @@ class RecordCommandlike(object):
 
         if not ok:
             logger.debug(
-                "Not trying to resolve/parse dynamic source statement. In theory, this should only happen when the dynamic token was exempted with a directive. We obviously can't resolve into the file, but we won't object to the statement",
+                "Not trying to resolve/parse dynamic source statement. In theory, this should only happen when the dynamic token was exempted with a directive or is in the short list of tokens (like dollar-subs) that we automatically exempt. We obviously can't resolve into the file, but we won't object to the statement. AST: %r",
                 cmd_ob,
             )
             return

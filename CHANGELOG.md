@@ -1,6 +1,14 @@
 # Changelog
 
-## v0.5.1 (Mar 4 20201)
+## v0.6.0 (IDK ? 2021)
+- To simplify separating the handlers for each builtin/command, resholve now treats invocations of the `.` builtin as if they used `source`. It won't make this translation in the source, but it does mean that any 
+
+### Migrating:
+- Directives specifying `.` should be updated to use `source`.
+
+    
+
+## v0.5.1 (Mar 4 2021)
 Fix re-resolution of an existing abspath command (specified via --fix abspath), which was incorrectly replacing the basename with the new abspath instead of replacing the entire command path.
 
 ## v0.5.0 (Feb 26 2021)
