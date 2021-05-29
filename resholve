@@ -19,7 +19,7 @@ from contextlib import contextmanager, nested
 import configargparse as argparse
 import logging
 
-from collections import defaultdict
+from collections import defaultdict, Iterable
 from distutils.spawn import find_executable
 
 logger = logging.getLogger(__name__)
@@ -1163,9 +1163,14 @@ class Solution(object):
 
     def __repr__(self):
         if self.solved:
-            return "{:} -> {:}".format(*self.replacement)
+            if self.exception:
+                return "Solution(error: {:})".format(self.exception)
+            elif isinstance(self.replacement, Iterable):
+                return "Solution({:} -> {:})".format(*self.replacement)
+            else:
+                return "Solution(no-op {:})".format(self.kind)
         else:
-            return "{:} (unsolved)".format(self.name)
+            return "Solution(unsolved {:})".format(self.kind)
 
     def custom(self, kind, initial, replacement):
         self.replacement = (initial, replacement)
