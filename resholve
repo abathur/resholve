@@ -3342,7 +3342,12 @@ class ResolvedScript(RecordCommandlike):
                     current,
                     solution.replace_in(current),
                 )
-                to.write(solution.replace_in(current))
+                if current[0:1] == "\\":
+                    to.write(current.replace(current[1:], solution.replacement[1]))
+                    location += 1
+                else:
+                    to.write(solution.replace_in(current))
+
                 logger.debug("replacement written and skipping to %r", location + 1)
 
                 # we already wrote this one; leapfrog
