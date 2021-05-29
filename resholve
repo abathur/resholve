@@ -1161,9 +1161,9 @@ class Solution(object):
 
     exception = kind = replacement = None
 
-    def __str__(self):
+    def __repr__(self):
         if self.solved:
-            return "{:} -> {:}".format(self.name, self.replacement)
+            return "{:} -> {:}".format(*self.replacement)
         else:
             return "{:} (unsolved)".format(self.name)
 
