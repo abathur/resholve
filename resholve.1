@@ -190,7 +190,7 @@ all of the following are supported:
 .\".It  RESHOLVE_FAFF
 .It  RESHOLVE_INTERPRETER
 .It  RESHOLVE_PATH
-.It RESHOLVE_INPUTS
+.It  RESHOLVE_INPUTS
 .It  RESHOLVE_FAKE
 .It  RESHOLVE_FIX
 .It  RESHOLVE_KEEP
@@ -202,8 +202,20 @@ all of the following are supported:
 .\" equivalent to --keep
 .El
 .\" .Sh FILES
-.\" .Sh EXIT STATUS
-.\" For sections 1, 6, and 8 only.
+.Sh EXIT STATUS
+.Ex -std
+.Pp
+Error statuses are not yet systematic or stable (use them if they help you--but expect changes). Generally:
+.Bl -tag -width "xx"
+.It Sy 1
+indicates a
+.Pf non- Nm
+error occurred (such as an error from the OSH parser)
+.It Sy 2
+indicates invocation/argument errors
+.It Sy 3+
+indicates a resolution error
+.El
 .Sh EXAMPLES
 Basic invocations:
 .Bd -literal

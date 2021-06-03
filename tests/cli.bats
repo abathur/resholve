@@ -33,14 +33,14 @@ CASES
     line -1 equals "resholve: error: one of the arguments --path --inputs is required"
   })
 } <<CASES
-resholve --interpreter /usr/bin/env < file_simple.sh
+resholve --interpreter $(type -p env) < file_simple.sh
 resholve --interpreter none file_simple.sh
 CASES
 
 @test "invoking resholve with missing interpreter prints an error" {
   require <({
-    status 1
-    line -1 equals "AssertionError: Interpreter must exist or be the string 'none'"
+    status 2
+    line -1 equals "resholve: error: argument --interpreter: Interpreter must exist or be the string 'none'"
   })
 } <<CASES
 resholve --interpreter /blah < file_simple.sh
@@ -49,8 +49,8 @@ CASES
 
 @test "invoking resholve with a relative interpreter prints an error" {
   require <({
-    status 1
-    line -1 equals "AssertionError: Interpreter path must be absolute"
+    status 2
+    line -1 equals "resholve: error: argument --interpreter: Interpreter path must be absolute"
   })
   # just using a random relative script as interp
 } <<CASES
@@ -60,8 +60,8 @@ CASES
 
 @test "invoking resholve with a non-executable interpreter prints an error" {
   require <({
-    status 1
-    line -1 equals "AssertionError: Interpreter must be executable"
+    status 2
+    line -1 equals "resholve: error: argument --interpreter: Interpreter must be executable"
   })
   # just using a random non-executable script as interp
 } <<'CASES'
@@ -74,7 +74,7 @@ CASES
   RESHOLVE_PATH=''
   require <({
     status 3
-    line -1 contains "Can't resolve command 'file' to a known function or executable"
+    line -1 contains "Couldn't resolve command 'file'"
   })
 } <<CASES
 resholve --interpreter $INTERP < file_simple.sh

@@ -75,7 +75,7 @@ RESHOLVE_KEEP='source:\$PWD' resholve --interpreter $INTERP < file_home_source_p
 CASES
 
 @test "'source' targets also need to be in RESHOLVE_PATH" {
-  demo "source_missing_target.sh" <(status 7)
+  demo "source_missing_target.sh" <(status 4)
 } <<CASES
 resholve --interpreter $INTERP < source_missing_target.sh
 CASES

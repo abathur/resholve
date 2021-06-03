@@ -418,6 +418,24 @@ def directive_keep(value):
     return directives
 
 
+def interpreter_to_shebang(interp):
+    if interp == "none":
+        return None
+
+    if not os.path.exists(interp):
+        raise argparse.ArgumentTypeError(
+            "Interpreter must exist or be the string 'none'"
+        )
+
+    if not os.path.isabs(interp):
+        raise argparse.ArgumentTypeError("Interpreter path must be absolute")
+
+    if not os.access(interp, os.X_OK):
+        raise argparse.ArgumentTypeError("Interpreter must be executable")
+
+    return "#!{:}\n".format(interp)
+
+
 class SuperSerial(csv.Dialect):
     """
     I'm using the unit separator for field separating but keeping \n
@@ -491,6 +509,7 @@ class LoreType(object):
             else:
                 raise Exception("%s is not a directory" % path)
         except Exception as e:
+            # TODO: this argparse error may not work like you think it does if argparse doesn't catch it
             raise argparse.ArgumentTypeError(
                 "%s\nLore must be a "
                 "directory with a file named "
@@ -537,8 +556,8 @@ def make_arg_parser(module):
 
     req.add_argument(
         "--interpreter",
-        dest="interpreter",
-        type=str,
+        dest="shebang",
+        type=interpreter_to_shebang,
         metavar="p",
         help="specify interpreter for shebang; does NOT otherwise impact how resholve interprets a script",
         required=True,
@@ -761,7 +780,13 @@ def ingest_assay(assayfile):
         ],
         dialect="superserial",
     )
+
     for row in reader:
+        logger.debug("assay ingest %r", row)
+        if row["wordnum"] == "0":
+            raise argparse.ArgumentTypeError(
+                "assay wordnum should be 1+ (0 is the same as the invoking command itself)"
+            )
         # TODO: IDK what the right format is
         # decided_execers[row["executable"]][row["command"]] = {
         #     k: v for k, v in row.items() if k != "executable"
@@ -853,21 +878,13 @@ def punshow():
     if ("aliases",) not in directives.fix:
         RecordCommandlike.disable_alias_replacement()
 
-    if args.interpreter == "none":
-        shebang = None
-    else:
-        interp = args.interpreter
-        assert os.path.exists(interp), "Interpreter must exist or be the string 'none'"
-        assert os.path.isabs(interp), "Interpreter path must be absolute"
-        assert os.access(interp, os.X_OK), "Interpreter must be executable"
-        shebang = "#!{:}\n".format(interp)
     try:
         to_write = set()
         if len(args.scripts) == 0:
             # None == <stdin>
             with sourcePATH(dict()):
                 resolved_scripts[None] = ResolvedScript(
-                    shebang=shebang,
+                    shebang=args.shebang,
                     prologue=args.prologue,
                     epilogue=args.epilogue,
                     # TODO: decide if passing these is needed or if it can be global state?
@@ -902,7 +919,7 @@ def punshow():
             for script in checked_scripts:
                 resolve_script(
                     script,
-                    shebang=shebang,
+                    shebang=args.shebang,
                     prologue=args.prologue,
                     epilogue=args.epilogue,
                 )
@@ -922,7 +939,7 @@ def punshow():
     except IOError as e:
         sys.stderr.write("Whoooo buddy: " + str(e))
         return 2
-    except ResolutionError as e:
+    except Forbid as e:
         e.print_if_needed()
         return e.exit_status
     except error._ErrorWithLocation as e:
@@ -1026,7 +1043,7 @@ class ExceptionWithContext(error._ErrorWithLocation):
     pass
 
 
-class ResolutionError(ExceptionWithContext):
+class TODODeleteResolutionError(ExceptionWithContext):
     printed = False
     arena = None
 
@@ -1040,15 +1057,70 @@ class ResolutionError(ExceptionWithContext):
             self.printed = True
 
 
-class ResolutionWarning(ExceptionWithContext):
+# label? code? issue? feedback? url?
+class ResolutionException(ExceptionWithContext):
+    """
+    mostly same code for all 3 resolution exceptions
+    """
+
+    REPO = "https://github.com/abathur/resholve"
+    ISSUES = "{:}/issues".format(REPO)
+    SA_TEMPL = "{e.ISSUES}/{e.issue}"
+    # ex: I could use your feedback on this at:\n
+
+    template = None
+    label = None
     printed = False
     arena = None
-    label = "WARNING: "
+    problem = None
+    solutions = None
+    status = None
+    issue = None
 
-    def __init__(self, msg, *args, **kwargs):
-        self.arena = kwargs.pop("arena")
-        error._ErrorWithLocation.__init__(self, self.label + msg, *args, **kwargs)
-        self.print_if_needed()
+    @property
+    def see_issue(self):
+        if self.issue:
+            return (
+                # I'd kinda like to push info/feedback/workarounds to be like
+                # options or dynamic or sommink?
+                self.SA_TEMPL.format(e=self)
+            )
+        return NotImplementedError()
+
+    @property
+    def description(self):
+        if self.problem:
+            # "I think it'd be nice to structure these around a core description ({problem}) with some default rules for how to append codes, description links, feedback issues, etc."
+            return self.template.format(e=self)
+        else:
+            raise NotImplementedError("Don't raise ResolutionException directly.")
+
+    @property
+    def steps(self):
+        return "\n".join(self.solutions)
+
+    def build_template(self):
+        template = ""
+        if self.label:
+            template += "{e.label}"
+        if self.problem:
+            template += "{e.problem}"
+        if self.solutions:
+            if len(self.solutions) > 1:
+                template += "\n\nNext steps:\n{e.steps}"
+            else:
+                template += "\n\nNext step: {e.steps}"
+        if self.issue:
+            template += "\n\n{e.see_issue}"
+
+        return template
+
+    def __init__(self, *args, **kwargs):
+        self.arena = kwargs.pop("arena", None)
+        self.template = self.build_template()
+        ExceptionWithContext.__init__(
+            self, self.description, *args, status=self.status, **kwargs
+        )
 
     def print_if_needed(self):
         if not self.printed:
@@ -1056,12 +1128,152 @@ class ResolutionWarning(ExceptionWithContext):
             self.printed = True
 
 
-EMIT_FEEDBACK_REQUESTS = False
-if logger.isEnabledFor(logging.WARNING):
-    EMIT_FEEDBACK_REQUESTS = True
+class Forbid(ResolutionException):
+    pass
 
-    class FeedbackWantedWarning(ResolutionWarning):
-        label = "FEEDBACK WANTED: "
+
+class Detain(Forbid):
+    pass
+
+
+class Census(ResolutionException):
+    label = "FEEDBACK WANTED: "
+
+    def __init__(self, *args, **kwargs):
+        ResolutionException.__init__(self, *args, **kwargs)
+        self.print_if_needed()
+
+
+"""
+TODO: I'm waffling a bit on messaging. They're important for shifting
+resholve into its next phase/gear--but they're also the kind of thing
+I can fritter a lot of time/effort away on (and they aren't too bad
+to iterate on). For now, I'll braindump and disable most solutions:
+- I'd like to basically workshop the messages towards whether people
+  understand what they mean.
+- I'm not sure where to come down wrt to linking to a web page/wiki
+  and explaining in the message. I've been inclined to see this as
+  something I should give more context on here because resholve isn't
+  quite a linter--most errors block as you hit them.
+- I don't want to get sucked into working on "docs" or a "site".
+- I don't want to fritter gobs of time on terse messages that aren't
+  detailed enough for anyone to solve their own problems without
+  reading the manpage or clicking on a URL anyways?
+- I DO want to take time to get the full test stack working again now
+  so that it's possible to iterate on these in isolation with a clearer
+  ~signal.
+"""
+
+
+class UnresolvedCommand(Forbid):
+    problem = "Couldn't resolve command %r"
+    # solutions = (
+    #     "- add executables to inputs/path",
+    #     "- `fake` a function/alias defined elsewhere",
+    # )
+    status = 3
+
+
+class UnresolvedSource(Forbid):
+    problem = "Unable to resolve source target %r to a known file"
+    # solutions = (
+    #     "- add it to inputs/path",
+    #     "- `fake` a source defined elsewhere",
+    # )
+    status = 4
+
+
+class UnexpectedAbsolutePath(Forbid):
+    problem = "Unexpected absolute %s path (not supplied by a listed dependency)."
+    solutions = ("patch/substitute it.",)
+    status = 5
+
+
+class DynamicArgument(Forbid):
+    # TODO: after dust settles: "Can't resolve dynamic argument in %r"
+    problem = "Can't resolve %r with a dynamic argument"
+    # solutions = (
+    #     "Decide if this is ",
+    #     "- `fake` a source defined elsewhere",
+    # )
+    status = 6
+
+
+class DynamicCommand(Forbid):
+    problem = "Can't resolve dynamic command"
+    # solutions = "TODO: where should they go? Doc? Wiki? Issue?"
+    status = 7
+
+
+class MissingLore(Forbid):
+    problem = "I don't have any lore for %r"
+    # solutions = "For more on how to supply it, see: TODO"
+    status = 8
+
+
+class PotentialExecer(Forbid):
+    problem = (
+        "%r _might_ be able to execute its arguments, and I "
+        "don't have any command-specific rules for figuring out if this "
+        "specific invocation does or not. "
+    )
+    # solutions = "TODO: where should they go? Doc? Wiki? Issue?"
+    status = 9
+
+
+# TODO: if no other testable assay cases turn up that justify keeping this vague, dial it in; the lone case ATM is for an assay that uses a number that overshoots the length of the command
+class InvalidAssay(Forbid):
+    problem = "I have an assay matching this invocation, but: %s\n\nAssay: %r"
+    # solutions = "TODO: where should they go? Doc? Wiki? Issue?"
+    status = 10
+
+
+class SedECommand(Detain):
+    problem = "I don't know how to handle sed `e` commands yet--sorry :("
+    solutions = ("- See the feedback issue for a workaround",)
+    status = 11
+    issue = 28
+
+
+class NixSetuidWrapper(Detain):
+    problem = "There is not yet a good way to resolve '%s' in Nix builds."
+    solutions = (
+        "- Your feedback will help clarify the best course of action.",
+        "- See the workaround in the issue.",
+    )
+    status = 12
+    issue = 29
+
+
+class OverriddenEssentialBuiltin(Census):
+    problem = "Essential builtin overridden by %s %r."
+    issue = 27
+
+
+class QuotedEval(Census):
+    problem = "Letting quoted %r through for now."
+    issue = 2
+
+
+# emit census/feedback requests at warning+ verbosity
+if logger.isEnabledFor(logging.WARNING):
+
+    def observe(cls, *args, **kwargs):
+        logger.debug("WAT %r %r", cls, args)
+        try:
+            raise cls(*args, **kwargs)
+        except Census:
+            # these self-print and don't block
+            pass
+
+
+else:
+
+    def observe(cls, *args, **kwargs):
+        logger.debug("WAT %r %r", cls, args)
+        if isinstance(cls, Census):
+            return
+        raise cls(*args, **kwargs)
 
 
 class InFileDirectiveError(Exception):
@@ -1277,11 +1489,8 @@ class OrderedCommandResolver(object):
         return False
 
     def _unexpected_absolute_path(self):
-        raise ResolutionError(
-            "Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.",
-            # the others are errors too, but we'll just flag the first
-            status=5,
-        )
+        # any others would be errors, too, but we'll just flag the first
+        observe(UnexpectedAbsolutePath, "command")
 
     def generate_external_resolver(self, relevant):
         if self.name.startswith("/") and os.path.isabs(self.name):
@@ -1452,16 +1661,7 @@ class OrderedCommandResolver(object):
         if self.name in self.NAUGHTY_NIXERS and "NIX_BUILD_TOP" in os.environ:
             # --fake 'external:sudo' or w/e will let this fall back to
             # a run-time PATH lookup.
-            raise ResolutionError(
-                "There is not yet a good way to resolve '%s' in "
-                "Nix builds. Your feedback may help me (and the "
-                "Nix community) understand what the best course of "
-                "action is here.\n\nSee https://github.com/abathur/"
-                "resholve/issues/29 for info, feedback, "
-                "and potential workarounds.",
-                self.name,
-                status=66,  # TODO
-            )
+            observe(NixSetuidWrapper, self.name)
 
         global lore
         executable = lookup(self.name)
@@ -1474,11 +1674,7 @@ class OrderedCommandResolver(object):
             # Instead, we just mark the status, and code higher up the
             # stack will catch this error, inject the correct arena and
             # location information for us, and then re-raise the error.
-            raise ResolutionError(
-                "Can't resolve command %r to a known function or executable",
-                self.name,
-                status=3,
-            )
+            observe(UnresolvedCommand, self.name)
         else:
             # if we know about the executable
             # - and know it cannot exec
@@ -1487,11 +1683,7 @@ class OrderedCommandResolver(object):
             # if we don't
             # - either require triage, or outright fail due to the lack of lore
             if executable not in lore:
-                raise Exception(
-                    "wee-oo-wee-oo: resholve is now more pedantic--you have to submit lore for every executable it finds",
-                    executable,
-                    lore,
-                )
+                observe(MissingLore, executable)
 
             return executable
 
@@ -1890,7 +2082,6 @@ class RecordCommandlike(object):
             #         raise FeedbackWantedWarning(
             #             "You have a dynamic alias. Weigh in @ https://github.com/abathur/resholve/issues/XX :)",
             #             word=w_ob,
-            #             status=8,  # TODO
             #             arena=self.arena,
             #         )
             #     except FeedbackWantedWarning:
@@ -1979,11 +2170,10 @@ class RecordCommandlike(object):
                     target,
                 )
             else:
-                # TODO: better message
-                raise ResolutionError(
-                    "Unexpected absolute source path (not supplied by a listed dependency). You should patch/substitute it.",
+                observe(
+                    UnexpectedAbsolutePath,
+                    "source",
                     word=sw_ob,
-                    status=5,
                     arena=self.arena,
                 )
         else:
@@ -2007,11 +2197,10 @@ class RecordCommandlike(object):
             # in theory I could pass this exception to the new
             # self.record_external_source, but this would mean we can't
             # fail as soon. Failing soon seems better, no?
-            raise ResolutionError(
-                "Unable to resolve source target %r to a known file",
+            observe(
+                UnresolvedSource,
                 sw_txt,
                 word=sw_ob,
-                status=7,
                 arena=self.arena,
             )
 
@@ -2020,24 +2209,19 @@ class RecordCommandlike(object):
         w_ob1 = cmd_ob.words[0]
         try:
             ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
-        except ResolutionError as e:
+        except Forbid as e:
             logger.debug("allowing resolution error for eval %r", e)
 
         if cmd_ob.words[1].parts[0].tag in (
             word_part_e.SingleQuoted,
             word_part_e.DoubleQuoted,
         ):
-            if EMIT_FEEDBACK_REQUESTS:
-                try:
-                    raise FeedbackWantedWarning(
-                        "Letting quoted %r through for now. Not sure if this is 'right' or not. Weigh in @ https://github.com/abathur/resholve/issues/2",
-                        w_ob1.parts[0].val,
-                        word=cmd_ob.words[1],
-                        status=66,
-                        arena=self.arena,
-                    )
-                except FeedbackWantedWarning:
-                    pass
+            observe(
+                QuotedEval,
+                w_ob1.parts[0].val,
+                word=cmd_ob.words[1],
+                arena=self.arena,
+            )
             return
 
     def handle_builtin_exec(self, cmd_ob, args, name, text):
@@ -2086,12 +2270,10 @@ class RecordCommandlike(object):
             handler(cmd_object, args, name, text)
 
         else:
-            # TODO: tentative
-            raise ResolutionError(
+            # TODO: tentative, maybe this can just be a log msg?
+            raise Exception(
                 "It's an error not to handle this builtin",
-                word=cmd_object.words[0],
-                status=99,
-                arena=self.arena,
+                cmd_object.words[0],
             )
 
     def _strip_varlikes(self, cmd_ob, args):
@@ -2487,7 +2669,7 @@ class RecordCommandlike(object):
         """
         sed = lookup("sed")
         if not sed:
-            raise ResolutionError(
+            raise Exception(
                 "Somehow I ended up trying to look for a sed `e` command in %r when sed isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
                 expr,
             )
@@ -2557,12 +2739,6 @@ class RecordCommandlike(object):
 
         Let's
         """
-        error_desc = (
-            "I don't quite know how to handle sed `e` "
-            "commands yet--sorry :(\n\n"
-            "I could use your feedback on this at:\n"
-            "https://github.com/abathur/resholve/issues/28"
-        )  # TODO
         logger.debug("trying external sed %r", cmd_ob)
         i = 1
         found_expr = False
@@ -2573,10 +2749,9 @@ class RecordCommandlike(object):
                 if arg[1] in ("e", "f"):
 
                     if self._find_sed_e_cmd(args.argv[i + 1]):
-                        raise ResolutionError(
-                            error_desc,
+                        observe(
+                            SedECommand,
                             word=cmd_ob.words[i + 1],
-                            status=16,  # TODO
                             arena=self.arena,
                         )
                     found_expr = True
@@ -2584,10 +2759,9 @@ class RecordCommandlike(object):
                 elif arg[1] == "-":
                     if arg.startswith("--expression") or arg.startswith("--file"):
                         if self._find_sed_e_cmd(args.argv[i + 1]):
-                            raise ResolutionError(
-                                error_desc,
+                            observe(
+                                SedECommand,
                                 word=cmd_ob.words[i + 1],
-                                status=16,  # TODO
                                 arena=self.arena,
                             )
                         found_expr = True
@@ -2610,10 +2784,9 @@ class RecordCommandlike(object):
             # assume we've found positional arg 1
             if not found_expr:
                 if self._find_sed_e_cmd(args.argv[i]):
-                    raise ResolutionError(
-                        error_desc,
+                    observe(
+                        SedECommand,
                         word=cmd_ob.words[i],
-                        status=16,  # TODO
                         arena=self.arena,
                     )
 
@@ -2852,11 +3025,24 @@ class RecordCommandlike(object):
         if outer in decided_execers:
             assay = decided_execers[outer]
             wordnum = int(assay["wordnum"])
+            logger.debug(
+                "outer=%r assay=%r wordnum=%r text=%r", outer, assay, wordnum, text
+            )
             if assay["command"] == text:
+                if wordnum >= len(args.arg_spids):
+                    observe(
+                        InvalidAssay,
+                        "the wordnum index(%d) is too large to zero-index args(%d)"
+                        % (wordnum, len(args.arg_spids)),
+                        assay,
+                        word=cmd_object.words[-1],
+                        arena=self.arena,
+                    )
                 pos = args.arg_spids[wordnum]
                 subcmd_txt = (
                     args.argv[wordnum] or cmd_object.words[wordnum].parts[0].val
                 )
+                logger.debug("assay.command == text")
                 # contra to the normal process--we'll register and
                 # then immediately resolve this (if it isn't already)
                 cmdlike = cmdlikes[subcmd_txt]
@@ -2931,10 +3117,11 @@ class RecordCommandlike(object):
             # which may be fine, or maybe we should be more pedantic?
             return
 
-        raise Exception(
-            "wee-oo-wee-oo: resholve is now more pedantic--you'll have to triage whether or not every invocation of this executable could sub-exec.",
-            cmd_object,
-            text,
+        observe(
+            PotentialExecer,
+            name,
+            word=cmd_object.words[0],
+            arena=self.arena,
         )
 
     def prune_unmatched(self, cmd_object, subcmd_txt, start, end):
@@ -3178,7 +3365,7 @@ class ResolvedScript(RecordCommandlike):
         try:
             self.Visit(node)
             self.handle_potential_redefiners()
-        except ResolutionError as e:
+        except Forbid as e:
             e.print_if_needed()
             raise e
 
@@ -3279,7 +3466,7 @@ class ResolvedScript(RecordCommandlike):
         f = open(path, "w") if path else sys.stdout
         try:
             self.render(to=f)
-        except ResolutionError as e:
+        except Forbid as e:
             e.print_if_needed()
             raise e
         finally:
@@ -3441,11 +3628,10 @@ class ResolvedScript(RecordCommandlike):
                     )
                     return True
 
-                raise ResolutionError(
-                    "Can't resolve %r with a dynamic argument",
+                observe(
+                    DynamicArgument,
                     fw_txt,
                     token=token,
-                    status=6,
                     arena=self.arena,
                 )
             else:
@@ -3458,11 +3644,9 @@ class ResolvedScript(RecordCommandlike):
                     return True
 
                 logger.debug("ffs %r %r %r %r", token, fw_txt, token_name, word_ob)
-                raise ResolutionError(
-                    # TODO: multiple copies of this message, speciate
-                    "Can't resolve dynamic command",
+                observe(
+                    DynamicCommand,
                     token=token,
-                    status=9,
                     arena=self.arena,
                 )
 
@@ -3484,9 +3668,13 @@ class ResolvedScript(RecordCommandlike):
 
             dynamic = find_dynamic_token(part)
             if dynamic and not self.allow_dynamic_token(dynamic, word_ob, fw_txt):
-                raise ResolutionError(
-                    # TODO: multiple copies of this message, speciate
-                    "Can't resolve dynamic command",
+                raise Exception(
+                    "I'm not convinced this is possible anymore, so speciating the messages is a waste of time.",
+                    word_ob,
+                    dynamic,
+                )
+                observe(
+                    DynamicCommand,
                     word=word_ob,
                     token=dynamic,
                     status=9,
@@ -3543,27 +3731,15 @@ class ResolvedScript(RecordCommandlike):
                 # TODO: write a test to verify this behavior
                 if not cmdlike.alias and not cmdlike.function:
                     return self.look_for_essential_builtin_sub_execution(fw_txt, cmd_ob)
-                elif EMIT_FEEDBACK_REQUESTS:
-                    try:
-                        raise FeedbackWantedWarning(
-                            "Essential builtin overridden by %s %r. Weigh in @ https://github.com/abathur/resholve/issues/27 :)",
-                            "function" if cmdlike.function else "alias",
-                            fw_txt,
-                            word=fw_ob,
-                            status=66,  # TODO
-                            arena=self.arena,
-                        )
-                    except FeedbackWantedWarning:
-                        pass
-                    # TODO: keep or dispose per feedback on above
-                    # raise ResolutionError(
-                    #     "I'm not sure if this is really an error but: essential builtin %r is shadowed by a %r :)",
-                    #     fw_txt,
-                    #     "function" if cmdlike.function else "alias",
-                    #     word=fw_ob,
-                    #     status=100,  # TODO
-                    #     arena=self.arena,
-                    # )
+
+                observe(
+                    OverriddenEssentialBuiltin,
+                    "function" if cmdlike.function else "alias",
+                    fw_txt,
+                    word=fw_ob,
+                    arena=self.arena,
+                )
+
             # queue all other commands for the general
             # batch resolution cycle
             # TODO: if this change sticks, it is worth
