@@ -95,7 +95,8 @@ Because Shell is a very flexible, tricky language, resholve necessarily focuses 
 
 The main areas I'm currently aware of:
 
-- resholve makes no attempt to perform deep/recursive analysis on commands that run other commands. Plainly: resholve *does* try to verify that "blah" in `command blah` resolves to a real command--but it won't resolve it if you do something cute like `command command command blah`. 
+- In any Nix build, resholve now blocks resolution of some fundamental external utilities (such as su and sudo) that use run wrappers in NixOS. See #29 for more.
+- Because resholve makes assumptions about the behavior of some builtins in order to resolve scripts, it blocks if it looks like one is overridden by a function or alias. (This can likely be relaxed once I have a better sense of who/what/when/where/why/how these are overridden).
 - resholve doesn't have robust handling of variables that get executed like commands (this includes things like `eval $variable` and `"$run_as_command"` and `$GIT_COMMAND status`). There's some room for improvement here, but I also want to manage expectations because some cases are completely intractable without evaluating the script.
     - there's a first-level complication about seeing-through the variables themselves
     - and then a second-level issue with seeing-through double-quoted strings (for example, an eval )

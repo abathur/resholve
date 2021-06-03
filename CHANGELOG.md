@@ -1,11 +1,50 @@
 # Changelog
 
 ## v0.6.0 (IDK ? 2021)
-- To simplify separating the handlers for each builtin/command, resholve now treats invocations of the `.` builtin as if they used `source`. It won't make this translation in the source, but it does mean that any 
-- Resolve backslash-escaped commands (used to skip alias expansion), leaving the backslash in place.
 
-### Migrating:
+In order to support a few new features, I've refactored a fair fraction of resholve's command-visitor and resolution process. I'll focus on what I've added, but fair warning: slips/regressions are more likely with this update.
+
+### Improved build-blocking/errors
+- Require "lore" specifying whether every external executable it encounters can, cannot, or might (default) execute its own arguments.
+    - Executables marked "cannot" are not checked for sub-executions.
+    - Executables marked "might" or "can" must either have:
+        - a command handler in resholve itself
+        - a directive to tell resholve if there's anything else to resolve
+    - Aside from its record separator, the lore format (see [TODO: document lore directory format](TODO) for more) is simple to write or generate.
+    - I'm developing the default/~reference lore provider as a separate project: https://github.com/abathur/binlore. (It is responsible for evaluating each executable and printing judgements in the appropriate format.)
+- Block Nix builds if a script uses some executables that, in Nix land, must use setuid wrappers. Details in #29, but generally this exists to catch users at risk of falling into some Nix traps.
+
+### Improved resolution
+- Separate per-command handlers (previously: shared handlers for ~similar builtins/commands) to better accommodate syntax/usage quirks of individual commands like variable assignments, flags, exec's fd behavior, varying sub-executable locations, etc.
+    - builtins: builtin, command, coproc, eval, exec, source. (Note: `time` is technically a keyword. Thus far, the OSH parser's handling of time has sheltered resholve from needing to consider it.)
+    - externals: coreutils (chroot env install nice nohup runcon sort split stdbuf timeout), sed, sudo (but not w/ Nix), findutils (xargs), rlwrap, sqlite3
+    <!-- TODO: find belongs above, once done -->
+- Recursively resolve command-executing commands (previously: a single level of sub-resolution).
+- Resolve backslash-escaped commands (used to skip alias expansion), leaving the backslash in place.
+- Unified handling of "dynamic" syntax handling (what kinds of substitutions and expansions resholve does and doesn't require exemptions for) across different contexts to make it more consistent. (These had ~speciated, so there's a higher risk of regressions and nonsense combinations here.)
+
+
+### Internal
+- To simplify separating the handlers for each builtin/command, resholve now treats invocations of the `.` builtin as if they used `source`. It won't make this translation in the source, but it does mean that any
+- Exit statuses have been *very* ad-hoc so far, and now they're only *fairly* ad-hoc.
+
+    This is under "internal" for a reason: resholve's statuses are a testing affordance. They aren't systematic. I have not decided if I will re-use an old status for semantically-new errors. I have not decided what I'll do with a status if I speciate an error into two more-specific errors. Use them if they help you, but keep an eye out for changes.
+
+    Specifics:
+
+    - resholve now _aspires_ to avoid status 1 for resholve-specific errors. This is predicated on the _assumption_ that errors raised by the underlying osh parser will use status 1 (unless resholve intentionally catches, changes, and re-raises them).
+    - resholve now _aspires_ to use status 2 for all invocation errors. (Some assertion-checked invocation errors previously resulted in status 1).
+    - resholve now _aspires_ to use a distinct 3+ status for each distinct error class. I refactored resolution errors to give each error its own class and make it harder to row in the wrong direction.
+    - Existing status numbers have been updated to eliminate gaps in the status numbers used.
+        - unresolved source 7 -> 4
+        - unresolvable dynamic command 9 -> 7
+
+
+
+
+### Migrating
 - Directives specifying `.` should be updated to use `source`.
+- If you have any scripts that depend on resholve's non-0 error statuses, double-check them. Some (but not all) error statuses have changed.
 
     
 
