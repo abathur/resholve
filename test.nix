@@ -181,10 +181,18 @@ in rec {
       export EMPTY_LORE=$PWD/empty_lore
       echo $EMPTY_LORE/*
       printf "\033[33m============================= resholve test suite ===================================\033[0m\n"
-      ./test.sh |& tee demo.ansi
+      if ./test.sh &> demo.ansi; then
+        cat demo.ansi
+      else
+        cat demo.ansi && exit 1
+      fi
     '' + lib.optionalString runDemo ''
       printf "\033[33m============================= resholve demo ===================================\033[0m\n"
-      ./demo |& tee demo.ansi
+      if ./demo &> demo.ansi; then
+        cat demo.ansi
+      else
+        cat demo.ansi && exit 1
+      fi
     '';
   };
 }
