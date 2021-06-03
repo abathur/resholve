@@ -36,7 +36,7 @@ Original:
 Output:
 >>>   which resholve
 >>>   ^~~~~
->>> [ stdinNone ]:3: Can't resolve command 'which' to a known function or executable
+>>> [ stdinNone ]:3: Couldn't resolve command 'which'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 1 'which' needs to be in RESHOLVE_PATH
@@ -53,7 +53,7 @@ Original:
 Output:
 >>>       command which "$@"
 >>>               ^~~~~
->>> [ stdinNone ]:5: Can't resolve command 'which' to a known function or executable
+>>> [ stdinNone ]:5: Couldn't resolve command 'which'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH
@@ -66,7 +66,9 @@ Original:
 Output:
 >>>   /usr/bin/which resholve
 >>>   ^~~~~~~~~~~~~~
->>> [ stdinNone ]:2: Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.
+>>> [ stdinNone ]:2: Unexpected absolute command path (not supplied by a listed dependency).
+>>> 
+>>> Next step: patch/substitute it.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 3 Absolute executable paths need exemptions
@@ -79,7 +81,9 @@ Original:
 Output:
 >>>   find . -name resholve -exec /usr/bin/file {} +
 >>>                               ^~~~~~~~~~~~~
->>> [ stdinNone ]:2: Unexpected absolute command path (not supplied by a listed dependency). You should patch/substitute it.
+>>> [ stdinNone ]:2: Unexpected absolute command path (not supplied by a listed dependency).
+>>> 
+>>> Next step: patch/substitute it.
 >>> #!/nix/store/l25gl3siwmq6gws4lqlyd1040xignvqw-bash-4.4-p23/bin/bash
 >>> /nix/store/3nb6lyw2ifs1jcjw3syvmmyin4na7pml-findutils-4.7.0/bin/find
 
@@ -201,7 +205,7 @@ Diff:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ok 10 Add an exemption with RESHOLVE_ALLOW=source:$PWD
 
---[ resholve --interpreter /nix/store/l25gl3siwmq6gws4lqlyd1040xignvqw-bash-4.4-p23/bin/bash < source_missing_target.sh (exit: 7) ]
+--[ resholve --interpreter /nix/store/l25gl3siwmq6gws4lqlyd1040xignvqw-bash-4.4-p23/bin/bash < source_missing_target.sh (exit: 4) ]
 
 Original:
 >>> # fails to resolve this (from inputs, or relative to directory)
@@ -334,8 +338,8 @@ much help
 test_future_perfection
 nothing up my sleeve
 +++++ type jq openssl
-/nix/store/isih1zya8i1sx1crhydci3l2l0qf4xqd-testmod3-unreleased/bin/conjure.sh: line 7: type: jq: not found
-/nix/store/isih1zya8i1sx1crhydci3l2l0qf4xqd-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
+/nix/store/7p3qgkpw9d09l8cw4sx3c55v6j3wg20z-testmod3-unreleased/bin/conjure.sh: line 7: type: jq: not found
+/nix/store/7p3qgkpw9d09l8cw4sx3c55v6j3wg20z-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
 +++++ set +x
 test_openssl
 +++++ /nix/store/4r8nzwa0jpzg7i2fh4ga2fv1n2ffncg7-openssl-1.1.1j-bin/bin/openssl version
@@ -354,7 +358,7 @@ Ran 3 tests.
 
 OK
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/isih1zya8i1sx1crhydci3l2l0qf4xqd-testmod3-unreleased/bin/conjure.sh
+       │ File: /nix/store/7p3qgkpw9d09l8cw4sx3c55v6j3wg20z-testmod3-unreleased/bin/conjure.sh
 ───────┼────────────────────────────────────────────────────────────────────────
    1   │ #!/nix/store/l25gl3siwmq6gws4lqlyd1040xignvqw-bash-4.4-p23/bin/bash
    2   │ test_future_perfection() {
@@ -376,14 +380,14 @@ OK
   18   │     libressl_sh
   19   │ }
   20   │ 
-  21   │ source /nix/store/0qlb8pk8mm2xldsd9nc9wpkzjrv9alny-testmod1-unreleased/bin/libressl.sh
+  21   │ source /nix/store/im7lxihcqszcy079p9rggwa7xvwlvncx-testmod1-unreleased/bin/libressl.sh
   22   │ 
   23   │ ### resholve directives (auto-generated) ## format_version: 2
-  24   │ # resholve: keep source:/nix/store/0qlb8pk8mm2xldsd9nc9wpkzjrv9alny-testmod1-unreleased/bin/libressl.sh
+  24   │ # resholve: keep source:/nix/store/im7lxihcqszcy079p9rggwa7xvwlvncx-testmod1-unreleased/bin/libressl.sh
   25   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/217fqfv3rz4nkgm8974359x54541rnjg-testmod2-unreleased/bin/openssl.sh
+       │ File: /nix/store/13ng8crq3ck5f3pkxbwa0c04h8m9bm4c-testmod2-unreleased/bin/openssl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
    1   │ openssl_sh() {
    2   │     set -x
@@ -392,18 +396,18 @@ OK
    5   │ }
    6   │ alias blah=/nix/store/4r8nzwa0jpzg7i2fh4ga2fv1n2ffncg7-openssl-1.1.1j-bin/bin/openssl
    7   │ 
-   8   │ source /nix/store/9hbr51sf83a123acqyy4xr39mdqvrw1v-shunit2-2019-08-10/bin/shunit2
+   8   │ source /nix/store/8971k785wm44bnjhr3jpq1hzdwdg342b-shunit2-2019-08-10/bin/shunit2
    9   │ 
   10   │ ### resholve directives (auto-generated) ## format_version: 2
   11   │ # resholve: fix aliases
   12   │ # resholve: keep /nix/store/4r8nzwa0jpzg7i2fh4ga2fv1n2ffncg7-openssl-1.1.1j-bin/bin/openssl
-  13   │ # resholve: keep source:/nix/store/9hbr51sf83a123acqyy4xr39mdqvrw1v-shunit2-2019-08-10/bin/shunit2
+  13   │ # resholve: keep source:/nix/store/8971k785wm44bnjhr3jpq1hzdwdg342b-shunit2-2019-08-10/bin/shunit2
   14   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/0qlb8pk8mm2xldsd9nc9wpkzjrv9alny-testmod1-unreleased/bin/libressl.sh
+       │ File: /nix/store/im7lxihcqszcy079p9rggwa7xvwlvncx-testmod1-unreleased/bin/libressl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
-   1   │ source /nix/store/0qlb8pk8mm2xldsd9nc9wpkzjrv9alny-testmod1-unreleased/submodule/helper.sh
+   1   │ source /nix/store/im7lxihcqszcy079p9rggwa7xvwlvncx-testmod1-unreleased/submodule/helper.sh
    2   │ 
    3   │ libressl_sh() {
    4   │     set -x
@@ -414,13 +418,13 @@ OK
    9   │ 
   10   │ just_being_helpful
   11   │ 
-  12   │ source /nix/store/217fqfv3rz4nkgm8974359x54541rnjg-testmod2-unreleased/bin/openssl.sh
+  12   │ source /nix/store/13ng8crq3ck5f3pkxbwa0c04h8m9bm4c-testmod2-unreleased/bin/openssl.sh
   13   │ 
   14   │ ### resholve directives (auto-generated) ## format_version: 2
   15   │ # resholve: keep /nix/store/536pqss7jciw91z6db73z5pxjach5098-jq-1.6-bin/bin/jq
   16   │ # resholve: keep /nix/store/y7a9zzv7jgxqgyz641hxikgzmcvr029b-libressl-3.2.5-bin/bin/openssl
-  17   │ # resholve: keep source:/nix/store/0qlb8pk8mm2xldsd9nc9wpkzjrv9alny-testmod1-unreleased/submodule/helper.sh
-  18   │ # resholve: keep source:/nix/store/217fqfv3rz4nkgm8974359x54541rnjg-testmod2-unreleased/bin/openssl.sh
+  17   │ # resholve: keep source:/nix/store/13ng8crq3ck5f3pkxbwa0c04h8m9bm4c-testmod2-unreleased/bin/openssl.sh
+  18   │ # resholve: keep source:/nix/store/im7lxihcqszcy079p9rggwa7xvwlvncx-testmod1-unreleased/submodule/helper.sh
   19   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ```

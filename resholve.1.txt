@@ -110,6 +110,19 @@ ENVIRONMENT
      RESHOLVE_PROLOGUE
      RESHOLVE_EPILOGUE
 
+EXIT STATUS
+     The resholve utility exits 0 on success, and >0 if an error occurs.
+
+     Error statuses are not yet systematic or stable (use them if they help
+     you‐‐but expect changes). Generally:
+
+     1   indicates a non‐resholve error occurred (such as an error from the
+         OSH parser)
+
+     2   indicates invocation/argument errors
+
+     3+  indicates a resolution error
+
 EXAMPLES
      Basic invocations:
 
