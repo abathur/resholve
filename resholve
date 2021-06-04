@@ -496,7 +496,30 @@ class LoreType(object):
         """"""
         self.lore_kinds = lore_kinds
 
+    # DOING: get this working as a thin change, but then try
+    # to see if you can fold ingest_lore in
+
     def __call__(self, path):
+        if len(self.lore_kinds) == 1:
+            return self._call_file(path)
+        else:
+            return self._call_dir(path)
+
+    def _call_file(self, path):
+        try:
+            if os.path.exists(path) and not os.path.isdir(path):
+                for kind in self.lore_kinds:
+                    f = open(path)
+                    reader = getattr(self, kind)
+                    return reader(f)
+            else:
+                raise Exception("%s is not a file" % path)
+        except Exception as e:
+            raise argparse.ArgumentTypeError(
+                "%s\n lore must be a single file. %s" % (self.lore_kinds[0], e)
+            )
+
+    def _call_dir(self, path):
         try:
             if os.path.isdir(path):
                 files = dict()
@@ -509,7 +532,6 @@ class LoreType(object):
             else:
                 raise Exception("%s is not a directory" % path)
         except Exception as e:
-            # TODO: this argparse error may not work like you think it does if argparse doesn't catch it
             raise argparse.ArgumentTypeError(
                 "%s\nLore must be a "
                 "directory with a file named "
@@ -604,13 +626,13 @@ def make_arg_parser(module):
     )
     res.add_argument(
         "--execer-lore",
-        type=argparse.FileType("r"),
+        type=LoreType(("execers",)),
         metavar="f",
         help="lorefile TODO",
     )
     res.add_argument(
         "--wrapper-lore",
-        type=argparse.FileType("r"),
+        type=LoreType(("wrappers",)),
         metavar="f",
         help="lorefile TODO",
     )
@@ -784,6 +806,8 @@ def ingest_assay(assayfile):
     for row in reader:
         logger.debug("assay ingest %r", row)
         if row["wordnum"] == "0":
+            # TODO this needs to be fixed somehow; argparse
+            # won't catch so it'll throw a stack AND exit 1
             raise argparse.ArgumentTypeError(
                 "assay wordnum should be 1+ (0 is the same as the invoking command itself)"
             )
@@ -863,12 +887,8 @@ def punshow():
     elif args.execer_lore or args.wrapper_lore:
         ingest_lore(
             {
-                "execers": LoreType.execers(args.execer_lore)
-                if args.execer_lore
-                else tuple(),
-                "wrappers": LoreType.wrappers(args.wrapper_lore)
-                if args.wrapper_lore
-                else tuple(),
+                "execers": args.execer_lore if args.execer_lore else tuple(),
+                "wrappers": args.wrapper_lore if args.wrapper_lore else tuple(),
             }
         )
 
