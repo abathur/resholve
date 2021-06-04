@@ -1,9 +1,16 @@
 # resholved specific
 *.resolved
 *.todo
+flarf/
 
 # nix
 result
+
+# subl
+*.sublime-*
+
+# TODO: when actually python-packaged,
+# cull irrelevant stuff below?
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
