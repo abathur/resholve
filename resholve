@@ -1210,8 +1210,7 @@ class UnexpectedAbsolutePath(Forbid):
 
 
 class DynamicArgument(Forbid):
-    # TODO: after dust settles: "Can't resolve dynamic argument in %r"
-    problem = "Can't resolve %r with a dynamic argument"
+    problem = "Can't resolve dynamic argument in %r"
     # solutions = (
     #     "Decide if this is ",
     #     "- `fake` a source defined elsewhere",

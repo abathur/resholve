@@ -161,7 +161,7 @@ CASES
 
   require <({
     status 6
-    line -1 contains "Can't resolve 'source' with a dynamic argument"
+    line -1 contains "Can't resolve dynamic argument in 'source'"
   })
 } <<CASES
 resholve --interpreter $INTERP source_var_pwd.sh
@@ -183,7 +183,7 @@ CASES
 @test "resholve fails when triage directive doesn't specify the right thing" {
   require <({
     status 6
-    line -1 contains "Can't resolve 'source' with a dynamic argument"
+    line -1 contains "Can't resolve dynamic argument in 'source'"
   })
 } <<CASES
 resholve --interpreter $INTERP --keep command:\$PWD < source_var_pwd.sh
