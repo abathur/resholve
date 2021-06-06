@@ -8,7 +8,9 @@ function file(){
 }
 
 file # I'm the alias
+\file # the function!
 command file # external
 
 find # alias
+\find # external
 command find # external

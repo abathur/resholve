@@ -1575,6 +1575,12 @@ class OrderedCommandResolver(object):
         return self.cro
 
     @property
+    def slash(self):
+        # \command skips alias resolution
+        # keyword > special builtin > function > builtin > external
+        return self.cro[1:]
+
+    @property
     def alias(self):
         return self.cro[3:]  # function > builtin > external
 
@@ -1839,6 +1845,9 @@ class CommandLike(object):
 
     def request_full_solution(self, source, cmd_object=None):
         return self.request_solution(source, self.find_cro(source).full, cmd_object)
+
+    def request_slash_solution(self, source, cmd_object=None):
+        return self.request_solution(source, self.find_cro(source).slash, cmd_object)
 
     def request_alias_solution(self, source, cmd_object=None):
         return self.request_solution(source, self.find_cro(source).alias, cmd_object)
@@ -3185,6 +3194,13 @@ class RecordCommandlike(object):
             self, cmd_object
         )
 
+    def record_slash_cmd(self, word_object, word_text, cmd_object, position=None):
+        """Record \command in general namespace - aliases."""
+        pos = self.get_word_position(word_object, position)
+        self.solutions[pos] = cmdlikes[word_text].request_slash_solution(
+            self, cmd_object
+        )
+
     def record_alias_cmd(self, word_object, word_text, position=None):
         """Record command found in alias definition namespace."""
         pos = self.get_word_position(word_object, position)
@@ -3740,7 +3756,10 @@ class ResolvedScript(RecordCommandlike):
         if not ok:
             self.allow_dynamic_executable_word(fw_ob, fw_txt)
         else:
-            self.record_general_cmd(fw_ob, fw_txt, cmd_ob)
+            if fw_ob.parts[0].tag == word_part_e.EscapedLiteral:
+                self.record_slash_cmd(fw_ob, fw_txt, cmd_ob)
+            else:
+                self.record_general_cmd(fw_ob, fw_txt, cmd_ob)
             # handle essential builtins immediately
             if fw_txt in FIRST_PASS_ESSENTIALS:
                 cmdlike = cmdlikes[fw_txt]

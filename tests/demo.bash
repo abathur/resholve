@@ -30,8 +30,8 @@ rule() {
 }
 quote() {
     echo "$1"
-    while IFS= read text; do
-        printf "\033[34m>>>\033[0m %s\n" "$text"
+    while IFS= read -r text; do
+        printf "\033[34m>>>\033[0m %s\n" "${text}"
     done
     echo ""
 }

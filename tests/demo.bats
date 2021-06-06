@@ -99,15 +99,17 @@ CASES
     line 5 contains 'find2="/nix/store'
     line 7 !contains "/nix/store"
     line 9 !contains "/nix/store"
-    line 10 contains "/nix/store"
-    line 11 !contains "/nix/store"
-    line 12 contains "/nix/store"
-    line 13 begins "### resholve directives (auto-generated)"
+    line 10 contains "\file # the function!"
+    line 11 contains "/nix/store"
+    line 12 !contains "/nix/store"
+    line 13 contains "/nix/store"
+    line 14 contains "/nix/store"
+    line 15 begins "### resholve directives (auto-generated)"
     # can't assert the ends; these get sorted
     # and the hash makes unstable :(
-    line 14 equals "# resholve: fix aliases"
-    line 15 begins "# resholve: keep /nix/store/"
-    line 16 begins "# resholve: keep /nix/store/"
+    line 16 equals "# resholve: fix aliases"
+    line 17 begins "# resholve: keep /nix/store/"
+    line 18 begins "# resholve: keep /nix/store/"
   })
 } <<CASES
 resholve --interpreter $INTERP --fix aliases < alias_riddle.sh
