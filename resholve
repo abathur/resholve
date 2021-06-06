@@ -164,9 +164,7 @@ from oil.osh import sh_expr_eval  # ArithEvaluator
 # LookupSpecialBuiltin, LookupAssignBuiltin, LookupNormalBuiltin, NO_INDEX
 from oil.frontend import consts
 from oil.frontend import parse_lib  # ParseContext
-from oil.frontend import (
-    reader,
-)  # FileLineReader (only into ParseContext().MakeOshParser)
+from oil.frontend import reader  # FileLineReader
 
 from oil._devbuild.gen.id_kind_asdl import Id  # VSub_Number, VSub_Name, VSub_DollarName
 
@@ -174,7 +172,6 @@ from oil._devbuild.gen.syntax_asdl import (
     source,  # MainFile, Stdin
     word_part_e,  # ArithSub, AssocArrayLiteral, BracedVarSub, CommandSub, DoubleQuoted, EscapedLiteral, ExtGlob, Literal, ShArrayLiteral, SimpleVarSub, SingleQuoted, Splice, TildeSub
     command,  # ShFunction, Simple
-    command_sub,  # TODO
     double_quoted,  # directly for cast()
     Token,  # directly for cast(), also for alias parsing
 )
@@ -624,6 +621,11 @@ def make_arg_parser(module):
         metavar="d",
         help="lore directory",
     )
+    """
+    TODO:
+    thinking I'd like to be able to drop the *-lore variants
+    and make these just directives or something
+    """
     res.add_argument(
         "--execer-lore",
         type=LoreType(("execers",)),
@@ -700,7 +702,6 @@ def lookup(word):
     return executables[word]
 
 
-# TODO: refactor to deduplicate this before/after stuff
 def resolve_script(script_path, shebang="", prologue=None, epilogue=None):
     if script_path in resolved_scripts:
         return resolved_scripts[script_path]
@@ -811,10 +812,7 @@ def ingest_assay(assayfile):
             raise argparse.ArgumentTypeError(
                 "assay wordnum should be 1+ (0 is the same as the invoking command itself)"
             )
-        # TODO: IDK what the right format is
-        # decided_execers[row["executable"]][row["command"]] = {
-        #     k: v for k, v in row.items() if k != "executable"
-        # }
+
         decided_execers[row["command"].split()[0]] = {k: v for k, v in row.items()}
 
 
@@ -838,17 +836,16 @@ and idioms that will be common for external commands matched this way.
 
 I'll keep them here as a reference at least until there are enough
 external commands to crib from.
-"""
+
 unused_builtin_subcommand_re = {
     "builtin": re.compile(r"(?<=builtin )(?P<resolve>.*)"),
-    # TODO: no rush, but maybe we can help the weird coproc
-    # situation with a handler that throws better errors
     "coproc": re.compile(r"(?<=coproc )(?P<resolve>.*)"),
     "command": re.compile(r"(?<=command (?!-(v|V) ))(?:-p )?(?P<resolve>.*)"),
     "eval": re.compile(r"(?<=eval )(?P<resolve>.*)"),
     # -a is probably wrong if NAME can be quoted?
     "exec": re.compile(r"(?<=exec )(?:-(c|l|a \S+) )?(?P<resolve>.*)"),
 }
+"""
 
 
 def punshow():
@@ -907,11 +904,6 @@ def punshow():
                     shebang=args.shebang,
                     prologue=args.prologue,
                     epilogue=args.epilogue,
-                    # TODO: decide if passing these is needed or if it can be global state?
-                    # lore=args.lore,
-                    # oracle=args.oracle,
-                    # assay=args.assay,
-                    # assayer=args.assayer,
                 )
                 to_write.add(None)
 
@@ -1063,20 +1055,6 @@ class ExceptionWithContext(error._ErrorWithLocation):
     pass
 
 
-class TODODeleteResolutionError(ExceptionWithContext):
-    printed = False
-    arena = None
-
-    def __init__(self, *args, **kwargs):
-        self.arena = kwargs.pop("arena", None)
-        ExceptionWithContext.__init__(self, *args, **kwargs)
-
-    def print_if_needed(self):
-        if not self.printed:
-            ui.PrettyPrintError(self, self.arena)
-            self.printed = True
-
-
 # label? code? issue? feedback? url?
 class ResolutionException(ExceptionWithContext):
     """
@@ -1165,10 +1143,15 @@ class Census(ResolutionException):
 
 
 """
-TODO: I'm waffling a bit on messaging. They're important for shifting
-resholve into its next phase/gear--but they're also the kind of thing
-I can fritter a lot of time/effort away on (and they aren't too bad
-to iterate on). For now, I'll braindump and disable most solutions:
+TODO: I'm waffling a bit on messaging.
+
+I think lucid error communication--what caused resholve to halt, why it
+is a problem, and what to do--is important for shifting resholve into
+its next phase/gear.
+
+But, they're also the kind of thing I can fritter a lot of time/effort
+away on (and they aren't too bad to iterate on). For now, braindump and
+disable most 'solutions':
 - I'd like to basically workshop the messages towards whether people
   understand what they mean.
 - I'm not sure where to come down wrt to linking to a web page/wiki
@@ -1609,7 +1592,11 @@ class OrderedCommandResolver(object):
 
     TODO: in theory these can be cached, but I'm not sure it'll be
     meaningful. The expensive part, lookup(), is already cached.
-    (note that walk-time lookups for some builtins may affect this)
+        update June 2021: walk-time lookups for some builtins and
+        general recursive resolution support *might* have moved the
+        needle far enough to justify this change at some point. Not
+        something I'll look at until the dust settles and I do a pass
+        on perf.
     """
 
     def resolve_alias(self):
@@ -1864,12 +1851,7 @@ class CommandLike(object):
     def resolve(self):
         global FIRST_PASS_ESSENTIALS, lore
         logger.debug("CALLING RESOLVE ON %r", self.name)
-        if self.resolved:
-            logger.debug(
-                "previously-resolved cmdlike %r: %r had its .resolve called again.",
-                self.name,
-                self,
-            )
+
         # find solutions for observed types
         for distinct_cro, solution in self.order_to_solution.items():
             if not solution.solved:
@@ -1915,13 +1897,6 @@ class CommandLike(object):
                         )
                         if handler:
                             args, name, text = source.get_subexec_context(cmd_object)
-                            if name == ".":  # remap
-                                # TODO: I *hope* this can be removed but
-                                # leave the emergency brake in for now
-                                name = "source"
-                                raise Exception(
-                                    "let's see; in theory these should all be picked by now..."
-                                )
                             handler(cmd_object, args, name, text)
                         else:
                             logger.debug(
@@ -1954,13 +1929,6 @@ class CommandLike(object):
                             source.look_for_external_sub_execution(
                                 self.name, cmd_object
                             )
-
-            # TODO: rm if not seen for a while? Not sure how long... --Jun 27, 2020
-            if not solution.solved:
-                raise Exception(
-                    "Can't resolve command %r to a known function or executable? I think this is obsolete now that resolve_external raises a similar error, but I won't hastily remove it..."
-                    % self.name
-                )
 
         self.resolved = True
 
@@ -2151,6 +2119,8 @@ class RecordCommandlike(object):
                 del subcmd.words[0]
                 self.record_command_cmd(sw_ob, sw_txt, subcmd)
 
+    # TODO: no rush, but maybe we can help the weird coproc
+    # situation with a handler that throws better errors
     def handle_builtin_coproc(self, cmd_ob, args, name, text):
         ok, sw_ob, sw_txt, _quoted = self._require_second_word(name, cmd_ob)
         if ok:
@@ -2232,7 +2202,6 @@ class RecordCommandlike(object):
                 arena=self.arena,
             )
 
-    # TODO: look at that other eval/pass site and verify it is needed?
     def handle_builtin_eval(self, cmd_ob, args, name, text):
         w_ob1 = cmd_ob.words[0]
         try:
@@ -2280,8 +2249,6 @@ class RecordCommandlike(object):
         global subcommand_re
         args, name, text = self.get_subexec_context(cmd_object)
 
-        # TODO: I'm about to repeat this in resolve(); look for dedup
-        # later
         if name == ".":  # remap
             name = "source"
 
@@ -3242,10 +3209,7 @@ class RecordCommandlike(object):
         to parse each source *before* we can late-resolve everything else
         correctly.
 
-        So, in this one case, the caller is passing in the solution at call
-        time. We still record the solutions, but instead of creating a
-        CommandLike, we add it to resolved_source so that it's easy to parse
-        each in a later step.
+        So, in this one case, we'll immediately resolve and parse these.
         """
         global resolved_scripts
         source = None
@@ -3254,7 +3218,7 @@ class RecordCommandlike(object):
         if replace_with:
             # TODO: see note about constant cmdkind
             sol.replace_name_with("source", word_text, replace_with)
-            source = replace_with  # TODO: self.resolved_source.add(replace_with)
+            source = replace_with
         else:
             # TODO: see note about constant cmdkind
             sol.no_change("source")
@@ -3323,11 +3287,6 @@ class ResolvedScript(RecordCommandlike):
         shebang="",
         prologue=None,
         epilogue=None,
-        # TODO: see note at call site
-        # lore=None,
-        # oracle=None,
-        # assay=None,
-        # assayer=None,
     ):
         global evaluator
         # generally, defer work until we know the script loaded
@@ -3393,8 +3352,6 @@ class ResolvedScript(RecordCommandlike):
         self.root = node
         self.prologue = prologue
         self.epilogue = epilogue
-
-        # self.resolved_source = set()  # ResolvedSource objects TODO: rm?
 
         # "resolve"
         try:
@@ -3596,13 +3553,10 @@ class ResolvedScript(RecordCommandlike):
         self.arena.PopSource()
         return self
 
-    # so, let's abstract
     def allow_dynamic_token(self, token, word_ob, fw_txt=None):
-        # number subs are probably okayish?
         if fw_txt == "eval":
-            # TODO: not sure this is at the right level...
             logger.info(
-                "allowing eval with dynamic argument? %r",
+                "allowing eval with dynamic argument %r",
                 token,
             )
             return True
@@ -3612,6 +3566,7 @@ class ResolvedScript(RecordCommandlike):
                 token,
             )
             return True
+        # ~number subs are probably okayish?
         elif token.id in (Id.VSub_Number, Id.VSub_At, Id.VSub_Star):
             logger.info(
                 "allowing dynamic command (first-word variable) with positional ($1, $@, $*) varsub %r:%r",
@@ -3640,7 +3595,6 @@ class ResolvedScript(RecordCommandlike):
 
             # start making real decisions
             if fw_txt:
-                # TODO: eval utility/accuracy of these commends
                 # TODO: practice below mostly considers part vars like
                 # $HOME/blah or $PREFIX/blah, but there are other
                 # patterns a more sophisticated version could address.
@@ -3678,14 +3632,11 @@ class ResolvedScript(RecordCommandlike):
                     )
                     return True
 
-                logger.debug("ffs %r %r %r %r", token, fw_txt, token_name, word_ob)
                 observe(
                     DynamicCommand,
                     token=token,
                     arena=self.arena,
                 )
-
-        return False  # TODO: this is meaningless if I raise everywhere I don't return True?
 
     def allow_dynamic_executable_word(
         self, word_ob, fw_txt=None
@@ -3742,7 +3693,7 @@ class ResolvedScript(RecordCommandlike):
 
     def handle_potential_redefiners(self):
         logger.info(
-            "TODO: this is where we'd process some builtins that might be modifying our execution context (enable, unset, unalias?)"
+            "TODO: this is where to process builtins that might mod execution context (enable, unset, unalias?)"
         )
 
     def _visit_command_Simple(self, cmd_ob):
@@ -3766,7 +3717,6 @@ class ResolvedScript(RecordCommandlike):
                 logger.debug(
                     "FIRST_PASS_ESSENTIAL (%r): %r %r", fw_txt, cmdlike, cmd_ob
                 )
-                # TODO: write a test to verify this behavior
                 if not cmdlike.alias and not cmdlike.function:
                     return self.look_for_essential_builtin_sub_execution(fw_txt, cmd_ob)
 
@@ -3778,6 +3728,10 @@ class ResolvedScript(RecordCommandlike):
                     arena=self.arena,
                 )
 
+            # TODO-SIGH: I don't remember what was going on below. IDK if the RM note
+            # means that this is effectively dead/decided as unnecessary, or if I meant
+            # that I should remove the pass and restore the record_ command. I'll have
+            # to just try the latter before I know, I think? Or brain it real good.
             # queue all other commands for the general
             # batch resolution cycle
             # TODO: if this change sticks, it is worth
