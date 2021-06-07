@@ -1848,6 +1848,59 @@ class CommandLike(object):
     def request_external_solution(self, source, cmd_object=None):
         return self.request_solution(source, self.find_cro(source).external, cmd_object)
 
+    def _resolve_invocations(self, solution):
+        # TODO: these could be folded up into the for loop above?
+        if solution.solved:
+            # filter out first-pass, handle builtins, if it's a solved external, handle executions
+            if (
+                solution.kind in ("builtin", "keyword")
+                and self.name in FIRST_PASS_ESSENTIALS
+            ):
+                pass  # should already be resolved!
+            elif solution.kind == "builtin":
+                for source, cmd_object in self.chomp_invocations():
+                    handler = getattr(
+                        source, "handle_builtin_{:}".format(self.name), None
+                    )
+                    if handler:
+                        args, name, text = source.get_subexec_context(cmd_object)
+                        handler(cmd_object, args, name, text)
+
+            elif solution.kind == "external" and isinstance(
+                solution.replacement, tuple
+            ):
+                executable = solution.replacement[1]
+
+                if lore[executable] != "cannot":
+                    # otherwise, walk down each execution
+                    # chain until we find a terminus
+                    for source, cmd_object in self.chomp_invocations():
+                        source.look_for_external_sub_execution(self.name, cmd_object)
+
+    def _resolve_cmdlike_contexts(self, distinct_cro, solution):
+        # run each function, continue early on exception/true/string
+        for cmdkind, func in distinct_cro:
+            logger.debug("resolve(%r): trying %r %r", self.name, cmdkind, func)
+            try:
+                # TODO: could cache these, but not sure it'll make much diff
+                test = func()
+            except ExceptionWithContext as e:
+                solution.causes_exception(e)
+                logger.debug("break because exception")
+                break
+
+            if test == True:
+                solution.no_change(cmdkind)
+                logger.debug("break because no change")
+                break
+            elif test:
+                # only external can return more than just t/f
+                solution.replace_name_with(cmdkind, self.path or self.name, test)
+                for source in self.order_to_source[distinct_cro]:
+                    source.directives.keep.add((test,))
+                logger.debug("break because replacement")
+                break
+
     def resolve(self):
         global FIRST_PASS_ESSENTIALS, lore
         logger.debug("CALLING RESOLVE ON %r", self.name)
@@ -1855,80 +1908,9 @@ class CommandLike(object):
         # find solutions for observed types
         for distinct_cro, solution in self.order_to_solution.items():
             if not solution.solved:
-                # run each function, continue early on exception/true/string
-                for cmdkind, func in distinct_cro:
-                    logger.debug("resolve(%r): trying %r %r", self.name, cmdkind, func)
-                    try:
-                        # TODO: could cache these, but not sure it'll make much diff
-                        test = func()
-                    except ExceptionWithContext as e:
-                        solution.causes_exception(e)
-                        logger.debug("break because exception")
-                        break
+                self._resolve_cmdlike_contexts(distinct_cro, solution)
 
-                    if test == True:
-                        solution.no_change(cmdkind)
-                        logger.debug("break because no change")
-                        break
-                    elif test:
-                        # only external can return more than just t/f
-                        solution.replace_name_with(
-                            cmdkind, self.path or self.name, test
-                        )
-                        for source in self.order_to_source[distinct_cro]:
-                            source.directives.keep.add((test,))
-                        logger.debug("break because replacement")
-                        break
-
-            # TODO: these could be folded up into the for loop above?
-            if solution.solved:
-                if (
-                    solution.kind in ("builtin", "keyword")
-                    and self.name in FIRST_PASS_ESSENTIALS
-                ):
-                    pass  # should already be resolved!
-                elif solution.kind == "builtin":
-                    for source, cmd_object in self.chomp_invocations():
-                        # TODO: this is a little wasteful, but expedient
-                        # DOING: I wonder if the bit I'm trying to sort out here can also fix the wastefulness of this?
-                        # - it is wasteful because we really only need to look this up at most once per source + cmdlike (and often once per cmdlike)
-                        handler = getattr(
-                            source, "handle_builtin_{:}".format(self.name), None
-                        )
-                        if handler:
-                            args, name, text = source.get_subexec_context(cmd_object)
-                            handler(cmd_object, args, name, text)
-                        else:
-                            logger.debug(
-                                "in theory this is fine--a builtin (%r) we don't need to handle specially",
-                                cmd_object,
-                            )
-
-                elif solution.kind == "external" and isinstance(
-                    solution.replacement, tuple
-                ):
-                    logger.debug(
-                        "compare replacement/path %r - %r - %r - %r",
-                        solution,
-                        solution.replacement,
-                        self.path,
-                        self.name,
-                    )
-                    executable = solution.replacement[1]
-
-                    logger.debug(
-                        "whimper %r %r %r",
-                        executable,
-                        lore[executable],
-                        self.invocations,
-                    )
-                    if lore[executable] != "cannot":
-                        # otherwise, walk down each execution
-                        # chain until we find a terminus
-                        for source, cmd_object in self.chomp_invocations():
-                            source.look_for_external_sub_execution(
-                                self.name, cmd_object
-                            )
+            self._resolve_invocations(solution)
 
         self.resolved = True
 
