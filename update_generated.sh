@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
-update(){
+#!/usr/bin/env bash
+update_timings(){
+	cat - result/test.txt <<'EOF'
+# Test Timings
+Experimenting with keeping a copy of test runs with timing information
+to start building up a loose record of performance over time. Not sure
+if it'll stick.
+
+```text
+EOF
+
+echo '```'
+} > timings.md
+
+update_demo(){
 	cat - result/demo.txt <<'EOF'
 # Demos
 I've built two different demos to illustrate what you can do with resholve--one for resholve itself, and the other shows the Nix integration.
@@ -66,6 +80,7 @@ echo '```'
 } > demos.md
 
 nix-build ci.nix
-update
+update_timings
+update_demo
 # gen plaintext manpage?
 groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt
