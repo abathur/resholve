@@ -22,6 +22,9 @@ In order to support a few new features, I've refactored a fair fraction of resho
 - Recursively resolve command-executing commands (previously: a single level of sub-resolution).
 - Resolve backslash-escaped commands (used to skip alias expansion), leaving the backslash in place.
 - Unified handling of "dynamic" syntax handling (what kinds of substitutions and expansions resholve does and doesn't require exemptions for) across different contexts to make it more consistent. (These had ~speciated, so there's a higher risk of regressions and nonsense combinations here.)
+- resholve now handles its own PATH lookups to support two improvements:
+    - Lookup will also match against full file paths in the inputs. This makes it easier to obtain one of resholve's big benefits--finding and declaring all external dependencies--even if you're using executables from general system directories.
+    - Lookup won't match files in PWD unless PWD or the individual files are explicitly added to the inputs.
 
 
 ### Internal
@@ -38,12 +41,13 @@ In order to support a few new features, I've refactored a fair fraction of resho
     - Existing status numbers have been updated to eliminate gaps in the status numbers used.
         - unresolved source 7 -> 4
         - unresolvable dynamic command 9 -> 7
-
+- resholve's test runs now report timings, and I'm storing a generated copy in [timings.md](timings.md). I've wanted this for a while, but I've been waiting for a bats release this March that changed from second -> ms precision. I hope this will create some vague record of performance over time, but I may scrap it if even single-machine timings are too noisy to make sense of.
 
 
 
 ### Migrating
 - Directives specifying `.` should be updated to use `source`.
+- To resolve references to files in PWD, you'll have to explicitly add either the current directory or the individual files to --(path|inputs).
 - If you have any scripts that depend on resholve's non-0 error statuses, double-check them. Some (but not all) error statuses have changed.
 
     

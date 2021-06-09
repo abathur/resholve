@@ -20,7 +20,6 @@ import configargparse as argparse
 import logging
 
 from collections import defaultdict, Iterable
-from distutils.spawn import find_executable
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
@@ -537,6 +536,51 @@ class LoreType(object):
             )
 
 
+lookup = None
+
+
+class LookSee(dict):
+    """
+    A dictionary for input (~PATH) lookups.
+
+    Broad strokes:
+    - Take ownership of lookup from distutils.spawn.find_executable to
+      stop matching files in the current PWD (explicit > implicit) and
+      avoid having to set PATH.
+    - Support both directories and individual files in the ~PATH.
+      - Pre-cache files and rm from search path
+      - Lazily lookup and cache others
+    """
+
+    paths = None
+    __call__ = dict.__getitem__
+
+    def __init__(self, path):
+        """
+        init from path-fmt string
+        - comes via --path/--inputs or RESHOLVE_(PATH|INPUTS)
+        - each element may be a dir or file
+        """
+        dict.__init__(self)
+        paths = set()
+        for path in set(path.split(os.pathsep)):
+            if os.path.isfile(path):
+                self[os.path.basename(path)] = path
+            else:
+                paths.add(path)
+        self.paths = paths
+
+    def __missing__(self, basename):
+        """
+        Return abspath or None
+        """
+        for path in self.paths:
+            abspath = os.path.join(path, basename)
+            if os.path.isfile(abspath):
+                return abspath
+        return None
+
+
 def make_arg_parser(module):
     parser = module.ArgumentParser(
         description="Resolve external command/script references in a shell script to absolute paths. This is a terse reminder of flag names; see 'man resholve' for usage.",
@@ -562,14 +606,14 @@ def make_arg_parser(module):
         "--path",
         metavar="str",
         dest="path",
-        type=str,
+        type=LookSee,
         help="paths to resolve commands from",
     )
     req_path.add_argument(
         "--inputs",
         metavar="str",
         dest="path",
-        type=str,
+        type=LookSee,
         help="alias for --path",
     )
 
@@ -692,14 +736,7 @@ def make_arg_parser(module):
 
 parser = make_arg_parser(argparse)
 
-executables = dict()
 resolved_scripts = dict()
-
-
-def lookup(word):
-    if word not in executables:
-        executables[word] = find_executable(word)
-    return executables[word]
 
 
 def resolve_script(script_path, shebang="", prologue=None, epilogue=None):
@@ -849,6 +886,7 @@ unused_builtin_subcommand_re = {
 
 
 def punshow():
+    global lookup
     args = parser.parse_args()
     # if it makes sense at some point, vars(args) yields a dict of these
     # that can be passed as kwargs or something...
@@ -863,7 +901,8 @@ def punshow():
         parser.error(
             "argument --path/--inputs (or RESHOLVE_PATH/RESHOLVE_INPUTS) is required"
         )
-    os.environ["PATH"] = args.path
+
+    lookup = args.path
 
     if args.fake:
         for group in args.fake:
@@ -2162,16 +2201,7 @@ class RecordCommandlike(object):
 
         # it was already a valid absolute path
         if target:
-            # lookup() seems to resolve relative filenames for files in the
-            # current directory, no matter what path is set to...
-            # TODO: I wonder if we can "fix" that by unsetting PWD or something?
-            if target == sw_txt:
-                # TODO: I guess these all need to get prefxed with $out?
-                # TODO: be skeptical of this (of what? above? below? yeesh.)
-                self.record_external_source(sw_ob, sw_txt)
-            # it resolved to a new location
-            elif target:
-                self.record_external_source(sw_ob, sw_txt, replace_with=target)
+            self.record_external_source(sw_ob, sw_txt, replace_with=target)
         # It didn't resolve, or it was an invalid absolute path
         elif target != False:
             # in theory I could pass this exception to the new

@@ -11,6 +11,8 @@
 # well-tested elsewhere.
 load demo
 
+RESHOLVE_PATH="${RESHOLVE_PATH}:${PWD}/tests"
+
 @test "'which' needs to be in RESHOLVE_PATH" {
   demo "which_simple.sh" <({
     status 3
