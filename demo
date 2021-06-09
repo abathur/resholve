@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-RESHOLVE_DEMO=1 bats -t tests/demo.bats
+RESHOLVE_DEMO=1 bats --tap --timing tests/demo.bats

@@ -8,4 +8,4 @@ set -o errexit
 # python tests/test_oil_namespace.py
 
 # and run all bats tests
-bats tests
+bats --timing tests
