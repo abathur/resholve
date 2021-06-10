@@ -135,7 +135,7 @@ resholve --interpreter $INTERP --fix '/usr/bin/file' < abspath_command.sh
 CASES
 
 
-us=$'\x1f'
+fs=$':'
 
 @test "resolve fails without lore" {
   require <({
@@ -143,7 +143,7 @@ us=$'\x1f'
     line -1 contains "I don't have any lore for '/nix/store/"
   })
 } <<CASES
-RESHOLVE_LORE=$EMPTY_LORE resholve --interpreter $INTERP --assay <(echo $(type -p find)${us}find __NO_COMMAND_SUB__ -name file -exec file {} +${us}yes${us}5 ; echo abspath${us}cmdname${us}args${us}no) < nested_execer.sh
+RESHOLVE_LORE=$EMPTY_LORE resholve --interpreter $INTERP --assay <(echo $(type -p find)${fs}find __NO_COMMAND_SUB__ -name file -exec file {} +${fs}yes${fs}5 ; echo abspath${fs}cmdname${fs}args${fs}no) < nested_execer.sh
 CASES
 
 
@@ -153,7 +153,7 @@ CASES
     line -1 contains "'cat' _might_ be able to execute its arguments, and I don't have any command-specific rules for figuring out if this specific invocation does or not."
   })
 } <<CASES
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) < assay.sh
 CASES
 
 @test "resolve fails with bad assay" {
@@ -162,8 +162,8 @@ CASES
     line -1 contains "'cat' _might_ be able to execute its arguments, and I don't have any command-specific rules for figuring out if this specific invocation does or not."
   })
 } <<CASES
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p head)${us}head${us}yes${us}4) < assay.sh
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p cat)${us}cat${us}yes${us}4) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p head)${fs}head${fs}yes${fs}4) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p cat)${fs}cat${fs}yes${fs}4) < assay.sh
 CASES
 
 @test "resolve fails with overshooting assay wordnum" {
@@ -173,8 +173,8 @@ CASES
     line 3 contains "is too large to zero-index args(4)"
   })
 } <<CASES
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p cat)${us}cat CANNOT="do this" --not-a-real-flag head${us}yes${us}4) < assay.sh
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p cat)${us}cat CANNOT="do this" --not-a-real-flag head${us}yes${us}5) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p cat)${fs}cat CANNOT="do this" --not-a-real-flag head${fs}yes${fs}4) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p cat)${fs}cat CANNOT="do this" --not-a-real-flag head${fs}yes${fs}5) < assay.sh
 CASES
 
 @test "resolve fails with assay wordnum 0" {
@@ -183,7 +183,7 @@ CASES
     line -1 contains "assay wordnum should be 1+ (0 is the same as the invoking command itself)"
   })
 } <<CASES
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p cat)${us}cat CANNOT="do this" --not-a-real-flag head${us}yes${us}0) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p cat)${fs}cat CANNOT="do this" --not-a-real-flag head${fs}yes${fs}0) < assay.sh
 CASES
 
 @test "resolve fails with undershooting assay wordnum" {
@@ -192,8 +192,8 @@ CASES
     line 3 contains "Couldn't resolve command"
   })
 } <<CASES
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p cat)${us}cat CANNOT="do this" --not-a-real-flag head${us}yes${us}1) < assay.sh
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${us}$(type -p cat)) --assay <(echo $(type -p cat)${us}cat CANNOT="do this" --not-a-real-flag head${us}yes${us}2) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p cat)${fs}cat CANNOT="do this" --not-a-real-flag head${fs}yes${fs}1) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo can${fs}$(type -p cat)) --assay <(echo $(type -p cat)${fs}cat CANNOT="do this" --not-a-real-flag head${fs}yes${fs}2) < assay.sh
 CASES
 
 @test "resolve succeeds with assay" {
@@ -202,7 +202,7 @@ CASES
     line -1 contains "bin/head"
   })
 } <<CASES
-unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo "can${us}$(type -p cat)" ; echo "cannot${us}$(type -p head)") --assay <(echo $(type -p cat)${us}cat CANNOT="do this" --not-a-real-flag head${us}yes${us}3) < assay.sh
+unset RESHOLVE_LORE && RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --execer-lore <(echo "can${fs}$(type -p cat)" ; echo "cannot${fs}$(type -p head)") --assay <(echo $(type -p cat)${fs}cat CANNOT="do this" --not-a-real-flag head${fs}yes${fs}3) < assay.sh
 CASES
 
 @test "resolve commands mixed with varlike assignments" {

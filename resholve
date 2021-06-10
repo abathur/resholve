@@ -442,7 +442,8 @@ class SuperSerial(csv.Dialect):
     write/script when where/needed.
     """
 
-    delimiter = str("\x1f")  # https://en.wikipedia.org/wiki/Unit_separator
+    delimiter = ":"
+    escapechar = str("\x1f")  # https://en.wikipedia.org/wiki/Unit_separator
     quotechar = None
     doublequote = False
     skipinitialspace = False

@@ -117,7 +117,6 @@ CASES
 resholve --interpreter $INTERP --fix aliases < alias_riddle.sh
 CASES
 
-us=$'\x1f'
 @test "Has (rudimentary) support for resolving executable arguments" {
   demo "nested_execer.sh" <({
     status 0
