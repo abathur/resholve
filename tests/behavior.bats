@@ -143,7 +143,7 @@ fs=$':'
     line -1 contains "I don't have any lore for '/nix/store/"
   })
 } <<CASES
-RESHOLVE_LORE=$EMPTY_LORE resholve --interpreter $INTERP --assay <(echo $(type -p find)${fs}find __NO_COMMAND_SUB__ -name file -exec file {} +${fs}yes${fs}5 ; echo abspath${fs}cmdname${fs}args${fs}no) < nested_execer.sh
+RESHOLVE_LORE=$EMPTY_LORE resholve --interpreter $INTERP < nested_execer.sh
 CASES
 
 
