@@ -493,14 +493,25 @@ class LoreType(object):
         """"""
         self.lore_kinds = lore_kinds
 
-    # DOING: get this working as a thin change, but then try
-    # to see if you can fold ingest_lore in
+    # TODO: see if you can fold ingest_lore in for better
+    #       invocation-time errors
 
-    def __call__(self, path):
+    def __call__(self, value):
         if len(self.lore_kinds) == 1:
-            return self._call_file(path)
+            return self._call_str(value)
         else:
-            return self._call_dir(path)
+            return self._call_dir(value)
+
+    def _call_str(self, value):
+        try:
+            for kind in self.lore_kinds:
+                reader = getattr(self, kind)
+                return next(reader(value.split()))
+        except Exception as e:
+            raise argparse.ArgumentTypeError(
+                "%s must be a colon-delimited string. Got: %r"
+                % (self.lore_kinds[0], value)
+            )
 
     def _call_file(self, path):
         try:
@@ -672,15 +683,17 @@ def make_arg_parser(module):
     and make these just directives or something
     """
     res.add_argument(
-        "--execer-lore",
+        "--execer",
         type=LoreType(("execers",)),
-        metavar="f",
+        metavar="str",
+        action="append",
         help="lorefile TODO",
     )
     res.add_argument(
-        "--wrapper-lore",
+        "--wrapper",
         type=LoreType(("wrappers",)),
-        metavar="f",
+        metavar="str",
+        action="append",
         help="lorefile TODO",
     )
     res.add_argument(
@@ -854,6 +867,33 @@ def ingest_assay(assayfile):
         decided_execers[row["command"].split()[0]] = {k: v for k, v in row.items()}
 
 
+"""
+I drafted the regex mechanism for subcommand resolution here
+before I built out the AST-based functions that I'm using for
+most commands. My rough intent/process at the time was to
+explore the possibility that regex would be a workable model
+for users to extend resholve's command support in a way that
+meets their own immediate needs *and* which they can readily
+upstream for our use here.
+
+In practice, I found this approach works for commands where
+subcommands follow specific flags in a predictable manner,
+but that it is a nightmare for the more-common kind of sub-
+executing command that accepts a number of flags/options
+which themselves may or may not have arguments--all of which
+we must be able to ignore--before we ultimately take the 1st
+surviving positional arg.
+
+Because of this, I have yet to settle on any end-user way to
+provide information resholve can use to *globally* answer
+this question (but see the --assay option for a per-case
+option).
+
+I suspect I'll eventually cut this implementation, but for
+now, I'm leaving `find` here to make sure the it won't rot
+between now and whenever I find a better approach.
+Jun 2021
+"""
 # TODO: \s+ is probably appropriate in many of the places you have single spaces here, but I assume it'll also cause some lookbehind issues; KISS for now
 subcommand_re = {
     # Caution: adding builtins here is almost certainly wrong;
@@ -921,11 +961,12 @@ def punshow():
         ingest_lore(args.lore)
         global lore
         logger.debug("lore: %r", lore)
-    elif args.execer_lore or args.wrapper_lore:
+
+    if args.execer or args.wrapper:
         ingest_lore(
             {
-                "execers": args.execer_lore if args.execer_lore else tuple(),
-                "wrappers": args.wrapper_lore if args.wrapper_lore else tuple(),
+                "execers": args.execer if args.execer else tuple(),
+                "wrappers": args.wrapper if args.wrapper else tuple(),
             }
         )
 
