@@ -31,8 +31,8 @@ rec {
   binlore = callPackage (fetchFromGitHub {
     owner = "abathur";
     repo = "binlore";
-    rev = "833d6b1a8731dcf7af40073dd7a5671f5da5b7fa";
-    hash = "sha256-aLgzXVdqyYi8PR2670crO26B9bo+96TaOWMukm2f0K0=";
+    rev = "3c9b9a5ff8f288ea078ea6ed579f8776a5d12b8e";
+    hash = "sha256-NSUqVYEe3JmlXmAaY69Q6fHkD07AxAvv7UFAsMR80p0=";
   }) { };
   oil = rec {
     # had to add this as well; 1.3 causes a break here; sticking
