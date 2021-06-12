@@ -663,6 +663,11 @@ def make_arg_parser(module):
         type=directive_keep,
         help="keep things we can't auto-fix/ignore",
     )
+    """
+    TODO: disabling some options that I sketched out but that
+    do not square with the current implementation and may not
+    be necessary. Can probably dump if still here in 2022.
+
     res.add_argument(
         "--oracle",
         dest="oracle",
@@ -672,16 +677,20 @@ def make_arg_parser(module):
         help="executable TODO",
     )
     res.add_argument(
+        "--assayer",
+        dest="assayer",
+        metavar="str",
+        action="append",
+        type=str,
+        help="executable TODO",
+    )
+    """
+    res.add_argument(
         "--lore",
         type=LoreType(("execers", "wrappers")),
         metavar="d",
         help="lore directory",
     )
-    """
-    TODO:
-    thinking I'd like to be able to drop the *-lore variants
-    and make these just directives or something
-    """
     res.add_argument(
         "--execer",
         type=LoreType(("execers",)),
@@ -695,14 +704,6 @@ def make_arg_parser(module):
         metavar="str",
         action="append",
         help="lorefile TODO",
-    )
-    res.add_argument(
-        "--assayer",
-        dest="assayer",
-        metavar="str",
-        action="append",
-        type=str,
-        help="executable TODO",
     )
     res.add_argument(
         "--assay",
