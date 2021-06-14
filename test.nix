@@ -122,6 +122,16 @@ in rec {
         scripts = [ "bin/openssl.sh" ];
         interpreter = "none";
         inputs = [ re_shunit2 openssl.bin ];
+        execer = [
+          /*
+          This is the same verdict binlore will
+          come up with. It's a no-op just to demo
+          how to fiddle lore via the Nix API.
+          */
+          "cannot:${openssl.bin}/bin/openssl"
+          # different verdict, but not used
+          "can:${openssl.bin}/bin/c_rehash"
+        ];
       };
       profile = {
         scripts = [ "profile" ];
