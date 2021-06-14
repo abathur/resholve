@@ -79,8 +79,27 @@ EOF
 echo '```'
 } > demos.md
 
-nix-build ci.nix
-update_timings
-update_demo
+update_manual(){
+	if [[ resholve.1.in -nt resholve.1 ]] ; then
+		{
+			printf ".Dd %(%B %d, %Y)T\n"
+			grep -v -E "\.Dd(\s|$)" resholve.1.in
+		} > resholve.1
+		groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt
+	fi
+}
+
+if [[ -n "$1" ]]; then
+	while [[ -n "$1" ]]; do
+		update_$1
+		shift
+	done
+else
+	nix-build ci.nix
+	update_timings
+	update_demo
+	update_manual
+fi
+
+
 # gen plaintext manpage?
-groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt

@@ -1,4 +1,5 @@
-.Dd June 13, 2021
+.\" note: .Dd below is replaced in update_generated when 1.in > .1
+.Dd
 .Dt RESHOLVE 1
 .Os
 .\" coolcomment

@@ -30,14 +30,20 @@ REQUIRED ARGUMENTS
         value none ensures there is no shebang. See execve(2)
 
      −−path path | RESHOLVE_PATH=path
-        A PATH‐format list of paths to resholve external dependencies from.
-        You may also use aliases −−inputs or RESHOLVE_PATH.
+        A PATH‐format list of directories and/or files to resolve external
+        dependencies from. You may also use aliases −−inputs or
+        RESHOLVE_INPUTS.
 
 OPTIONS
      −−fake directives
      −−fix directives
      −−keep directives
         Adjust how resolution is performed. See CONTROLLING RESOLUTION.
+
+     −−lore directory
+     −−execers directives
+     −−wrappers directives
+        Adjust when nested resolution is performed. See NESTED RESOLUTION.
 
      −−overwrite
         Resolve script in‐place (useful for out‐of‐tree builds).
@@ -50,7 +56,7 @@ OPTIONS
 
 CONTROLLING RESOLUTION
      If resholve can’t figure something out, you can often help it along with
-     a mix of fake, fix, and keep directives.  If quoted, directives can be
+     a mix of fake, fix, and keep directives. If quoted, directives can be
      separated by a space: ’directive[ directive]...’
 
      −−fake ’directives’ | RESHOLVE_FAKE=’directives’
@@ -96,6 +102,67 @@ CONTROLLING RESOLUTION
 
          Ex: −−keep ’which:git;ls source:$HOME $LS:exa /etc/bashrc ~/.bashrc’
 
+NESTED RESOLUTION
+     Initially, resolution of commands in the arguments to command‐executing
+     commands was limited to one level for a hard‐coded list of builtins and
+     external commands. Version 0.6.0 (June 2021) adds recursive resolution.
+
+     This task is complex. The main components of the current approach are:
+
+     ·   To pick out a sub‐command among other flags, options, and arguments,
+         resholve has a small collection per‐command rules.
+
+         This collection will need to grow, but I only intend to include
+         fairly‐common commands. I’m not sure yet if there will be a user‐fac‐
+         ing mechanism for customizing this; I’m not sure the current imple‐
+         mentation is fully‐baked, and I’d like to see how often it’s needed.
+         If you encounter instances of commands you think deserve explicit
+         support, please report them.
+
+     ·   To meet the goal of blocking builds when all dependencies are not
+         known, resholve needs a way to discover command‐executing executables
+         that it lacks per‐command rules for (a sub‐command might be present,
+         but it is unable to disambiguate).
+
+         The discovery process is outsourced. Only the result‐‐a directory of
+         "lore"‐‐is passed via the −−lore flag or RESHOLVE_LORE.
+
+         resholve requires lore for every executable it finds in a script. See
+         Lore for more on this format.
+
+     Nested resolution is much more rigorous‐‐but (at least for now) it adds
+     complexity that some users will need to wrestle with.
+
+   Lore
+     Outsourcing discovery makes it easy to save/cache this lore and avoid
+     repeating expensive work each run. It also makes it possible to hand‐
+     write or even generate it with tools that meet your own needs.
+
+     Most users of the Nix API should be spared from needing to understand
+     lore in detail. It automatically uses binlore
+     (https://github.com/abathur/binlore) to generate lore for the executables
+     in each input’s bin/ directory, merge them into a combined copy, and pass
+     it via RESHOLVE_LORE. If you find mis‐identified executables, please
+     report them to the binlore project.
+
+     On the command‐line, you can supply lore directly with two flags:
+
+     −−execer ’directives’ | RESHOLVE_EXECER=’directives’
+        Each execer‐lore directive indicates whether an executable sub‐exe‐
+        cutes its arguments with a verdict:abspath pair, where verdict is one
+        of can, cannot, or might. This information enables resholve to raise
+        an error when it encounters a command with a can|might verdict unless
+        it has rules for figuring out whether the invocation includes a nested
+        command.
+
+     −−wrapper ’directives’ | RESHOLVE_WRAPPER=’directives’
+        Each wrapper‐lore directive indicates whether one executable is just
+        an exec wrapper for another with a wrapper_abspath:wrapped_abspath
+        pair. .Nm uses this information to substitute the wrapped executable’s
+        verdict whenever it encounters a wrapper. (Executables are often
+        wrapped in nixpkgs, but it’s also common in packages. In gnugrep, for
+        example, both egrep and fgrep are wrappers of grep.)
+
 ENVIRONMENT
      Most options can also be passed via environment variables. For example,
      all of the following are supported:
@@ -106,6 +173,9 @@ ENVIRONMENT
      RESHOLVE_FAKE
      RESHOLVE_FIX
      RESHOLVE_KEEP
+     RESHOLVE_LORE
+     RESHOLVE_EXECER
+     RESHOLVE_WRAPPER
      RESHOLVE_OVERWRITE
      RESHOLVE_PROLOGUE
      RESHOLVE_EPILOGUE
@@ -149,4 +219,4 @@ SEE ALSO
 AUTHORS
      Travis A. Everett ⟨travis.a.everett@gmail.com⟩
 
-BSD                           September 26, 2020                           BSD
+BSD                              June 13, 2021                             BSD
