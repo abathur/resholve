@@ -494,7 +494,7 @@ class LoreType(object):
         self.lore_kinds = lore_kinds
 
     # TODO: see if you can fold ingest_lore in for better
-    #       invocation-time errors
+    #       invocation-time argparse errors
 
     def __call__(self, value):
         if len(self.lore_kinds) == 1:
@@ -674,7 +674,7 @@ def make_arg_parser(module):
         metavar="str",
         action="append",
         type=str,
-        help="executable TODO",
+        help="executable...",
     )
     res.add_argument(
         "--assayer",
@@ -682,7 +682,7 @@ def make_arg_parser(module):
         metavar="str",
         action="append",
         type=str,
-        help="executable TODO",
+        help="executable...",
     )
     """
     res.add_argument(
@@ -709,7 +709,8 @@ def make_arg_parser(module):
         "--assay",
         type=argparse.FileType("r"),
         metavar="f",
-        help="assayfile TODO",
+        # see tests for usage; not "supported; unsure.
+        help=argparse.SUPPRESS,
     )
 
     other = parser.add_argument_group(title="Other")
@@ -844,6 +845,9 @@ def ingest_lore(lorefiles):
 
 def ingest_assay(assayfile):
     reader = csv.DictReader(
+        # TODO: If the general practice sticks, I may move cmd to end because
+        # the separator is now ":", and it'll be easier to adapt to colons in
+        # invocations if we can eat 3 colons and call the rest the command.
         assayfile,
         [
             "executable",  # abspath
@@ -1058,16 +1062,6 @@ def punshow():
     except argparse.ArgumentTypeError as e:
         sys.stderr.write("Hold up there, cowpoke: " + str(e))
         return 2
-    # except Exception as e:
-    #     raise e
-    # I was doing the below, but I'm not sure why I wouldn't want to surface a real error here for now; it seems like this will only make debugging harder
-    # print(type(e))
-    # sys.stderr.write("whoooo buddy " + str(e))
-    # return 2
-    # print(len(resolved_scripts))
-    # for script, resolver in resolved_scripts.items():
-    #     print(script)
-    #     print(resolver.funcs_defined)
 
 
 def find_dynamic_token(part):
@@ -1080,47 +1074,43 @@ def find_dynamic_token(part):
     """
     UP_part = part
     with tagswitch(part) as case:
-        # TODO remove this try/except wrapper before this lands
-        try:
-            if case(word_part_e.ShArrayLiteral):
-                return cast(Token, UP_part).token
+        if case(word_part_e.ShArrayLiteral):
+            return cast(Token, UP_part).token
 
-            elif case(word_part_e.AssocArrayLiteral):
-                return cast(Token, UP_part).token
+        elif case(word_part_e.AssocArrayLiteral):
+            return cast(Token, UP_part).token
 
-            elif case(word_part_e.Literal):
-                return False
+        elif case(word_part_e.Literal):
+            return False
 
-            elif case(word_part_e.EscapedLiteral):
-                return False
+        elif case(word_part_e.EscapedLiteral):
+            return False
 
-            elif case(word_part_e.SingleQuoted):
-                return False
+        elif case(word_part_e.SingleQuoted):
+            return False
 
-            elif case(word_part_e.DoubleQuoted):
-                part = cast(double_quoted, UP_part)
-                for p in part.parts:
-                    tok = find_dynamic_token(p)
-                    if tok:
-                        return tok
+        elif case(word_part_e.DoubleQuoted):
+            part = cast(double_quoted, UP_part)
+            for p in part.parts:
+                tok = find_dynamic_token(p)
+                if tok:
+                    return tok
 
-                return False
-            elif case(word_part_e.CommandSub):
-                return cast(Token, UP_part).left_token
+            return False
+        elif case(word_part_e.CommandSub):
+            return cast(Token, UP_part).left_token
 
-            elif case(
-                word_part_e.SimpleVarSub,
-                word_part_e.BracedVarSub,
-                word_part_e.TildeSub,
-                word_part_e.ArithSub,
-                word_part_e.ExtGlob,
-                word_part_e.Splice,
-            ):
-                return cast(Token, UP_part).token
-            else:
-                raise AssertionError(part.tag_())
-        except Exception as e:
-            raise Exception("TOKEN DEBUG", UP_part, e)
+        elif case(
+            word_part_e.SimpleVarSub,
+            word_part_e.BracedVarSub,
+            word_part_e.TildeSub,
+            word_part_e.ArithSub,
+            word_part_e.ExtGlob,
+            word_part_e.Splice,
+        ):
+            return cast(Token, UP_part).token
+        else:
+            raise AssertionError(part.tag_())
 
 
 # For optview.Parse. Oil does [False] * option_i.ARRAY_SIZE and
@@ -1343,7 +1333,6 @@ class QuotedEval(Census):
 if logger.isEnabledFor(logging.WARNING):
 
     def observe(cls, *args, **kwargs):
-        logger.debug("WAT %r %r", cls, args)
         try:
             raise cls(*args, **kwargs)
         except Census:
@@ -1354,7 +1343,6 @@ if logger.isEnabledFor(logging.WARNING):
 else:
 
     def observe(cls, *args, **kwargs):
-        logger.debug("WAT %r %r", cls, args)
         if isinstance(cls, Census):
             return
         raise cls(*args, **kwargs)
@@ -1791,15 +1779,6 @@ alias
 builtin|command|coproc|eval
     we have to look into these in case they hold instances of the above
 
-TODO: the last of these can skip _alias_ defs, so it's also relevant
-(but these are rare in the wild, so not terribly urgent?)
-(command.CommandList
-  children: [
-    (C {<builtin>} {<source>} {<blah3>})
-    (C {(word_part.EscapedLiteral token:<Id.Lit_EscapedChar '\\s'>) <ource>} {<blah4>})
-  ]
-)
-
 CAUTION:
 We're flying about as close to the sun as we can without tiptoeing into
 symbolic execution. resholve's concept of this won't be robust to a
@@ -1931,7 +1910,6 @@ class CommandLike(object):
         return self.request_solution(source, self.find_cro(source).external, cmd_object)
 
     def _resolve_invocations(self, solution):
-        # TODO: these could be folded up into the for loop above?
         if solution.solved:
             # filter out first-pass, handle builtins, if it's a solved external, handle executions
             if (
@@ -2065,21 +2043,21 @@ class RecordCommandlike(object):
         code is ~v2/3 of trying to handle aliases.
         - v1: try to spot alias identifiers to add to
           allowed unresolved "commands"
-          # TODO: make sure the code's check order is aliases > functions > externals
         - v2: try to extract alias/expansion pairs to
           - allow unresolved commands
           - make users triage externals in low-hanging-fruit
             alias definitions (resolve? ignore?)
-          - TODO: do anything else with high-hanging fruit?
         - v3: roughly v2 except:
           - split out into own method
           - ???
 
-        TODO: there may be a generalized handler for "varlikes" here, which
-        oil defines as <id>=<stuff> but I'll say is more like:
-        [<alias|declare|local|set>] [<<id>=<val>>...]
-        (mainly valuable if I decide to consider taking one more firm
-        step into dynamic-land by resolving through refs to simple vars)
+        TODO:
+        - do anything else with high-hanging fruit?
+        - there may be a generalized handler for "varlikes" here, which
+          oil defines as <id>=<stuff> but I'll say is more like:
+          [<alias|declare|local|set>] [<<id>=<val>>...]
+          (mainly valuable if I decide to consider taking one more firm
+          step into dynamic-land by resolving through refs to simple vars)
         """
         logger.debug("alias cmd_ob: %r", cmd_ob)
 
@@ -2136,16 +2114,9 @@ class RecordCommandlike(object):
                     )
 
                 self.record_alias_cmd(w_ob, commandlike, position=pos)
-            # TODO: decide?
-            # elif EMIT_FEEDBACK_REQUESTS:
-            #     try:
-            #         raise FeedbackWantedWarning(
-            #             "You have a dynamic alias. Weigh in @ https://github.com/abathur/resholve/issues/XX :)",
-            #             word=w_ob,
-            #             arena=self.arena,
-            #         )
-            #     except FeedbackWantedWarning:
-            #         pass
+            # else: # dynamic
+            # TODO: decide if you want to emit a warning or error on dynamic aliases?
+            #       letting them slide for now.
 
     def handle_first_pass_essentials(self, txt, cmd_ob):
         global FIRST_PASS_ESSENTIALS, cmdlikes
@@ -2195,7 +2166,11 @@ class RecordCommandlike(object):
 
     def handle_builtin_source(self, cmd_ob, args, name, text):
         """
-        CAUTION: in a multi-module library, we'll have to think very carefully about how to look up targets in order to parse them, but *avoid* translating the source statement into an absolute URI. (If this is sticky, another option might be a post-substitute to replace the build-path with the output path?)
+        CAUTION:
+        in a multi-module library, we should:
+        - look up targets at their install path to resolve the source statement into
+          the correct absolute URI.
+        - post-substitute to replace the build-time-path with the install/output path
         """
         target = None
 
@@ -2320,9 +2295,9 @@ class RecordCommandlike(object):
             handler(cmd_object, args, name, text)
 
         else:
-            # TODO: tentative, maybe this can just be a log msg?
             raise Exception(
-                "It's an error not to handle this builtin",
+                "I've made a mistake and there's no handler for this "
+                "builtin. Please report it!",
                 cmd_object.words[0],
             )
 
@@ -2515,7 +2490,6 @@ class RecordCommandlike(object):
             ("--skip-chdir", 0),
         ),
     )
-    # src/env.c:execvp Usage: %s [OPTION]... [-] [NAME=VALUE]... [COMMAND [ARG]...]\n"),
 
     # src/install.c:execlp --strip-program
     handle_external_install = _handle_executable_flag("--strip-program")
@@ -2739,7 +2713,9 @@ class RecordCommandlike(object):
             badchar = int(re.split(r"\s|:", stderr)[6])
             badchar -= 1  # adjust 1 -> 0 index
 
-            # trying to work around the issue shown in https://gist.github.com/abathur/ca0c6ca342da292f4361acd826740691
+            # trying to work around an issue
+            # demo: https://gist.github.com/abathur/ca0c6ca342da292f4361acd826740691
+            # report: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=48725
             # my best-guess is that the error, for s cmds, can't trigger until
             # the s-cmd ends? And since s supports internal spaces,
             # that isn't until a brace or a semicolon or the end of the arg?
@@ -2786,8 +2762,6 @@ class RecordCommandlike(object):
         either come after an -e/--expression flag, or they can
         be the first ~positional argument as long as -e or -f
         or --expression or --file weren't used.
-
-        Let's
         """
         logger.debug("trying external sed %r", cmd_ob)
         i = 1
@@ -3015,16 +2989,6 @@ class RecordCommandlike(object):
         )
 
         if len(args.argv) >= 1:
-            # subcmd = copy.deepcopy(cmd_object)
-            # fw_ob = subcmd.words[0]
-            # subcmd.words.remove(fw_ob)
-
-            # logger.debug(
-            #     "sub_exec on %r -> %r",
-            #     cmd_object,
-            #     subcmd,
-            # )
-
             pos = args.arg_spids[0]
             subcmd_txt = args.argv[0] or cmd_object.words[0].parts[0].val
             cmdlike = cmdlikes[subcmd_txt]
@@ -3037,10 +3001,6 @@ class RecordCommandlike(object):
                     self, cmd_object
                 )
                 self.word_objects[pos] = cmd_object.words[0]
-                # TODO: not sure *this* is right;
-                # before we were basically popping off word 0 every time,
-                # but that's only ~right for builtin <x> style subexec and
-                # not for find -exec <x> style...
 
             logger.debug(
                 "while seeking external subexec for %r, recorded solution=%r at pos=%r cmdlike=%r",
@@ -3145,9 +3105,13 @@ class RecordCommandlike(object):
             logger.debug("about to search %r for %r", text, subcommand_re[outer])
             match = subcommand_re[outer].search(text)
             if match:
-                # TODO: subcmd_txt is currently unused here and in prune
-                # but not quite comfortable throwing it out the window yet
-                # kill if still here after June 2021
+                # TODO:
+                # - future of subcommand_re is generally tenuous/in-question
+                #   don't spend too much time on any specific TODOs in here until
+                #   you know you're keeping the pattern
+                # - subcmd_txt is currently unused here and in prune
+                #   but not quite comfortable throwing it out the window yet
+                #   kill if still here after June 2021
                 subcmd_txt = match.group("resolve")
                 start, end = match.span("resolve")
 
@@ -3348,7 +3312,7 @@ class ResolvedScript(RecordCommandlike):
         with (
             open(script_path) if script_path else io.BytesIO(sys.stdin.read())
         ) as script:
-            if shebang:  # not allow_shebang:
+            if shebang:
                 script = self.replace_shebang(script, shebang)
 
             arena = alloc.Arena()
@@ -3374,11 +3338,10 @@ class ResolvedScript(RecordCommandlike):
             mem = state.Mem("", list(), dict(), arena)
             parse_opts, exec_opts, mutable_opts = state.MakeOpts(mem, None)
             mem.exec_opts = exec_opts
-            # exec_opts = optview.Exec(opts, NO_OPTIONS_OVERLAY)
 
             splitter = split.SplitContext(mem)
             errfmt = ui.ErrorFormatter(arena)
-            # TODO: ask andy about these
+            # TODO: ask andy about these as well
             evaluator = word_eval.CompletionWordEvaluator(
                 mem, exec_opts, mutable_opts, splitter, errfmt
             )
@@ -3476,7 +3439,6 @@ class ResolvedScript(RecordCommandlike):
                             __version__, DIRECTIVE_FORMAT, version
                         )
                     )
-            # TODO: any lines we should freak out about?
         script.seek(0)
         self.directives.update(self.in_doc_directives, directives)
 
@@ -3693,9 +3655,7 @@ class ResolvedScript(RecordCommandlike):
                     arena=self.arena,
                 )
 
-    def allow_dynamic_executable_word(
-        self, word_ob, fw_txt=None
-    ):  # verify cutting cmd_ob
+    def allow_dynamic_executable_word(self, word_ob, fw_txt=None):
         """
         Handle a word that didn't pass StaticEval
         """
@@ -3782,19 +3742,6 @@ class ResolvedScript(RecordCommandlike):
                     word=fw_ob,
                     arena=self.arena,
                 )
-
-            # TODO-SIGH: I don't remember what was going on below. IDK if the RM note
-            # means that this is effectively dead/decided as unnecessary, or if I meant
-            # that I should remove the pass and restore the record_ command. I'll have
-            # to just try the latter before I know, I think? Or brain it real good.
-            # queue all other commands for the general
-            # batch resolution cycle
-            # TODO: if this change sticks, it is worth
-            # auditing for places where first-pass may
-            # accidentally record_ instead of resolve?
-            else:
-                pass  # TODO RM
-                # self.record_general_cmd(fw_ob, fw_txt, cmd_ob)
 
     def _visit_command_ShFunction(self, node):
         cmdlikes[node.name].function = True
