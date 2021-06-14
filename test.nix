@@ -189,16 +189,15 @@ in rec {
       mkdir empty_lore
       touch empty_lore/{execers,wrappers}
       export EMPTY_LORE=$PWD/empty_lore
-      echo $EMPTY_LORE/*
-      printf "\033[33m============================= resholve test suite ===================================\033[0m\n"
-      if ./test.sh &> test.ansi; then
+      printf "\033[33m============================= resholve test suite ===================================\033[0m\n" > test.ansi
+      if ./test.sh &>> test.ansi; then
         cat test.ansi
       else
         cat test.ansi && exit 1
       fi
     '' + lib.optionalString runDemo ''
-      printf "\033[33m============================= resholve demo ===================================\033[0m\n"
-      if ./demo &> demo.ansi; then
+      printf "\033[33m============================= resholve demo ===================================\033[0m\n" > demo.ansi
+      if ./demo &>> demo.ansi; then
         cat demo.ansi
       else
         cat demo.ansi && exit 1
