@@ -1,42 +1,59 @@
-{ lib, stdenv, callPackage, resholve, resholvePackage, shunit2, coreutils, gnused, gnugrep, findutils, jq, bash, bats, libressl, openssl, python27, file, gettext, rSrc, runDemo ? false, binlore }:
+{ lib
+, stdenv
+, callPackage
+, resholve
+, resholvePackage
+, shunit2
+, coreutils
+, gnused
+, gnugrep
+, findutils
+, jq
+, bash
+, bats
+, libressl
+, openssl
+, python27
+, file
+, gettext
+, rSrc
+, runDemo ? false
+, binlore
+}:
 
 let
-  testSrc = builtins.filterSource
-      (path: type:
-        type != "directory" || baseNameOf path
-        == "tests") rSrc;
-
   inherit (callPackage ./default.nix { })
     resholve resholvePackage;
 
   # ourCoreutils = coreutils.override { singleBinary = false; };
 
   /*
-  TODO: wrapped copy of find so that we can eventually test
-  our ability to see through wrappers. Unused for now.
-  Note: grep can serve the negative case; grep doesn't match, and
-  egrep is a shell wrapper for grep.
+    TODO: wrapped copy of find so that we can eventually test
+    our ability to see through wrappers. Unused for now.
+    Note: grep can serve the negative case; grep doesn't match, and
+    egrep is a shell wrapper for grep.
   */
   # wrapfind = runCommand "wrapped-find" { } ''
   #   source ${makeWrapper}/nix-support/setup-hook
   #   makeWrapper ${findutils}/bin/find $out/bin/wrapped-find
   # '';
   /* TODO:
-  unrelated, but is there already a function (or would
-  there be demand for one?) along the lines of:
-  wrap = { drv, executable(s?), args ? { } }: that:
-  - generates a sane output name
-  - sources makewrapper
-  - retargets real executable if already wrapped
-  - wraps the executable
+    unrelated, but is there already a function (or would
+    there be demand for one?) along the lines of:
+    wrap = { drv, executable(s?), args ? { } }: that:
+    - generates a sane output name
+    - sources makewrapper
+    - retargets real executable if already wrapped
+    - wraps the executable
 
-  I wonder because my first thought here was overrideAttrs,
-  but I realized rebuilding just for a custom wrapper is an
-  ongoing waste of time. If it is a common pattern in the
-  wild, it would be a nice QoL improvement.
+    I wonder because my first thought here was overrideAttrs,
+    but I realized rebuilding just for a custom wrapper is an
+    ongoing waste of time. If it is a common pattern in the
+    wild, it would be a nice QoL improvement.
   */
 
-in rec {
+in
+rec {
   re_shunit2 = with shunit2;
     resholvePackage {
       inherit pname src version installPhase;
@@ -83,7 +100,8 @@ in rec {
     pname = "testmod1";
     version = "unreleased";
 
-    src = lib.cleanSource (rSrc + /tests/nix/libressl);
+    src = rSrc;
+    setSourceRoot = "sourceRoot=$(echo */tests/nix/libressl)";
 
     installPhase = ''
       mkdir -p $out/{bin,submodule}
@@ -106,7 +124,8 @@ in rec {
     pname = "testmod2";
     version = "unreleased";
 
-    src = lib.cleanSource (rSrc + /tests/nix/openssl);
+    src = rSrc;
+    setSourceRoot = "sourceRoot=$(echo */tests/nix/openssl)";
 
     installPhase = ''
       mkdir -p $out/bin
@@ -124,9 +143,9 @@ in rec {
         inputs = [ re_shunit2 openssl.bin ];
         execer = [
           /*
-          This is the same verdict binlore will
-          come up with. It's a no-op just to demo
-          how to fiddle lore via the Nix API.
+            This is the same verdict binlore will
+            come up with. It's a no-op just to demo
+            how to fiddle lore via the Nix API.
           */
           "cannot:${openssl.bin}/bin/openssl"
           # different verdict, but not used
@@ -144,7 +163,8 @@ in rec {
     pname = "testmod3";
     version = "unreleased";
 
-    src = lib.cleanSource (rSrc + /tests/nix/future_perfect_tense);
+    src = rSrc;
+    setSourceRoot = "sourceRoot=$(echo */tests/nix/future_perfect_tense)";
 
     installPhase = ''
       mkdir -p $out/bin
@@ -162,7 +182,7 @@ in rec {
 
   cli = stdenv.mkDerivation {
     name = "resholve-test";
-    src = testSrc;
+    src = rSrc;
     installPhase = ''
       mkdir $out
       cp *.ansi $out/

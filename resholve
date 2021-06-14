@@ -16,7 +16,8 @@ import csv
 from subprocess import Popen, PIPE
 from contextlib import contextmanager, nested
 
-import configargparse as argparse
+import argparse as theirparse  # external command parsers
+import configargparse as ourparse  # resholve's own parser
 import logging
 
 from collections import defaultdict, Iterable
@@ -24,115 +25,6 @@ from collections import defaultdict, Iterable
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
 # logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
-
-import oil
-import importlib
-
-"""
-This is all a little arcane, so it's worth explaining a bit.
-
-Oil isn't really packaged as a library. Initially I forked
-and packaged for expediency, and because I was hoping to be
-able to upstream the package definition. Oil has resisted
-this, but I also want to minimize the work it takes to get
-caught up with upstream at any given time.
-
-Unfortuately, forcing a namespace on Oil and using it in
-resholve isn't enough on its own.
-
-A byproduct of the fact that it isn't already packaged and
-that it runs on python2, is that oil's internal imports
-aren't namespaced, and are a bit of a nest. Some of the
-package names are generic (i.e., "misc", and "tools"), so
-I want to force a namespace on oil, but without having to
-fork and maintain a large change.
-
-Thus, we're here monkeypatching __builtins__.__import__ in
-order to (try) to:
-- detect when something in oil is importing
-- try first to prefix it with "oil." and fall back if not
-  (this should import oil stuff from oil., but not block
-  batteries and other packages)
-
-TODO: This isn't terribly rigorous. A marginal improvement
-would be generating a list of packages (or maybe the whole
-tree) at build time, and only fiddling with these.
-
-CAUTION: There's a demon in here. It's possible for different
-paths to lead to distinct imports, and for isinstance() to
-fail on some things it should succeed on.
-"""
-import_cache = dict()
-# TODO: I don't like hard-coding these
-_oil_extensions = {
-    "fastlex",
-    "libc",
-    "lineinput",
-    "posix_",
-}
-
-
-def _import(name, *args):
-    _globals, _locals, _ids = args[0:3]
-    _lvl = args[3] if len(args) > 3 else -1
-
-    current_file = _globals["__file__"]
-    ret = None
-    if "/oil/" in current_file and name not in _oil_extensions:
-        # logger.debug("rewrite oil's imports to %r", name)
-        oilyname = "oil." + name
-        if name in import_cache and oilyname in import_cache:
-            # logger.debug("both name and oilyname are in import_cache; returning early")
-            if id(import_cache[oilyname]) != id(import_cache[name]):
-                raise Exception("Module IDs differ")
-            return import_cache[name]
-        try:
-            ret = original_import(oilyname, _globals, _locals, _ids, _lvl)
-            # logger.debug(
-            #     "putting %r in import cache with name %r and id %r",
-            #     ret,
-            #     oilyname,
-            #     id(ret),
-            # )
-            import_cache[oilyname] = ret
-
-            # but also add it under the un-rewritten name
-            sys.modules[name] = ret
-
-            if (
-                len(
-                    set(
-                        [
-                            id(ret),
-                        ]
-                    )
-                )
-                > 1
-            ):
-                raise Exception("Module IDs unexpectedly differ")
-        except ImportError:
-            ret = original_import(name, _globals, _locals, _ids, _lvl)
-            # logger.debug(
-            #     "putting %r in import cache with name %r and id %r", ret, name, id(ret),
-            # )
-            import_cache[name] = ret
-
-    if not ret:
-        ret = original_import(name, _globals, _locals, _ids, _lvl)
-        # logger.debug(
-        #     "putting %r in import cache with name %r and id %r", ret, name, id(ret)
-        # )
-        import_cache[name] = ret
-
-    # logger.debug(
-    #     "%r is trying to import %r and we're returning %r ", current_file, name, ret
-    # )
-
-    return ret
-
-
-original_import = __builtins__.__import__
-__builtins__.__import__ = _import
 
 """
 NOTE:
@@ -148,22 +40,27 @@ from oil.mycpp.mylib import tagswitch  # only in find_dynamic_token
 
 from oil.asdl import pybase  # CompoundObj
 
-from oil.core import alloc  # Arena
-from oil.core import error  # Parse, _ErrorWithLocation
-from oil.core import main_loop  # ParseWholeFile
-from oil.core import optview  # Parse
-from oil.core import state  # InitOpts
-from oil.core import ui  # PrettyPrintError
+from oil.core import (
+    alloc,  # Arena
+    error,  # Parse, _ErrorWithLocation
+    main_loop,  # ParseWholeFile
+    optview,  # Parse
+    state,  # InitOpts
+    ui,  # PrettyPrintError
+)
 
-from oil.osh import word_  # LeftMostSpanForWord, RightMostSpanForWord StaticEval
-from oil.osh import split  # SplitContext
-from oil.osh import word_eval  # CompletionWordEvaluator, StringWordEvaluator
-from oil.osh import sh_expr_eval  # ArithEvaluator
+from oil.osh import (
+    word_,  # LeftMostSpanForWord, RightMostSpanForWord StaticEval
+    split,  # SplitContext
+    word_eval,  # CompletionWordEvaluator, StringWordEvaluator
+    sh_expr_eval,  # ArithEvaluator
+)
 
-# LookupSpecialBuiltin, LookupAssignBuiltin, LookupNormalBuiltin, NO_INDEX
-from oil.frontend import consts
-from oil.frontend import parse_lib  # ParseContext
-from oil.frontend import reader  # FileLineReader
+from oil.frontend import (
+    consts,  # LookupSpecialBuiltin, LookupAssignBuiltin, LookupNormalBuiltin, NO_INDEX
+    parse_lib,  # ParseContext
+    reader,  # FileLineReader
+)
 
 from oil._devbuild.gen.id_kind_asdl import Id  # VSub_Number, VSub_Name, VSub_DollarName
 
@@ -171,7 +68,8 @@ from oil._devbuild.gen.syntax_asdl import (
     source,  # MainFile, Stdin
     word_part_e,  # ArithSub, AssocArrayLiteral, BracedVarSub, CommandSub, DoubleQuoted, EscapedLiteral, ExtGlob, Literal, ShArrayLiteral, SimpleVarSub, SingleQuoted, Splice, TildeSub
     command,  # ShFunction, Simple
-    double_quoted,  # directly for cast()
+    double_quoted,  # directly for cast(), also subcmd parse
+    single_quoted,  # subcmd parse
     Token,  # directly for cast(), also for alias parsing
 )
 
@@ -312,11 +210,11 @@ def parse_directive(value, scope_map=None):
                 for rule in rules:
                     out.add((scope, rule))
             else:
-                raise argparse.ArgumentTypeError(
+                raise ourparse.ArgumentTypeError(
                     "Directives may not have more than one colon: %r" % directive
                 )
     except ValueError as e:
-        raise argparse.ArgumentTypeError(
+        raise ourparse.ArgumentTypeError(
             "I don't recognize %r as a known directive. See 'man resholve'." % value
         )
     return out
@@ -348,11 +246,11 @@ def directive_fake(value):
         return None
     for directive in directives:
         if len(directive) == 1:
-            raise argparse.ArgumentTypeError(
+            raise ourparse.ArgumentTypeError(
                 "valid fake directives must have at least two parts"
             )
         elif directive[0] not in FAKE_DIRECTIVE_TYPES:
-            raise argparse.ArgumentTypeError(
+            raise ourparse.ArgumentTypeError(
                 "fake directive type (%r) is not one of %r"
                 % (directive[0], FAKE_DIRECTIVE_TYPES)
             )
@@ -373,7 +271,7 @@ def directive_fix(value):
             elif os.path.isabs(directive[0]):
                 pass  # ok absolute path
             else:
-                raise argparse.ArgumentTypeError(
+                raise ourparse.ArgumentTypeError(
                     "valid single-part fix directives: 'aliases', absolute path"
                 )
         elif len(directive) == 2:
@@ -381,7 +279,7 @@ def directive_fix(value):
             # but we can pre-validate command lookup for the target
             target = lookup(directive[1])
             if not target:
-                raise argparse.ArgumentTypeError(
+                raise ourparse.ArgumentTypeError(
                     "I couldn't resolve '{command}' in directive {scope}:{command}".format(
                         scope=directive[0], command=directive[1]
                     )
@@ -405,7 +303,7 @@ def directive_keep(value):
             elif os.path.isabs(directive[0]):
                 pass  # ok absolute path
             else:
-                raise argparse.ArgumentTypeError(
+                raise ourparse.ArgumentTypeError(
                     "valid single-part keep directives: $variable, absolute path, ~/path"
                 )
         elif len(directive) == 2:
@@ -419,15 +317,15 @@ def interpreter_to_shebang(interp):
         return None
 
     if not os.path.exists(interp):
-        raise argparse.ArgumentTypeError(
+        raise ourparse.ArgumentTypeError(
             "Interpreter must exist or be the string 'none'"
         )
 
     if not os.path.isabs(interp):
-        raise argparse.ArgumentTypeError("Interpreter path must be absolute")
+        raise ourparse.ArgumentTypeError("Interpreter path must be absolute")
 
     if not os.access(interp, os.X_OK):
-        raise argparse.ArgumentTypeError("Interpreter must be executable")
+        raise ourparse.ArgumentTypeError("Interpreter must be executable")
 
     return "#!{:}\n".format(interp)
 
@@ -490,11 +388,11 @@ class LoreType(object):
         )
 
     def __init__(self, lore_kinds):
-        """"""
+        """ """
         self.lore_kinds = lore_kinds
 
     # TODO: see if you can fold ingest_lore in for better
-    #       invocation-time argparse errors
+    #       invocation-time ourparse errors
 
     def __call__(self, value):
         if len(self.lore_kinds) == 1:
@@ -508,7 +406,7 @@ class LoreType(object):
                 reader = getattr(self, kind)
                 return list(reader(value.split()))
         except Exception as e:
-            raise argparse.ArgumentTypeError(
+            raise ourparse.ArgumentTypeError(
                 "%s must be a colon-delimited string. Got: %r"
                 % (self.lore_kinds[0], value)
             )
@@ -523,7 +421,7 @@ class LoreType(object):
             else:
                 raise Exception("%s is not a file" % path)
         except Exception as e:
-            raise argparse.ArgumentTypeError(
+            raise ourparse.ArgumentTypeError(
                 "%s\n lore must be a single file. %s" % (self.lore_kinds[0], e)
             )
 
@@ -540,7 +438,7 @@ class LoreType(object):
             else:
                 raise Exception("%s is not a directory" % path)
         except Exception as e:
-            raise argparse.ArgumentTypeError(
+            raise ourparse.ArgumentTypeError(
                 "%s\nLore must be a "
                 "directory with a file named "
                 "'execers' (and optionally one named "
@@ -548,7 +446,7 @@ class LoreType(object):
             )
 
 
-class Accumulate(argparse.Action):
+class Accumulate(ourparse.Action):
     def __call__(self, _parser, ns, vals, *args):
         setattr(ns, self.dest, (getattr(ns, self.dest) or []) + vals)
 
@@ -713,23 +611,23 @@ def make_arg_parser(module):
     )
     res.add_argument(
         "--assay",
-        type=argparse.FileType("r"),
+        type=ourparse.FileType("r"),
         metavar="f",
         # see tests for usage; not "supported; unsure.
-        help=argparse.SUPPRESS,
+        help=ourparse.SUPPRESS,
     )
 
     other = parser.add_argument_group(title="Other")
 
     other.add_argument(
         "--prologue",
-        type=argparse.FileType("r"),
+        type=ourparse.FileType("r"),
         metavar="f",
         help="insert file before resolved script",
     )
     other.add_argument(
         "--epilogue",
-        type=argparse.FileType("r"),
+        type=ourparse.FileType("r"),
         metavar="f",
         help="insert file after resolved script",
     )
@@ -756,7 +654,7 @@ def make_arg_parser(module):
     return parser
 
 
-parser = make_arg_parser(argparse)
+parser = make_arg_parser(ourparse)
 
 resolved_scripts = dict()
 
@@ -871,7 +769,7 @@ def ingest_assay(assayfile):
         if row["wordnum"] == "0":
             # TODO this needs to be fixed somehow; argparse
             # won't catch so it'll throw a stack AND exit 1
-            raise argparse.ArgumentTypeError(
+            raise ourparse.ArgumentTypeError(
                 "assay wordnum should be 1+ (0 is the same as the invoking command itself)"
             )
 
@@ -1065,9 +963,42 @@ def punshow():
     except InFileDirectiveError as e:
         sys.stderr.write(str(e))
         return 2
-    except argparse.ArgumentTypeError as e:
+    except ourparse.ArgumentTypeError as e:
         sys.stderr.write("Hold up there, cowpoke: " + str(e))
         return 2
+
+
+def find_earliest_spid(node):
+    """
+    I'll focus on the goal rather than mislead you with assertions about
+    what this does (I'm not confident I understand all of the underlying
+    variation within oil on this point).
+
+    The old assumption was that, when a node has an spids list, the first
+    item in the list is the earliest spid under the umbrella. That is
+    usually true, and has held water for many months, but I've found at
+    least one case with command.AndOr nodes where the leftmost spid in
+    this array is actually for the && or || token.
+
+    We really do want the earliest spid, because we want to be able to
+    inject a prologue at that point. So, we'll try to descend the ~edge
+    of the AST, keeping the lowest spid we find.
+    """
+    node_spid = sub_spid = None
+    if hasattr(node, "spids") and node.spids and len(node.spids):
+        node_spid = node.spids[0]
+    elif hasattr(node, "span_id"):
+        node_spid = node.span_id
+
+    if hasattr(node, "children"):
+        sub_spid = find_earliest_spid(node.children[0])
+    elif hasattr(node, "words"):
+        sub_spid = find_earliest_spid(node.words[0])
+    elif hasattr(node, "parts"):
+        sub_spid = find_earliest_spid(node.parts[0])
+
+    # min will return a None, so fail down the list just in case
+    return min(node_spid, sub_spid) or node_spid or sub_spid
 
 
 def find_dynamic_token(part):
@@ -1117,6 +1048,41 @@ def find_dynamic_token(part):
             return cast(Token, UP_part).token
         else:
             raise AssertionError(part.tag_())
+
+
+def find_word_and_pos(needle, cmd_ob, args):
+    """
+    CAUTION: not very happy about this first_close_match bit
+    this is an attempt to make sure we prefer exact matches,
+    but still have a fallback if we don't have one. See the
+    comment in handle_external_generic() for more context.
+    """
+    first_close_match = None
+    for i, arg in enumerate(args.argv):
+        if i == 0:
+            continue  # skip first
+        if needle in arg:
+            # prefer first exact match
+            if needle == arg:
+                if cmd_ob.words[i].parts[0].__class__ in (
+                    double_quoted,
+                    single_quoted,
+                ):
+                    return cmd_ob.words[i], cmd_ob.words[i].parts[0].spids[0] + 1
+                else:
+                    return cmd_ob.words[i], args.arg_spids[i]
+            elif not first_close_match:
+                if cmd_ob.words[i].parts[0].__class__ in (
+                    double_quoted,
+                    single_quoted,
+                ):
+                    first_close_match = (
+                        cmd_ob.words[i],
+                        cmd_ob.words[i].parts[0].spids[0] + 1,
+                    )
+                else:
+                    first_close_match = cmd_ob.words[i], args.arg_spids[i]
+    return first_close_match
 
 
 # For optview.Parse. Oil does [False] * option_i.ARRAY_SIZE and
@@ -1325,6 +1291,11 @@ class NixSetuidWrapper(Detain):
     issue = 29
 
 
+class OshEvalProblem(Census):
+    problem = "OSH eval error while looking for sub-exec in %s %r."
+    issue = 30
+
+
 class OverriddenEssentialBuiltin(Census):
     problem = "Essential builtin overridden by %s %r."
     issue = 27
@@ -1392,6 +1363,496 @@ class MultiKeyDefaultDict(dict):
     def __missing__(self, key):
         return self.setdefault(key, self.factory(*key))
 
+
+"""
+I'm refactoring to use argparse instead of a bespoke parser.
+This worked okay for a while, and let me cut some corners,
+but looking at how to graft in support for -comboflags made
+it obvious that I don't want to be maintaining this logic in
+the short run. (Maybe reconsider once the set of covered
+external commands feels very stable.)
+
+Some general principles/notes:
+- only set up parsers for externals we actually find
+- cache them since multiple calls will be common
+- compact and clarify the definitions
+- don't add help by default (favor being explicit)
+- minimize the number of bespoke handlers
+
+Some patterns coalescing:
+- generic handler uses the "command" dest to find subcommands
+- init parser with a name and variant, i.e. "sed" and "gnu" or "bsd"
+- use a "skip" target if there are options that are mutually-exclusive
+  with sub-execution
+
+Reminder: You could reap a performance benefit by dropping all of the
+bool flags, but it breaks handling of combined -abcd args.
+
+TODO:
+- Nix Test suite just for exercising the syntax of these commands (
+  demonstrating it doesn't break, that it can resolve what it's
+  supposed to, and a place to add edge-cases that turn up.)
+- I'd like to eventually end up with a ~config-file format to specify
+  these, if it can be done clearly for the vast-majority of cases
+- If the above works out, I'd also like more space to ~annotate/doc
+  these without polluting the source or slowing the program down...
+- I'd like to condense these expressions, but retain the flexibility
+  of specifying whatever argparse supports (if the above fails?)
+"""
+
+
+class ExternalParser(theirparse.ArgumentParser):
+    """
+    Changes:
+    - don't raise errors; I don't *think* we want to halt here
+      (because then we're going to have to have a full model of all in-use
+      options, even across different programs...)
+
+    TODO:
+    - if this pattern sticks, AND resholve gains a test-suite focused on
+      extensively picking at external command syntax, the time needed to
+      run those tests may be able to guide some optimizations here. i.e.
+      pull in function source and:
+      - knock out features and safety checks
+      - maybe just literally construct the end data structure
+      - two for loops in parse_known_args could probably be done on init
+    - regardless, I need to be keeping better notes on the cmds
+      - version, variant, description of how they differ, platform
+    """
+
+    def __init__(self, name, variant="generic"):
+        theirparse.ArgumentParser.__init__(
+            self, prog="{:} ({:})".format(name, variant), add_help=False
+        )
+        self.add_argument("external")
+
+    def error(self, message):
+        logger.warn("ExternalParser %r passing instead of %r", self, message)
+
+
+class ExternalCommandParsers(object):
+    """
+    TODO:
+    - I'm not terribly sure when I should use nargs="?" vs nargs="*"
+    - --help/--version add_help -h -v consistency?
+
+    Caution: argparse defaults may end up being gotchas...
+    - allow_abbrev is on by default
+    - nargs=?/* on options will want to eat subsequent args and may
+      be a smell that you should really be using more than one parser
+      (i.e. one with 0, one with 1, etc.)
+    """
+
+    @staticmethod
+    def chroot():
+        """
+        coreutils src/chroot.c:execvp
+        bsd: [-g group] [-G group,group,...] [-u user] newroot [command]
+        gnu: [OPTION] NEWROOT [COMMAND [ARG]...]
+             or:  chroot OPTION
+             Run COMMAND with root directory set to NEWROOT.
+
+             --groups=G_LIST        specify supplementary groups as g1,g2,..,gN
+             --userspec=USER:GROUP  specify user and group (ID or name) to use
+             --skip-chdir           do not change working directory to '/'
+             --help     display this help and exit
+             --version  output version information and exit
+        """
+        generic = ExternalParser("chroot")
+        # bsd
+        generic.add_argument("-g")
+        generic.add_argument("-G")
+        generic.add_argument("-u")
+        # gnu
+        generic.add_argument("--groups")
+        generic.add_argument("--userspec")
+        generic.add_argument("--skip-chdir", action="store_true")
+        generic.add_argument("--help")
+        generic.add_argument("--version")
+
+        # both
+        generic.add_argument("newroot", nargs="?")
+        generic.add_argument("command", nargs="?")
+        return (generic,)
+
+    @staticmethod
+    def env():
+        """
+        coreutils src/env.c:execvp
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+
+        both gnu and bsd support "-" as a synonym for -i
+        argparse appears to support, but IDK if it'll cause trouble
+
+        assignment-alikes should be stripped out already
+        """
+        generic = ExternalParser("env")
+        generic.add_argument("-P")  # bsd altpath
+        # gnu
+        generic.add_argument(
+            # -i and - are also bsd
+            "-i",
+            "--ignore-environment",
+            "-",
+            action="store_true",
+        )
+        generic.add_argument("-0", "--null", action="store_true")
+        generic.add_argument("-u", "--unset")  # -u is bsd
+        generic.add_argument("-C", "--chdir")
+        generic.add_argument("-S", "--split-string")  # -S is bsd
+        generic.add_argument("--block-signal")
+        generic.add_argument("--default-signal")
+        generic.add_argument("--ignore-signal")
+        generic.add_argument("--list-signal-handling")
+        generic.add_argument("-v", "--debug", action="store_true")  # -v is bsd
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+    @staticmethod
+    def install():
+        """
+        coreutils src/install.c:execlp
+        """
+        generic = ExternalParser("install")
+        generic.add_argument("--strip-program", dest="command")
+        return (generic,)
+
+    @staticmethod
+    def nice():
+        """
+        coreutils src/nice.c:execvp
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+        """
+        generic = ExternalParser("nice")
+        generic.add_argument("-n")
+        generic.add_argument("--adjustment")
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+    @staticmethod
+    def nohup():
+        """
+        coreutils src/nohup.c:execvp
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+        """
+        generic = ExternalParser("nohup")
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+    @staticmethod
+    def runcon():
+        """
+        coreutils src/runcon.c:execvp
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+
+        two mutually-exclusive forms; if opts are present, the command
+        is the first arg--if not, there's a combined context first.
+        """
+        opt_context = ExternalParser("runcon", "opt context")
+        context = opt_context.add_mutually_exclusive_group(required=True)
+        context.add_argument("-c", "--compute", action="store_true")
+        context.add_argument("-t", "--type")
+        context.add_argument("-u", "--user")
+        context.add_argument("-r", "--role")
+        context.add_argument("-l", "--range")
+        opt_context.add_argument("command", nargs="*")
+
+        # these two forms are mutua
+        combined_context = ExternalParser("runcon", "combined context")
+        combined_context.add_argument("context")
+        combined_context.add_argument("command", nargs="*")
+        return (opt_context, combined_context)
+
+    @staticmethod
+    def sort():
+        """
+        coreutils src/sort.c:execlp
+        """
+        generic = ExternalParser("sort")
+        generic.add_argument("--compress-program", dest="command")
+        return (generic,)
+
+    @staticmethod
+    def split():
+        """
+        coreutils src/split.c:execl
+        """
+        generic = ExternalParser("split")
+        generic.add_argument("--filter", dest="command")
+        return (generic,)
+
+    @staticmethod
+    def stdbuf():
+        """
+        coreutils src/stdbuf.c:?
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+        """
+        generic = ExternalParser("stdbuf")
+        generic.add_argument("-i", "--input")
+        generic.add_argument("-o", "--output")
+        generic.add_argument("-e", "--error")
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+    @staticmethod
+    def timeout():
+        """
+        coreutils src/timeout.c:execvp
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+        """
+        generic = ExternalParser("timeout")
+        generic.add_argument("-k", "--kill-after")
+        generic.add_argument("-s", "--signal")
+        generic.add_argument("-v", "--verbose", action="store_true")
+        generic.add_argument("--preserve-status", action="store_true")
+        generic.add_argument("--foreground", action="store_true")
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+    @staticmethod
+    def sqlite3():
+        """ """
+        generic = ExternalParser("sqlite3")
+        generic.add_argument("--cmd", dest="command")
+        return (generic,)
+
+    @staticmethod
+    def script():
+        linux = ExternalParser("script", "linux")
+        linux.add_argument("-a", "--append", action="store_true")
+        linux.add_argument("-E", "--echo")
+        linux.add_argument("-e", "--return", action="store_true")
+        linux.add_argument("-f", "--flush", action="store_true")
+        linux.add_argument("--force", action="store_true")
+        linux.add_argument("-B", "--log-io")
+        linux.add_argument("-I", "--log-in")
+        linux.add_argument("-O", "--log-out")
+        linux.add_argument("-T", "--log-timing")
+        linux.add_argument("-m", "--logging-format")
+        linux.add_argument("-o", "--output-limit")
+        linux.add_argument("-t", "--timing")
+        linux.add_argument("-q", "--quiet", action="store_true")
+        linux.add_argument("-V", "--version", action="store_true")
+        linux.add_argument("-c", "--command")
+        linux.add_argument("file", nargs="?")
+
+        bsd = ExternalParser("script", "bsd")
+        bsd.add_argument("-d", action="store_true")
+        bsd.add_argument("-k", action="store_true")
+        bsd.add_argument("-p", action="store_true")
+        bsd.add_argument("-r", action="store_true")
+        bsd.add_argument("-q", action="store_true")
+        bsd.add_argument("-t", action="store_true")
+        bsd.add_argument("-a", action="store_true")
+        bsd.add_argument("-F")
+        bsd.add_argument("-T")
+        bsd.add_argument("file", nargs="?")
+        bsd.add_argument("command", nargs="?")
+
+        return (linux, bsd)
+
+    @staticmethod
+    def sed():
+        """
+        see also handle_external_sed()
+        """
+        generic = ExternalParser("sed", "generic")
+        # very unsure about this group part
+        script = generic.add_mutually_exclusive_group(required=True)
+        generic.add_argument("-a", action="store_true")  # BSD-only
+        generic.add_argument("-n", "--quiet", "--silent", action="store_true")
+        generic.add_argument("--debug", action="store_true")
+        script.add_argument("-e", "--expression", action="append")
+        script.add_argument("-f", "--file")
+        generic.add_argument("--follow-symlinks", action="store_true")
+        generic.add_argument("-i", "--in-place", nargs="?", const=True)
+        # gnu always has the arg, but BSD uses this for line-buffered
+        # I think we can wrangle both w/ one arg
+        generic.add_argument("-l", "--line-length", nargs="?", const=True)
+        generic.add_argument("--posix", action="store_true")
+        generic.add_argument("-E", "-r", "--regexp-extended", action="store_true")
+        generic.add_argument("-s", "--separate", action="store_true")
+        generic.add_argument("-u", "--unbuffered", action="store_true")
+        generic.add_argument("-z", "--null-data", action="store_true")
+        generic.add_argument("--sandbox", action="store_true")
+        generic.add_argument("--version", action="store_true")
+        script.add_argument("script", nargs="?")
+        generic.add_argument("input_file", nargs="*")
+
+        return (generic,)
+
+    @staticmethod
+    def sudo():
+        """
+        sudo lists several forms, but only 2 should get resolved
+        NO: sudo -h | -K | -k | -V
+        NO: sudo -v [-AknS] [-g group] [-h host] [-p prompt] [-u user]
+        NO: sudo -e [-AknS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] file ...
+        YES: sudo -l [-AknS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
+        YES: sudo [-AbEHknPS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
+        """
+        generic = ExternalParser("sudo", "generic")
+        # 1. weed out sudo forms that don't need resolving
+        # note: some of these long forms aren't known correct
+        #       because sudo re-uses a lot of flags
+        generic.add_argument(
+            # "-h", # handled separately due to overlap
+            "--help",
+            "-K",
+            "--remove-timestamp",
+            # shown in both places
+            # "-k",
+            # "--reset-timestamp",
+            "-V",
+            "--version",
+            "-v",
+            "--validate",
+            "-e",
+            "--edit",
+            dest="skip",
+            action="store_true",
+        )
+        # sudo -l form
+        generic.add_argument("-l", "--list", action="count")
+        generic.add_argument("-A", "--askpass", action="store_true")
+        generic.add_argument("-k", "--reset-timestamp", action="store_true")
+        generic.add_argument("-n", "--non-interactive", action="store_true")
+        generic.add_argument("-S", "--stdin", action="store_true")
+        generic.add_argument("-g", "--group")
+        # nargs because `-h` (help) overlaps us...
+        generic.add_argument("-h", "--host", nargs="?", const=True)
+        generic.add_argument("-p", "--prompt")
+        generic.add_argument("-U", "--other-user")
+        generic.add_argument("-u", "--user")
+        # extra from sans-l for
+        generic.add_argument("-b", "--background", action="store_true")
+        generic.add_argument("-E", "--preserve-env", nargs="?", const=True)
+        generic.add_argument("-H", "--set-home")
+        generic.add_argument("-P", "--preserve-groups", action="store_true")
+        generic.add_argument("-C", "--close-from")
+        generic.add_argument("-T", "--command-timeout")
+        generic.add_argument("-i", "--login", action="store_true")
+        generic.add_argument("-s", "--shell", action="store_true")
+        # not listed in the synopsis; probably valid in most
+        generic.add_argument("-B", "--bell", action="store_true")
+        generic.add_argument("command")
+        return (generic,)
+
+    # TODO: find? currently leaving it as regex
+
+    @staticmethod
+    def xargs():
+        """
+        coreutils src/xargs.c:?
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+
+        There's technically an argless form of a few args here:
+        -i --replace
+        -e --eof
+        -l --max-lines
+        all marked as deprecated or discouraged for !posix.
+        We can match them with something like `nargs="?", const="{}"`,
+        but it will only actually work as the last argument--otherwise
+        it'll eat the next positional as the arg, never actually use
+        the default, and require more handling to disambiguate between
+        a bare flag with a default value and a normal flag with one
+        passed. I'm going to see if we can get by w/o them...
+
+        if this doesn't work, we'll probably need N parsers...
+        """
+        generic = ExternalParser("xargs")
+        # gnu
+        generic.add_argument("-0", "--null", action="store_true")
+        generic.add_argument("-a", "--arg-file")
+        generic.add_argument("-d", "--delimiter")
+        # see head note per both of these args
+        generic.add_argument("-E", "-e", "--eof")
+        generic.add_argument("-I", "-i", "--replace")
+
+        generic.add_argument("-L", "-l", "--max-lines")
+        generic.add_argument("-n", "--max-args")
+        generic.add_argument("-o", "--open-tty", action="store_true")
+        generic.add_argument("-P", "--max-procs")
+        generic.add_argument("-p", "--interactive", action="store_true")
+        generic.add_argument("--process-slot-var")
+        generic.add_argument("-r", "--no-run-if-empty", action="store_true")
+        generic.add_argument("-s", "--max-chars")
+        generic.add_argument("--show-limits", action="store_true")
+        generic.add_argument("-t", "--verbose", action="store_true")
+        generic.add_argument("-x", "--exit", action="store_true")
+        generic.add_argument("--help", action="store_true")
+        generic.add_argument("--version", action="store_true")
+        # bsd seems to have at least one extra, probably equiv of -I/-i
+        generic.add_argument("-J")
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+    @staticmethod
+    def rlwrap():
+        """
+        coreutils src/rlwrap.c:?
+        Usage: %s [OPTION] [COMMAND [ARG]...]
+
+        There's technically an argless form of a few args here:
+        -i --replace
+        -e --eof
+        -l --max-lines
+        all marked as deprecated or discouraged for !posix.
+        We can match them with something like `nargs="?", const="{}"`,
+        but it will only actually work as the last argument--otherwise
+        it'll eat the next positional as the arg, never actually use
+        the default, and require more handling to disambiguate between
+        a bare flag with a default value and a normal flag with one
+        passed. I'm going to see if we can get by w/o them...
+
+        if this doesn't work, we'll probably need N parsers...
+        """
+        generic = ExternalParser("rlwrap")
+        generic.add_argument("-a", "--always-readline")
+        generic.add_argument("-A", "--ansi-colour-aware", action="store_true")
+        generic.add_argument("-b", "--break-chars")
+        generic.add_argument("-c", "--complete-filenames", action="store_true")
+        generic.add_argument("-C", "--command-name")
+        generic.add_argument("-D", "--history-no-dupes")
+        generic.add_argument("-e", "--extra-char-after-completion")
+        generic.add_argument("-f", "--file")
+        generic.add_argument("-g", "--forget-matching")
+        generic.add_argument("-h", "--help", action="store_true")
+        generic.add_argument("-H", "--history-filename")
+        generic.add_argument("-i", "--case-insensitive", action="store_true")
+        generic.add_argument("-I", "--pass-sigint-as-sigterm", action="store_true")
+        generic.add_argument("-l", "--logfile")
+        generic.add_argument("-m", "--multi-line")
+        generic.add_argument("-M", "--multi-line-ext")
+        generic.add_argument("-n", "--no-warnings", action="store_true")
+        generic.add_argument("-N", "--no-children", action="store_true")
+        generic.add_argument("-o", "--one-shot", action="store_true")
+        generic.add_argument("-O", "--only-cook")
+        generic.add_argument("-p", "--prompt-colour")
+        generic.add_argument("-P", "--pre-given")
+        generic.add_argument("-q", "--quote-characters")
+        generic.add_argument("-r", "--remember", action="store_true")
+        generic.add_argument("-R", "--renice", action="store_true")
+        generic.add_argument("-s", "--histsize")
+        generic.add_argument("-S", "--substitute-prompt")
+        generic.add_argument("-t", "--set-term-name")
+        generic.add_argument("-U", "--mirror-arguments", action="store_true")
+        generic.add_argument("-v", "--version", action="store_true")
+        generic.add_argument("-w", "--wait-before-prompt")
+        generic.add_argument("-W", "--polling", action="store_true")
+        # TODO: -z/--filter may need resolution? not sure
+        generic.add_argument("-z", "--filter")
+        generic.add_argument("command", nargs="*")
+        return (generic,)
+
+
+def generate_external_command_parser(cmdname):
+    if hasattr(ExternalCommandParsers, cmdname):
+        return getattr(ExternalCommandParsers, cmdname)()
+    return None
+
+
+externals = SingleKeyDefaultDict(generate_external_command_parser)
 
 """
 It's probably worth discussing the big picture before the next section. It may
@@ -1667,7 +2128,7 @@ class OrderedCommandResolver(object):
       for a quirk about raising exceptions here)
 
     TODO: in theory these can be cached, but I'm not sure it'll be
-    meaningful. The expensive part, lookup(), is already cached.
+        meaningful. The expensive part, lookup(), is already cached.
         update June 2021: walk-time lookups for some builtins and
         general recursive resolution support *might* have moved the
         needle far enough to justify this change at some point. Not
@@ -1842,7 +2303,7 @@ class CommandLike(object):
     def chomp_cmdlikes(cls):
         logger.debug("unresolved clen1 %r %r", len(cls.unresolved), cls.unresolved)
         while len(cls.unresolved):
-            unresolved = cls.unresolved
+            unresolved = sorted(cls.unresolved)
             cls.unresolved = set()
             for cmdlike in unresolved:
                 yield cmdlike
@@ -1929,7 +2390,28 @@ class CommandLike(object):
                         source, "handle_builtin_{:}".format(self.name), None
                     )
                     if handler:
-                        args, name, text = source.get_subexec_context(cmd_object)
+                        try:
+                            # try/except hopefully obsoleted in
+                            # https://github.com/oilshell/oil/issues/956
+                            args, name, text = source.get_subexec_context(cmd_object)
+                        except (AssertionError, error.FatalRuntime) as e:
+                            err_attrs = {
+                                key: value
+                                for key, value in (
+                                    (attr, getattr(e, attr, None))
+                                    for attr in ("word", "part", "token", "span_id")
+                                )
+                                if value
+                            }
+                            observe(
+                                OshEvalProblem,
+                                "general builtin",
+                                self.name,
+                                arena=source.arena,
+                                **err_attrs
+                            )
+                            continue
+
                         handler(cmd_object, args, name, text)
 
             elif solution.kind == "external" and isinstance(
@@ -2129,7 +2611,7 @@ class RecordCommandlike(object):
         subcmd = copy.deepcopy(cmd_ob)
         subcmd.words.remove(subcmd.words[0])
         logger.debug("handle_first_pass_essentials %r %r %r", txt, cmd_ob, subcmd)
-        if txt in FIRST_PASS_ESSENTIALS:
+        if txt in sorted(FIRST_PASS_ESSENTIALS):
             cmdlike = cmdlikes[txt]
             if not cmdlike.alias and not cmdlike.function:
                 self.look_for_essential_builtin_sub_execution(txt, subcmd)
@@ -2261,6 +2743,8 @@ class RecordCommandlike(object):
         if len(cmd_ob.words) > 1:
             # presumably a real command we need to recurse on
             subcmd = args.argv[1] or cmd_ob.words[1].parts[0].val
+            subcmd_ob = copy.deepcopy(cmd_ob)
+            del subcmd_ob.words[0]
             pos = args.arg_spids[1]
             cmdlike = cmdlikes[subcmd]
 
@@ -2269,7 +2753,7 @@ class RecordCommandlike(object):
                 solution = self.solutions[pos]
             else:
                 solution = self.solutions[pos] = cmdlike.request_external_solution(
-                    self, cmd_ob
+                    self, subcmd_ob
                 )
                 self.word_objects[pos] = cmd_ob.words[1]
 
@@ -2283,7 +2767,27 @@ class RecordCommandlike(object):
 
     def look_for_essential_builtin_sub_execution(self, outer, cmd_object):
         global subcommand_re
-        args, name, text = self.get_subexec_context(cmd_object)
+        try:
+            # try/except hopefully obsoleted in
+            # https://github.com/oilshell/oil/issues/956
+            args, name, text = self.get_subexec_context(cmd_object)
+        except (AssertionError, error.FatalRuntime) as e:
+            err_attrs = {
+                key: value
+                for key, value in (
+                    (attr, getattr(e, attr, None))
+                    for attr in ("word", "part", "token", "span_id")
+                )
+                if value
+            }
+            observe(
+                OshEvalProblem,
+                "essential builtin",
+                outer,
+                arena=self.arena,
+                **err_attrs
+            )
+            return
 
         if name == ".":  # remap
             name = "source"
@@ -2314,376 +2818,12 @@ class RecordCommandlike(object):
         i = len(cmd_ob.words)
         while i > 0:
             i -= 1
-            if new_cmd.words[i].parts[0].id == Id.Lit_VarLike:
+            if getattr(new_cmd.words[i].parts[0], "id", None) == Id.Lit_VarLike:
                 del new_cmd.words[i]
                 del new_args.argv[i]
                 del new_args.arg_spids[i]
         logger.debug("WORDS AFTER %r", new_cmd.words)
         return new_cmd, new_args, " ".join(new_args.argv)
-
-    def _handle_executable_flag(flag):
-        def temp(self, cmd_ob, args, name, text):
-            if len(cmd_ob.words) > 2:
-                logger.debug(
-                    "handle_executable_flag: %r %r %r %r", name, cmd_ob, args, text
-                )
-
-                pos = word = None
-                for i, arg in enumerate(args.argv):
-                    if arg.startswith(flag):
-                        if arg == flag:
-                            target = i + 1
-                            subcmd = (
-                                args.argv[target] or cmd_ob.words[target].parts[0].val
-                            )
-                            pos = args.arg_spids[target]
-                            cmdlike = cmdlikes[subcmd]
-                            word = cmd_ob.words[target]
-                        elif arg[len(flag)] == "=":
-                            # they might all be in one word :/
-                            subcmd = arg.split("=")[1]
-                            pos = cmd_ob.words[i].parts[-1].span_id
-                            cmdlike = cmdlikes[subcmd]
-                            # Note: this is a white lie; it's a token, not a word
-                            # I don't know if this will break elsewhere...
-                            word = cmd_ob.words[i].parts[-1]
-
-                if pos:
-                    logger.debug("%r %r %r", subcmd, pos, word)
-                    # presumably a real command we need to recurse on
-                    solution = None
-                    if pos in self.solutions:
-                        solution = self.solutions[pos]
-                    else:
-                        solution = self.solutions[
-                            pos
-                        ] = cmdlike.request_external_solution(self, cmd_ob)
-                        self.word_objects[pos] = word
-
-                    logger.debug(
-                        "while handling external flag for %r, recorded solution=%r at pos=%r",
-                        cmd_ob,
-                        solution,
-                        pos,
-                    )
-
-                    if not solution.solved:
-                        cmdlike.resolve()
-
-        return temp
-
-    def _handle_executable_ignoring_args(
-        ignore_positional, ignore_opts, break_double_dash=False
-    ):
-        """
-        flags = [
-            (string "arg", int flag args to consume)
-            i.e., 0 if it's just a flag, 1 if the flag has 1 arg
-            if there are required positional args before
-            the subcommand, the first arg should be
-            (commandname, int required positional args)
-            otherwise, (commandname, 0)
-        ]
-        """
-
-        def temp(self, cmd_ob, args, name, text):
-            logger.debug(
-                "handle_executable_ignoring_args: %r %r %r %r", name, cmd_ob, args, text
-            )
-
-            pos = word = None
-            i = 1  # skip command itself
-            drop = ignore_positional
-            while i < len(args.argv):
-                arg = args.argv[i]
-                if break_double_dash and arg == "--":
-                    i += 1
-                    break
-
-                for needle, skip in ignore_opts:
-                    distinct_equal_form = False
-                    if needle[-1] == "=":
-                        # special-case flags that end with =
-                        # assume both 0 and 1-arg forms
-                        distinct_equal_form = True
-                        needle = needle[0:-1]
-
-                    if arg.startswith(needle):
-                        logger.debug("found needle: %r %r %r", arg, needle, skip)
-                        if arg == needle:
-                            logger.debug("exact match")
-                            i += skip + 1
-                        elif arg[len(needle)] == "=":
-                            if distinct_equal_form:
-                                logger.debug("zero-arg alt '=' form")
-                                i += 1
-                            else:
-                                logger.debug("equal after")
-                                i += skip
-
-                        logger.debug("break inner loop")
-                        break
-                else:
-                    logger.debug("enter inner-loop's else")
-                    logger.debug("test for drop %r", drop)
-                    if drop > 1:
-                        drop -= 1
-                    elif drop == 1:
-                        drop -= 1
-                        i += 1
-                        logger.debug("drop == 1 break")
-                        break
-                    else:
-                        logger.debug("drop < 1 break")
-                        break
-
-                logger.debug("reach end of outer while loop")
-
-            word = cmd_ob.words[i]
-            ok, word_txt, quoted = word_.StaticEval(word)
-            if not ok and self.allow_dynamic_executable_word(cmd_ob.words[i]):
-                return  # no-op
-            subcmd = args.argv[i] or get_next_val(cmd_ob.words[i])
-            pos = args.arg_spids[i]
-            cmdlike = cmdlikes[subcmd]
-            logger.debug(
-                "WOMBLE subcmd=%r pos=%r word=%r cmdlike=%r:%r",
-                subcmd,
-                pos,
-                word,
-                cmdlike,
-                cmdlike.name,
-            )
-            if pos:
-                # presumably a real command we need to recurse on
-                new_cmd = copy.deepcopy(cmd_ob)
-                del new_cmd.words[0:i]
-                solution = None
-                if pos in self.solutions:
-                    solution = self.solutions[pos]
-                else:
-                    solution = self.solutions[pos] = cmdlike.request_external_solution(
-                        self, new_cmd
-                    )
-                    self.word_objects[pos] = word
-
-                logger.debug(
-                    "while handling ignored args for %r, recorded solution=%r at pos=%r",
-                    new_cmd,
-                    solution,
-                    pos,
-                )
-
-                if not solution.solved:
-                    cmdlike.resolve()
-
-        return temp
-
-    # sub-executing coreutils
-    # src/chroot.c:execvp
-    #   gnu: [OPTION] NEWROOT [COMMAND [ARG]...]
-    #   bsd: [-g group] [-G group,group,...] [-u user] newroot [command]
-    handle_external_chroot = _handle_executable_ignoring_args(
-        1,
-        (
-            # bsd
-            ("--g", 1),
-            ("--G", 1),
-            ("--u", 1),
-            # gnu
-            ("--groups", 1),
-            ("--userspec", 1),
-            ("--skip-chdir", 0),
-        ),
-    )
-
-    # src/install.c:execlp --strip-program
-    handle_external_install = _handle_executable_flag("--strip-program")
-    # src/nice.c:execvp Usage: %s [OPTION] [COMMAND [ARG]...]
-    handle_external_nice = _handle_executable_ignoring_args(
-        0,
-        (
-            ("-n", 1),
-            ("--adjustment", 1),
-        ),
-    )
-    # src/nohup.c:execvp
-    # gnu: COMMAND [ARG]...\n\
-    # bsd: [--] utility [arguments]
-    handle_external_nohup = _handle_executable_ignoring_args(
-        0, tuple(), break_double_dash=True
-    )
-    # src/runcon.c:execvp Usage: %s CONTEXT COMMAND [args]\n\
-    handle_external_runcon_context = _handle_executable_ignoring_args(
-        1,
-        tuple(),
-    )
-    handle_external_runcon_flags = _handle_executable_ignoring_args(
-        0,
-        (
-            ("-c", 0),
-            ("--compute", 0),
-            ("-t", 1),
-            ("--type", 1),
-            ("-u", 1),
-            ("--user", 1),
-            ("-r", 1),
-            ("--role", 1),
-            ("-l", 1),
-            ("--range", 1),
-        ),
-    )
-
-    def handle_external_runcon(self, cmd_ob, args, name, text):
-        for flag in (
-            "-c",
-            "--compute",
-            "-t",
-            "--type",
-            "-u",
-            "--user",
-            "-r",
-            "--role",
-            "-l",
-            "--range",
-        ):
-            if (" " + flag) in text:
-                return self.handle_external_runcon_flags(cmd_ob, args, name, text)
-
-        return self.handle_external_runcon_context(cmd_ob, args, name, text)
-
-    # src/sort.c:execlp --compress-program
-    handle_external_sort = _handle_executable_flag("--compress-program")
-    # src/split.c:execl --filter=COMMAND
-    handle_external_split = _handle_executable_flag("--filter")
-    # src/stdbuf.c: OPTION... COMMAND
-    handle_external_stdbuf = _handle_executable_ignoring_args(
-        0,
-        (
-            ("-i", 1),
-            ("--input", 1),
-            ("-o", 1),
-            ("--output", 1),
-            ("-e", 1),
-            ("--error", 1),
-        ),
-    )
-    # src/timeout.c:Usage: %s [OPTION] DURATION COMMAND [ARG]...\n\
-    handle_external_timeout = _handle_executable_ignoring_args(
-        1,
-        (
-            ("--preserve-status", 0),
-            ("--foreground", 0),
-            ("-k", 1),
-            ("--kill-after", 1),
-            ("-s", 1),
-            ("--signal", 1),
-            ("-v", 0),
-            ("--verbose", 0),
-        ),
-    )
-
-    """
-    /usr/bin/env: illegal option -- h
-    usage: env [-iv] [-P utilpath] [-S string] [-u name]
-               [name=value ...] [utility [argument ...]]
-
-    Usage: env [OPTION]... [-] [NAME=VALUE]... [COMMAND [ARG]...]
-    Set each NAME to VALUE in the environment and run COMMAND.
-          --block-signal[=SIG]    block delivery of SIG signal(s) to COMMAND
-          --default-signal[=SIG]  reset handling of SIG signal(s) to the default
-          --ignore-signal[=SIG]   set handling of SIG signals(s) to do nothing
-          --list-signal-handling  list non default signal handling to stderr
-      -v, --debug          print verbose information for each processing step
-          --help     display this help and exit
-          --version  output version information and exit
-
-    A mere - implies -i.  If no COMMAND, print the resulting environment.
-
-    I think this implementation needs to end up doing a general ignore thing on most of these flags, a special ignore thing for varlikes?
-        TODO: but note, I guess the ability to ignore varlikes should be very common and very in-the-test-suite
-    """
-    handle_external_env_options = _handle_executable_ignoring_args(
-        0,
-        (
-            # bsd
-            ("-P", 1),
-            ("-S", 1),
-            ("-u", 1),
-            ("-v", 0),
-            # gnu
-            ("-i", 0),
-            ("--ignore-environment", 0),
-            ("-0", 0),
-            ("--null", 0),
-            ("-u", 1),
-            ("--unset", 1),
-            ("-C", 1),
-            ("--chdir", 1),
-            ("-S", 1),
-            ("--split-string", 1),
-            ("--block-signal", 1),
-            ("--default-signal", 1),
-            ("--ignore-signal", 1),
-            ("--list-signal-handling", 1),
-            ("-v", 0),
-            ("--debug", 0),
-        ),
-    )
-
-    def handle_external_env(self, cmd_ob, args, name, text):
-        new_ob, new_args, new_text = self._strip_varlikes(cmd_ob, args)
-        logger.debug("replaced %r %r %r===%r", cmd_ob, new_ob, name, new_args.argv[0])
-        return self.handle_external_env_options(
-            new_ob, new_args, new_args.argv[0], new_text
-        )
-
-    handle_external_sudo_options = _handle_executable_ignoring_args(
-        0,
-        (
-            # sudo -l form
-            ("-l", 0),
-            ("--list", 0),
-            ("-A", 0),
-            ("--askpass", 0),
-            ("-k", 0),
-            ("--reset-timestamp", 0),
-            ("-n", 0),
-            ("--non-interactive", 0),
-            ("-S", 0),
-            ("--stdin", 0),
-            ("-g", 1),
-            ("--group", 1),
-            ("-h", 1),
-            ("--host", 1),
-            ("-p", 1),
-            ("--prompt", 1),
-            ("-U", 1),
-            ("--other-user", 1),
-            ("-u", 1),
-            ("--user", 1),
-            # extra from sans-l form
-            ("-b", 0),
-            ("--background", 0),
-            ("-E", 0),
-            ("--preserve-env=", 0),
-            ("-H", 0),
-            ("--set-home", 1),
-            ("-n", 0),
-            ("-P", 0),
-            ("--preserve-groups", 0),
-            ("-C", 1),
-            ("--close-from", 1),
-            ("-T", 1),
-            ("--command-timeout", 1),
-            ("-i", 0),
-            ("--login", 0),
-            ("-s", 0),
-            ("--shell", 0),
-            # untouched: -B/--bell
-        ),
-        break_double_dash=True,
-    )
 
     def _find_sed_e_cmd(self, expr):
         """
@@ -2735,254 +2875,102 @@ class RecordCommandlike(object):
 
         return False
 
-    SED_SKIP_SHORT = (
-        "-a",  # BSD-only
-        "-l",  # BSD-only
-        "-n",
-        "-E",
-        "-r",
-        "-s",
-        "-u",
-        "-h",
-        "-z",
-        "-v",
-    )
-    SED_SKIP_LONG = (
-        "--quiet",
-        "--silent",
-        "--debug",
-        "--follow-symlinks",
-        "--posix",
-        "--regexp-extended",
-        "--separate",
-        "--sandbox",
-        "--unbuffered",
-        "--help",
-        "--null-data",
-        "--version",
-    )
-
-    def handle_external_sed(self, cmd_ob, args, name, text):
+    def handle_external_sed(self, parsed, cmd_ob, args, name, text):
         """
         We want to check sed expressions on the CLI. They can
         either come after an -e/--expression flag, or they can
         be the first ~positional argument as long as -e or -f
         or --expression or --file weren't used.
+
+        This is also the main example of how to override a handler
+        for a command that can't skate by with the generic handler.
+        - return True if this is now handled (will try any additional
+          parsers before failing if it isn't handled)
         """
-        logger.debug("trying external sed %r", cmd_ob)
-        i = 1
-        found_expr = False
-        while i < len(args.argv):
-            arg = args.argv[i]
-            logger.debug("trying arg[%d]: %r", i, arg)
-            if arg[0] == "-":
-                if arg[1] in ("e", "f"):
-
-                    if self._find_sed_e_cmd(args.argv[i + 1]):
-                        observe(
-                            SedECommand,
-                            word=cmd_ob.words[i + 1],
-                            arena=self.arena,
-                        )
-                    found_expr = True
-                    i += 2
-                elif arg[1] == "-":
-                    if arg.startswith("--expression") or arg.startswith("--file"):
-                        if self._find_sed_e_cmd(args.argv[i + 1]):
-                            observe(
-                                SedECommand,
-                                word=cmd_ob.words[i + 1],
-                                arena=self.arena,
-                            )
-                        found_expr = True
-                    elif arg.split("=")[0] in self.SED_SKIP_LONG:
-                        i += 1
-                    elif arg.startswith("--inplace"):
-                        i += 2 if "=" in arg else 1
-                    elif arg.startswith("--line-length"):
-                        i += 2 if "=" in arg else 1
-                elif arg in self.SED_SKIP_SHORT:
-                    i += 1
-                elif arg.startswith("-i "):
-                    i += 2
-                elif arg.startswith("-i"):
-                    i += 1
-
-                continue
-
-            # goal: if we ever get to the end of this loop,
-            # assume we've found positional arg 1
-            if not found_expr:
-                if self._find_sed_e_cmd(args.argv[i]):
+        if parsed.expression:
+            for expression in parsed.expression:
+                if self._find_sed_e_cmd(expression):
+                    word, pos = find_word_and_pos(expression, cmd_ob, args)
                     observe(
                         SedECommand,
-                        word=cmd_ob.words[i],
+                        word=word,
+                        span_id=pos,
                         arena=self.arena,
                     )
+            return True
+        elif not parsed.file and parsed.script:
+            # trailing positional expression
+            if self._find_sed_e_cmd(parsed.script):
+                word, pos = find_word_and_pos(parsed.script, cmd_ob, args)
+                observe(
+                    SedECommand,
+                    word=word,
+                    span_id=pos,
+                    arena=self.arena,
+                )
+            return True
 
-            break
+    def handle_external_generic(self, parsed, cmd_ob, args, name, text):
+        if parsed.command:
+            subcmd = None
+            try:
+                subcmd = parsed.command.split()[0]
+            except AttributeError as e:
+                subcmd = parsed.command[0].split()[0]
 
-    def handle_external_sudo(self, cmd_ob, args, name, text):
-        """
-        note that a few of these shouldn't get resolved at all
-        NO: sudo -h | -K | -k | -V
-        NO: sudo -v [-AknS] [-g group] [-h host] [-p prompt] [-u user]
-        NO: sudo -e [-AknS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] file ...
-        YES: sudo -l [-AknS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
-        YES: sudo [-AbEHknPS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
-        """
-        # 1. weed out sudo forms that don't need resolving
-        # note: some of these long forms aren't known correct
-        #       because sudo re-uses a lot of flags
-        if len(args.argv) > 1 and args.argv[1] not in (
-            "-h",
-            "--help",
-            "-K",
-            "--remove-timestamp",
-            "-k",
-            "--reset-timestamp",
-            "-V",
-            "--version",
-            "-v",
-            "--validate",
-            "-e",
-            "--edit",
-        ):
-            # supposedly -l form is the only one that supports vars
-            if args.argv[1] == "-l":
-                return self.handle_external_sudo_options(cmd_ob, args, name, text)
-            else:
-                # 2. we need to special-case `--preserve-env=` because there's a
-                #    zero-arg form without the =
-                new_ob, new_args, new_text = self._strip_varlikes(cmd_ob, args)
+            cmdlike = cmdlikes[subcmd]
+
+            subcmd_word, pos = find_word_and_pos(subcmd, cmd_ob, args)
+
+            """
+            CAUTION: I'm not very happy about the use of trim here.
+            Before, we were iterating through args manually and had
+            good position information on where we hit a match. I've
+            refactored all of this on top of argparse because all of
+            the command-parsing logic was getting too complex and
+            repetitious, but this also means we no longer have a great
+            sense of what position we matched in.
+
+            I've grafted in this trim-position context as a way to
+            figure out how many words to knock off the beginning of
+            the command object, but the whole enterprise is risky in
+            pathological buffalo buffalo buffalo cases
+            """
+
+            if pos:
+                # presumably a real command we need to recurse on
+                new_cmd = copy.deepcopy(cmd_ob)
+                trim = 0
+                for word in cmd_ob.words:
+                    if word == subcmd_word:
+                        break
+                    trim += 1
+
+                del new_cmd.words[0:trim]
+                solution = None
+                if pos in self.solutions:
+                    solution = self.solutions[pos]
+                else:
+                    solution = self.solutions[pos] = cmdlike.request_external_solution(
+                        self, new_cmd
+                    )
+                    self.word_objects[pos] = subcmd_word
+
                 logger.debug(
-                    "replaced %r %r %r===%r", cmd_ob, new_ob, name, new_args.argv[0]
-                )
-                return self.handle_external_sudo_options(
-                    new_ob, new_args, new_args.argv[0], new_text
+                    "while handling external flag for %r, recorded solution=%r at pos=%r",
+                    new_cmd,
+                    solution,
+                    pos,
                 )
 
-    handle_external_xargs = _handle_executable_ignoring_args(
-        0,
-        (
-            # gnu
-            ("-0", 0),
-            ("--null", 0),
-            ("-a", 1),
-            ("--arg-file", 1),
-            ("-d", 1),
-            ("--delimiter", 1),
-            ("-E", 1),
-            ("-e=", 1),
-            ("--eof=", 0),  # not certain
-            ("-I", 1),
-            ("-i=", 1),
-            ("--replace=", 1),
-            ("-L", 1),
-            ("--max-lines", 1),
-            ("-l", 1),  # TODO: this one probably needs special support
-            ("-n", 1),
-            ("--max-args", 1),
-            ("-o", 0),
-            ("--open-tty", 0),
-            ("-P", 1),
-            ("--max-procs", 1),
-            ("-p", 0),
-            ("--interactive", 0),
-            ("--process-slot-var", 1),
-            ("-r", 0),
-            ("--no-run-if-empty", 0),
-            ("-s", 1),
-            ("--max-chars", 1),
-            ("--show-limits", 0),
-            ("-t", 0),
-            ("--verbose", 0),
-            ("-x", 0),
-            ("--exit", 0),
-            ("--help", 0),  # TODO: not really sure if help/vers are needed
-            ("--version", 0),
-            # bsd seems to have at least one extra
-            ("-J", 1),
-        ),
-    )
+                if not solution.solved:
+                    cmdlike.resolve()
 
-    handle_external_rlwrap = _handle_executable_ignoring_args(
-        0,
-        (
-            ("-a", 1),
-            ("--always-readline", 1),
-            ("-A", 0),
-            ("--ansi-colour-aware", 0),
-            ("-b", 1),
-            ("--break-chars", 1),
-            ("-c", 0),
-            ("--complete-filenames", 0),
-            ("-C", 1),
-            ("--command-name", 1),
-            ("-D", 1),
-            ("--history-no-dupes", 1),
-            ("-e", 1),
-            ("--extra-char-after-completion", 1),
-            ("-f", 1),
-            ("--file", 1),
-            ("-g", 1),
-            ("--forget-matching", 1),
-            ("-h", 0),
-            ("--help", 0),
-            ("-H", 1),
-            ("--history-filename", 1),
-            ("-i", 0),
-            ("--case-insensitive", 0),
-            ("-I", 0),
-            ("--pass-sigint-as-sigterm", 0),
-            ("-l", 1),
-            ("--logfile", 1),
-            ("-m", 1),
-            ("--multi-line", 1),
-            ("-M", 1),
-            ("--multi-line-ext", 1),
-            ("-n", 0),
-            ("--no-warnings", 0),
-            ("-N", 0),
-            ("--no-children", 0),
-            ("-o", 0),
-            ("--one-shot", 0),
-            ("-O", 1),
-            ("--only-cook", 1),
-            ("-p", 1),
-            ("--prompt-colour", 1),
-            ("-P", 1),
-            ("--pre-given", 1),
-            ("-q", 1),
-            ("--quote-characters", 1),
-            ("-r", 0),
-            ("--remember", 0),
-            ("-R", 0),
-            ("--renice", 0),
-            ("-s", 1),
-            ("--histsize", 1),
-            ("-S", 1),
-            ("--substitute-prompt", 1),
-            ("-t", 1),
-            ("--set-term-name", 1),
-            ("-U", 0),
-            ("--mirror-arguments", 0),
-            ("-v", 0),
-            ("--version", 0),
-            ("-w", 1),
-            ("--wait-before-prompt", 1),
-            ("-W", 0),
-            ("--polling", 0),
-            # TODO: these last two may need their own
-            # resolution? unsure.
-            ("-z", 1),
-            ("--filter", 1),
-        ),
-    )
-    handle_external_sqlite3 = _handle_executable_flag("--cmd")
+                return True
 
     def look_for_external_sub_execution(self, outer, cmd_object):
         global decided_execers, lore
+
         args, name, text = self.get_subexec_context(cmd_object)
 
         logger.debug(
@@ -3094,18 +3082,42 @@ class RecordCommandlike(object):
                 if solution.solved:
                     return
 
-        handler = getattr(self, "handle_external_{:}".format(name), None)
-        if handler:
-            logger.debug(
-                "calling %r(ob=%r, args=%r, name=%r, text=%r)",
-                handler,
-                cmd_object,
-                args,
-                name,
-                text,
-            )
-            handler(cmd_object, args, name, text)
-            return
+        global externals
+        # tentatively try knocking out varlikes for everyone?
+        cmd_object, args, text = self._strip_varlikes(cmd_object, args)
+
+        if externals[name]:
+            for parser in externals[name]:
+                parsed = _unparsed = None
+                parsed = parser.parse_known_args(args.argv)
+                if not parsed:
+                    logger.debug("parse failed (parser=%r, args=%r)", parser, args)
+                    continue
+                else:
+                    parsed, _unparsed = parsed
+                    # see sudo parser for example
+                    if "skip" in parsed and parsed.skip:
+                        continue
+
+                handler = getattr(
+                    self,
+                    "handle_external_{:}".format(name),
+                    self.handle_external_generic,
+                )
+                logger.debug(
+                    "parsed %r args %r (unparsed: %r)", parser, parsed, _unparsed
+                )
+                logger.debug(
+                    "calling %r(parsed=%r, ob=%r, args=%r, name=%r, text=%r)",
+                    handler,
+                    parsed,
+                    cmd_object,
+                    args,
+                    name,
+                    text,
+                )
+                if handler(parsed, cmd_object, args, name, text):
+                    return
         elif outer in subcommand_re:
             logger.debug("name %r has subcommand regex", outer)
             logger.debug("about to search %r for %r", text, subcommand_re[outer])
@@ -3420,7 +3432,7 @@ class ResolvedScript(RecordCommandlike):
                         self.in_doc_directives.keep.update(
                             directive_keep(line[17:].strip())
                         )
-                except argparse.ArgumentTypeError as e:
+                except ourparse.ArgumentTypeError as e:
                     raise InFileDirectiveError(e.message, path, line)
             elif line.startswith(
                 "### resholve directives (auto-generated) ## format_version: "
@@ -3499,23 +3511,7 @@ class ResolvedScript(RecordCommandlike):
         # if the user has specified a prepend string, find the first
         # actual code span, so that we can inject before it.
         if self.prologue:
-            first_span = 0
-
-            first_node = self.root
-            while True:
-                if hasattr(first_node, "spids") and len(first_node.spids):
-                    first_span = first_node.spids[0]
-                    break
-                if hasattr(first_node, "words"):
-                    first_span = word_.LeftMostSpanForWord(first_node.words[0])
-                    break
-                first_node = first_node.children[0]
-
-            assert first_span <= replacements[0], (
-                "First identified code span (%r) is unexpectedly later than the first identified replacement (%r)."
-                % (first_span, replacements[0])
-            )
-
+            first_span = find_earliest_spid(self.root)
             cursor.PrintUntil(first_span)
             to.write("\n# begin prologue inserted by resholve\n")
             to.write(self.prologue.read())
@@ -3733,7 +3729,7 @@ class ResolvedScript(RecordCommandlike):
             else:
                 self.record_general_cmd(fw_ob, fw_txt, cmd_ob)
             # handle essential builtins immediately
-            if fw_txt in FIRST_PASS_ESSENTIALS:
+            if fw_txt in sorted(FIRST_PASS_ESSENTIALS):
                 cmdlike = cmdlikes[fw_txt]
                 logger.debug(
                     "FIRST_PASS_ESSENTIAL (%r): %r %r", fw_txt, cmdlike, cmd_ob

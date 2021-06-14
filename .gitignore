@@ -1,4 +1,5 @@
-# resholved specific
+# resholve specific
+.local.nix
 *.resolved
 *.todo
 flarf/

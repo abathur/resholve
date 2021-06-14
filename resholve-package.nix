@@ -10,11 +10,11 @@
 let
   inherit stdenv;
   /* These functions break up the work of partially validating the
-   * 'solutions' attrset and massaging it into env/cli args.
-   *
-   * Note: some of the left-most args do not *have* to be passed as
-   * deep as they are, but I've done so to provide more error context
-   */
+    'solutions' attrset and massaging it into env/cli args.
+
+    Note: some of the left-most args do not *have* to be passed as
+    deep as they are, but I've done so to provide more error context
+  */
 
   # for brevity / line length
   spaces = l: builtins.concatStringsSep " " l;
@@ -72,11 +72,7 @@ let
   /* Build a single resholve invocation */
   makeInvocation = solution: value:
     if validateSolution value then
-      # TODO/DOING: one of a few things MUST be true:
-      # 1. resholve has a semantic way to pass separate files (and the code here figures out how to deliver)
-      # 2. we pass resholve a directory (and it errors if the correct lorefiles aren't present?)
-      # 3. binlore's format gets collapsed down into a single file, presumably with a leading type specifier on every line (bleh)
-      # 4. ?
+    # we pass resholve a directory
       "RESHOLVE_LORE=${binlore.collect { drvs = value.inputs; } } ${makeEnvs solution value} resholve --overwrite ${makeArgs value}"
     else throw "invalid solution"; # shouldn't trigger for now
 
@@ -88,13 +84,14 @@ let
     // {
     inherit pname version src;
     buildInputs = [ resholve ];
+
     # enable below for verbose debug info if needed
     # supports default python.logging levels
     # LOGLEVEL="INFO";
     /*
-    subshell/PS4/set -x and : command to output resholve envs
-    and invocation. Extra context makes it clearer what the
-    Nix API is doing, makes nix-shell debugging easier, etc.
+      subshell/PS4/set -x and : command to output resholve envs
+      and invocation. Extra context makes it clearer what the
+      Nix API is doing, makes nix-shell debugging easier, etc.
     */
     preFixup = ''
       (
