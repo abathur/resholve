@@ -230,6 +230,20 @@ builtin_overridden="FEEDBACK WANTED: Essential builtin overridden by"
 resholve --interpreter $INTERP builtin_overridden.sh
 CASES
 
+bad_word_eval="FEEDBACK WANTED: OSH eval error while looking for sub-exec in"
+@test "verify warnings are thrown for OSH eval errors" {
+  require <({
+    status 0
+    # 4 first because essential builtins
+    # get handled ~immediately
+    line 3 contains "bad_word_eval.sh:4: $bad_word_eval essential builtin 'eval'"
+    line 7 contains "bad_word_eval.sh:2: $bad_word_eval general builtin 'exec'"
+    line 11 contains "bad_word_eval.sh:3: $bad_word_eval external 'env'"
+  })
+} <<CASES
+RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP bad_word_eval.sh
+CASES
+
 @test "Buffalo buffalo Buffalo buffalo buffalo buffalo Buffalo buffalo" {
   require <({
     status 0

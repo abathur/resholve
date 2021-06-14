@@ -3,19 +3,18 @@
 , python27Packages
 , installShellFiles
 , rSrc
+, version
 , bash
 , oildev
 , binlore
 }:
-let
-  version = "0.5.1";
-  # rSrc = ./.;
-in
+
 python27Packages.buildPythonApplication {
   pname = "resholve";
   inherit version;
   src = rSrc;
   format = "other";
+  dontBuild = true;
 
   nativeBuildInputs = [ installShellFiles ];
 
@@ -38,12 +37,13 @@ python27Packages.buildPythonApplication {
     rm $out/nix-support/propagated-build-inputs
   '';
 
+  passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc; inherit binlore; };
+
   meta = with lib; {
     description = "Resolve external shell-script dependencies";
     homepage = "https://github.com/abathur/resholve";
     license = with licenses; [ mit ];
     maintainers = with maintainers; [ abathur ];
     platforms = platforms.all;
-    passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc; inherit binlore; };
   };
 }

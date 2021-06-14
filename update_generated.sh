@@ -13,7 +13,7 @@ EOF
 echo '```'
 } > timings.md
 
-update_demo(){
+gen_demo(){
 	cat - result/demo.txt <<'EOF'
 # Demos
 I've built two different demos to illustrate what you can do with resholve--one for resholve itself, and the other shows the Nix integration.
@@ -77,6 +77,10 @@ $ nix-build ci.nix
 EOF
 
 echo '```'
+}
+
+update_demo(){
+	gen_demo | sed -E 's@/nix/store/[a-z0-9]{32}-@/nix/store/...-@g'
 } > demos.md
 
 update_manual(){

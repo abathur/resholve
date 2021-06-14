@@ -1,17 +1,18 @@
 { pkgs ? import <nixpkgs> { } }:
 
-let
-  rSrc = ./.;
-  deps = pkgs.callPackage (rSrc + /deps.nix) { inherit rSrc; };
-in with pkgs; rec
+with pkgs; let
+  source = callPackage ./source.nix { };
+  deps = callPackage ./deps.nix { };
+in
+with pkgs; rec
 {
-  resholve = callPackage (rSrc + /resholve.nix) {
-    inherit rSrc;
+  resholve = callPackage ./resholve.nix {
+    inherit (source) rSrc;
+    inherit (source) version;
     inherit (deps) binlore;
     inherit (deps.oil) oildev;
-    # oildev = deps.oil.oildev;
   };
-  resholvePackage = callPackage (rSrc + /resholve-package.nix) {
+  resholvePackage = callPackage ./resholve-package.nix {
     inherit resholve;
     inherit (deps) binlore;
   };

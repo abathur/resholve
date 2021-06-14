@@ -1,12 +1,12 @@
 /*
-This shell is for using resholve--it builds and loads
-resholve itself, not just resholve's dependencies.
+  This shell is for using resholve--it builds and loads
+  resholve itself, not just resholve's dependencies.
 */
-{ pkgs ? import <nixpkgs> { }, rSrc ? ./. }:
+{ pkgs ? import <nixpkgs> { } }:
 
 with pkgs;
 let
-  deps = pkgs.callPackage (rSrc + /deps.nix) { inherit rSrc; };
+  deps = callPackage ./deps.nix { };
   resholve = (callPackage ./default.nix { }).resholve;
   resolveTimeDeps = [ coreutils file findutils gettext ];
 in

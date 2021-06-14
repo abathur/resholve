@@ -25,115 +25,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
 # logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
 
-import oil
-import importlib
-
-"""
-This is all a little arcane, so it's worth explaining a bit.
-
-Oil isn't really packaged as a library. Initially I forked
-and packaged for expediency, and because I was hoping to be
-able to upstream the package definition. Oil has resisted
-this, but I also want to minimize the work it takes to get
-caught up with upstream at any given time.
-
-Unfortuately, forcing a namespace on Oil and using it in
-resholve isn't enough on its own.
-
-A byproduct of the fact that it isn't already packaged and
-that it runs on python2, is that oil's internal imports
-aren't namespaced, and are a bit of a nest. Some of the
-package names are generic (i.e., "misc", and "tools"), so
-I want to force a namespace on oil, but without having to
-fork and maintain a large change.
-
-Thus, we're here monkeypatching __builtins__.__import__ in
-order to (try) to:
-- detect when something in oil is importing
-- try first to prefix it with "oil." and fall back if not
-  (this should import oil stuff from oil., but not block
-  batteries and other packages)
-
-TODO: This isn't terribly rigorous. A marginal improvement
-would be generating a list of packages (or maybe the whole
-tree) at build time, and only fiddling with these.
-
-CAUTION: There's a demon in here. It's possible for different
-paths to lead to distinct imports, and for isinstance() to
-fail on some things it should succeed on.
-"""
-import_cache = dict()
-# TODO: I don't like hard-coding these
-_oil_extensions = {
-    "fastlex",
-    "libc",
-    "lineinput",
-    "posix_",
-}
-
-
-def _import(name, *args):
-    _globals, _locals, _ids = args[0:3]
-    _lvl = args[3] if len(args) > 3 else -1
-
-    current_file = _globals["__file__"]
-    ret = None
-    if "/oil/" in current_file and name not in _oil_extensions:
-        # logger.debug("rewrite oil's imports to %r", name)
-        oilyname = "oil." + name
-        if name in import_cache and oilyname in import_cache:
-            # logger.debug("both name and oilyname are in import_cache; returning early")
-            if id(import_cache[oilyname]) != id(import_cache[name]):
-                raise Exception("Module IDs differ")
-            return import_cache[name]
-        try:
-            ret = original_import(oilyname, _globals, _locals, _ids, _lvl)
-            # logger.debug(
-            #     "putting %r in import cache with name %r and id %r",
-            #     ret,
-            #     oilyname,
-            #     id(ret),
-            # )
-            import_cache[oilyname] = ret
-
-            # but also add it under the un-rewritten name
-            sys.modules[name] = ret
-
-            if (
-                len(
-                    set(
-                        [
-                            id(ret),
-                        ]
-                    )
-                )
-                > 1
-            ):
-                raise Exception("Module IDs unexpectedly differ")
-        except ImportError:
-            ret = original_import(name, _globals, _locals, _ids, _lvl)
-            # logger.debug(
-            #     "putting %r in import cache with name %r and id %r", ret, name, id(ret),
-            # )
-            import_cache[name] = ret
-
-    if not ret:
-        ret = original_import(name, _globals, _locals, _ids, _lvl)
-        # logger.debug(
-        #     "putting %r in import cache with name %r and id %r", ret, name, id(ret)
-        # )
-        import_cache[name] = ret
-
-    # logger.debug(
-    #     "%r is trying to import %r and we're returning %r ", current_file, name, ret
-    # )
-
-    return ret
-
-
-original_import = __builtins__.__import__
-__builtins__.__import__ = _import
-
 """
 NOTE:
 All of the below are imports from/for oil. Try to keep careful notes
@@ -490,7 +381,7 @@ class LoreType(object):
         )
 
     def __init__(self, lore_kinds):
-        """"""
+        """ """
         self.lore_kinds = lore_kinds
 
     # TODO: see if you can fold ingest_lore in for better
@@ -1070,6 +961,39 @@ def punshow():
         return 2
 
 
+def find_earliest_spid(node):
+    """
+    I'll focus on the goal rather than mislead you with assertions about
+    what this does (I'm not confident I understand all of the underlying
+    variation within oil on this point).
+
+    The old assumption was that, when a node has an spids list, the first
+    item in the list is the earliest spid under the umbrella. That is
+    usually true, and has held water for many months, but I've found at
+    least one case with command.AndOr nodes where the leftmost spid in
+    this array is actually for the && or || token.
+
+    We really do want the earliest spid, because we want to be able to
+    inject a prologue at that point. So, we'll try to descend the ~edge
+    of the AST, keeping the lowest spid we find.
+    """
+    node_spid = sub_spid = None
+    if hasattr(node, "spids") and node.spids and len(node.spids):
+        node_spid = node.spids[0]
+    elif hasattr(node, "span_id"):
+        node_spid = node.span_id
+
+    if hasattr(node, "children"):
+        sub_spid = find_earliest_spid(node.children[0])
+    elif hasattr(node, "words"):
+        sub_spid = find_earliest_spid(node.words[0])
+    elif hasattr(node, "parts"):
+        sub_spid = find_earliest_spid(node.parts[0])
+
+    # min will return a None, so fail down the list just in case
+    return min(node_spid, sub_spid) or node_spid or sub_spid
+
+
 def find_dynamic_token(part):
     # type: (word_part_t) -> token|bool
     """Recursive search for dynamic token.
@@ -1323,6 +1247,11 @@ class NixSetuidWrapper(Detain):
     )
     status = 12
     issue = 29
+
+
+class OshEvalProblem(Census):
+    problem = "OSH eval error while looking for sub-exec in %s %r."
+    issue = 30
 
 
 class OverriddenEssentialBuiltin(Census):
@@ -1929,7 +1858,28 @@ class CommandLike(object):
                         source, "handle_builtin_{:}".format(self.name), None
                     )
                     if handler:
-                        args, name, text = source.get_subexec_context(cmd_object)
+                        try:
+                            # try/except hopefully obsoleted in
+                            # https://github.com/oilshell/oil/issues/956
+                            args, name, text = source.get_subexec_context(cmd_object)
+                        except (AssertionError, error.FatalRuntime) as e:
+                            err_attrs = {
+                                key: value
+                                for key, value in (
+                                    (attr, getattr(e, attr, None))
+                                    for attr in ("word", "part", "token", "span_id")
+                                )
+                                if value
+                            }
+                            observe(
+                                OshEvalProblem,
+                                "general builtin",
+                                self.name,
+                                arena=source.arena,
+                                **err_attrs
+                            )
+                            continue
+
                         handler(cmd_object, args, name, text)
 
             elif solution.kind == "external" and isinstance(
@@ -2261,6 +2211,8 @@ class RecordCommandlike(object):
         if len(cmd_ob.words) > 1:
             # presumably a real command we need to recurse on
             subcmd = args.argv[1] or cmd_ob.words[1].parts[0].val
+            subcmd_ob = copy.deepcopy(cmd_ob)
+            del subcmd_ob.words[0]
             pos = args.arg_spids[1]
             cmdlike = cmdlikes[subcmd]
 
@@ -2269,7 +2221,7 @@ class RecordCommandlike(object):
                 solution = self.solutions[pos]
             else:
                 solution = self.solutions[pos] = cmdlike.request_external_solution(
-                    self, cmd_ob
+                    self, subcmd_ob
                 )
                 self.word_objects[pos] = cmd_ob.words[1]
 
@@ -2283,7 +2235,27 @@ class RecordCommandlike(object):
 
     def look_for_essential_builtin_sub_execution(self, outer, cmd_object):
         global subcommand_re
-        args, name, text = self.get_subexec_context(cmd_object)
+        try:
+            # try/except hopefully obsoleted in
+            # https://github.com/oilshell/oil/issues/956
+            args, name, text = self.get_subexec_context(cmd_object)
+        except (AssertionError, error.FatalRuntime) as e:
+            err_attrs = {
+                key: value
+                for key, value in (
+                    (attr, getattr(e, attr, None))
+                    for attr in ("word", "part", "token", "span_id")
+                )
+                if value
+            }
+            observe(
+                OshEvalProblem,
+                "essential builtin",
+                outer,
+                arena=self.arena,
+                **err_attrs
+            )
+            return
 
         if name == ".":  # remap
             name = "source"
@@ -2314,7 +2286,7 @@ class RecordCommandlike(object):
         i = len(cmd_ob.words)
         while i > 0:
             i -= 1
-            if new_cmd.words[i].parts[0].id == Id.Lit_VarLike:
+            if getattr(new_cmd.words[i].parts[0], "id", None) == Id.Lit_VarLike:
                 del new_cmd.words[i]
                 del new_args.argv[i]
                 del new_args.arg_spids[i]
@@ -2983,7 +2955,22 @@ class RecordCommandlike(object):
 
     def look_for_external_sub_execution(self, outer, cmd_object):
         global decided_execers, lore
-        args, name, text = self.get_subexec_context(cmd_object)
+
+        try:
+            # try/except hopefully obsoleted in
+            # https://github.com/oilshell/oil/issues/956
+            args, name, text = self.get_subexec_context(cmd_object)
+        except (AssertionError, error.FatalRuntime) as e:
+            err_attrs = {
+                key: value
+                for key, value in (
+                    (attr, getattr(e, attr, None))
+                    for attr in ("word", "part", "token", "span_id")
+                )
+                if value
+            }
+            observe(OshEvalProblem, "external", outer, arena=self.arena, **err_attrs)
+            return
 
         logger.debug(
             "look_for_external_sub_execution0: %r %r outer=%r name=%r %r",
@@ -3499,23 +3486,7 @@ class ResolvedScript(RecordCommandlike):
         # if the user has specified a prepend string, find the first
         # actual code span, so that we can inject before it.
         if self.prologue:
-            first_span = 0
-
-            first_node = self.root
-            while True:
-                if hasattr(first_node, "spids") and len(first_node.spids):
-                    first_span = first_node.spids[0]
-                    break
-                if hasattr(first_node, "words"):
-                    first_span = word_.LeftMostSpanForWord(first_node.words[0])
-                    break
-                first_node = first_node.children[0]
-
-            assert first_span <= replacements[0], (
-                "First identified code span (%r) is unexpectedly later than the first identified replacement (%r)."
-                % (first_span, replacements[0])
-            )
-
+            first_span = find_earliest_spid(self.root)
             cursor.PrintUntil(first_span)
             to.write("\n# begin prologue inserted by resholve\n")
             to.write(self.prologue.read())

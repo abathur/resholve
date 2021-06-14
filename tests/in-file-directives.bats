@@ -14,7 +14,7 @@ load helpers
     line -1 contains "error:  While parsing resholve directives already in this script, I encountered an 'allow' directive from resholve(d)'s pre-history. The program no longer supports this directive format--you'll have to re-resholve this script with a modern version."
   })
 } <<CASES
-resholve --interpreter $INTERP directives_v1_shunit2.sh
+resholve --interpreter $INTERP directives_v1.sh
 CASES
 
 # TODO: exhaustive v2 directive case

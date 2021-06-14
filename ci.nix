@@ -1,19 +1,20 @@
-{ pkgs ? import <nixpkgs> { }, rSrc ? ./. }:
+{ pkgs ? import <nixpkgs> { }, source ? pkgs.callPackage ./source.nix { } }:
 
 with pkgs;
 let
-  deps = pkgs.callPackage (rSrc + /deps.nix) { inherit rSrc; };
+  deps = pkgs.callPackage ./deps.nix { };
   inherit (callPackage ./default.nix { })
     resholve resholvePackage;
   inherit (callPackage ./test.nix {
     inherit resholve resholvePackage;
-    inherit rSrc;
+    inherit (source) rSrc;
     inherit (deps) binlore;
     runDemo = true;
   })
     module1 module2 module3 cli;
 
-in runCommand "resholve-ci" { } ''
+in
+runCommand "resholve-ci" { } ''
   mkdir $out
   printf "\033[33m============================= resholve Nix demo ===============================\033[0m\n"
   env -i ${module3}/bin/conjure.sh |& tee nix-demo.ansi
