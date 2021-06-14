@@ -506,7 +506,7 @@ class LoreType(object):
         try:
             for kind in self.lore_kinds:
                 reader = getattr(self, kind)
-                return next(reader(value.split()))
+                return list(reader(value.split()))
         except Exception as e:
             raise argparse.ArgumentTypeError(
                 "%s must be a colon-delimited string. Got: %r"
@@ -546,6 +546,11 @@ class LoreType(object):
                 "'execers' (and optionally one named "
                 "'wrappers')." % e
             )
+
+
+class Accumulate(argparse.Action):
+    def __call__(self, _parser, ns, vals, *args):
+        setattr(ns, self.dest, (getattr(ns, self.dest) or []) + vals)
 
 
 lookup = None
@@ -601,6 +606,7 @@ def make_arg_parser(module):
         add_env_var_help=False,
         add_help=False,
     )
+    parser.register("action", "accumulate", Accumulate)
 
     req = parser.add_argument_group(
         title="Required",
@@ -695,15 +701,15 @@ def make_arg_parser(module):
         "--execer",
         type=LoreType(("execers",)),
         metavar="str",
-        action="append",
-        help="lorefile TODO",
+        action="accumulate",
+        help="single execer directive",
     )
     res.add_argument(
         "--wrapper",
         type=LoreType(("wrappers",)),
         metavar="str",
-        action="append",
-        help="lorefile TODO",
+        action="accumulate",
+        help="single wrapper directive",
     )
     res.add_argument(
         "--assay",
