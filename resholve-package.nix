@@ -91,12 +91,19 @@ let
     # enable below for verbose debug info if needed
     # supports default python.logging levels
     # LOGLEVEL="INFO";
+    /*
+    subshell/PS4/set -x and : command to output resholve envs
+    and invocation. Extra context makes it clearer what the
+    Nix API is doing, makes nix-shell debugging easier, etc.
+    */
     preFixup = ''
-      pushd "$out"
-      set -x # TODO: temporary for debug/clarity
-      ${builtins.concatStringsSep "\n" (makeCommands solutions)}
-      set +x
-      popd
+      (
+        cd "$out"
+        PS4=$'\x1f'"\033[33m[resholve context]\033[0m "
+        set -x
+        : changing directory to $PWD
+        ${builtins.concatStringsSep "\n" (makeCommands solutions)}
+      )
     '';
   }));
 in
