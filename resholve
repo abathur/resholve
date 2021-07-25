@@ -2816,7 +2816,7 @@ class RecordCommandlike(object):
     def handle_builtin_exec(self, cmd_ob, args, name, text):
         if len(cmd_ob.words) > 1:
             # presumably a real command we need to recurse on
-            subcmd = args.argv[1] or cmd_ob.words[1].parts[0].val
+            subcmd = args.argv[1] or get_next_val(cmd_ob.words[1])
             subcmd_ob = copy.deepcopy(cmd_ob)
             del subcmd_ob.words[0]
             pos = args.arg_spids[1]

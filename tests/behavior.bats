@@ -238,23 +238,3 @@ CASES
 } <<CASES
 RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_FINDUTILS" resholve --interpreter $INTERP < buffalo.sh
 CASES
-
-@test "Override variable used as first-word/command" {
-  require <({
-    status 0
-    line 3 begins '/nix/store'
-    line 3 ends '/bin/file resholver'
-    line 4 begins '"/nix/store'
-    line 4 ends '/bin/file" resholver'
-    line 5 begins '/nix/store'
-    line 5 ends '/bin/file resholver'
-    line 6 begins '"/nix/store'
-    line 6 ends '/bin/file" resholver'
-    line 7 begins '/nix/store'
-    line 7 ends '/bin/file resholver'
-    line 8 begins '"/nix/store'
-    line 8 ends '/bin/file" resholver'
-  })
-} <<CASES
-resholve --interpreter $INTERP --fix '\$FILE_CMD:file' < file_var.sh
-CASES
