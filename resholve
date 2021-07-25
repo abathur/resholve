@@ -14,7 +14,7 @@ import re
 import csv
 
 from subprocess import Popen, PIPE
-from contextlib import contextmanager, nested
+from contextlib import contextmanager
 
 import argparse as theirparse  # external command parsers
 import configargparse as ourparse  # resholve's own parser
@@ -71,9 +71,25 @@ from oil._devbuild.gen.syntax_asdl import (
     double_quoted,  # directly for cast(), also subcmd parse
     single_quoted,  # subcmd parse
     Token,  # directly for cast(), also for alias parsing
+    simple_var_sub,
+    braced_var_sub,
 )
 
 from oil.tools import osh2oil  # Cursor
+
+# TODO:
+# - I don't want to scope-creep atm, but this approach might
+#   simplify the ~walk for commands and such as well.
+# - maybe should be using ordered sets?
+def jeepers_peepers(self, *args, **kwargs):
+    self._old_init(*args, **kwargs)
+    self.members.add(self)
+
+
+for peep in (simple_var_sub, braced_var_sub):
+    peep.members = set()
+    peep._old_init = peep.__init__
+    peep.__init__ = jeepers_peepers
 
 
 def span_pair(word_object, arena):
@@ -138,6 +154,21 @@ def get_next_val(word):
 
 class ResolutionDirectives(object):
     fake = fix = keep = None
+
+    @property
+    def varsubs(self):
+        """
+        It's a little wasteful if we end up needing these
+        more than once, but at the moment we don't, and it
+        takes more logic to "ingest" them into their own var
+        in even a hackish way, let alone a principled/safe
+        one...
+        """
+        return {
+            k[1:]: v
+            for k, v in filter(lambda x: isinstance(x, tuple) and len(x) == 2, self.fix)
+            if k.startswith("$")
+        }
 
     def __init__(self, fake=None, fix=None, keep=None):
         self.fake = fake or set()
@@ -276,14 +307,12 @@ def directive_fix(value):
                 )
         elif len(directive) == 2:
             # we can't validate $variable or outer_command before parse
-            # but we can pre-validate command lookup for the target
-            target = lookup(directive[1])
-            if not target:
-                raise ourparse.ArgumentTypeError(
-                    "I couldn't resolve '{command}' in directive {scope}:{command}".format(
-                        scope=directive[0], command=directive[1]
-                    )
-                )
+            # we could pre-validate command lookup for a target, but we
+            # have to wait for the lookup() object... but it isn't a
+            # given that this will only be used to substitute commands.
+            # So, we'll just let it fail naturally during the regular
+            # parse.
+            pass
     return directives
 
 
@@ -968,6 +997,18 @@ def punshow():
         return 2
 
 
+"""
+TODO:
+there's a shifting reality wrt to directly using Oil's APIs for pos/spid.
+They worked for simple cases, but are getting leaky for more complex ones.
+
+I don't want to try to abstract them before I know how many distinct cases
+I have (I think at least two--finding the "first" spid as here, and more
+like finding the needle spid), but hopefully something more semantic and
+lucid will shake out by early 2022?
+"""
+
+
 def find_earliest_spid(node):
     """
     I'll focus on the goal rather than mislead you with assertions about
@@ -989,6 +1030,8 @@ def find_earliest_spid(node):
         node_spid = node.spids[0]
     elif hasattr(node, "span_id"):
         node_spid = node.span_id
+    elif hasattr(node, "token"):
+        node_spid = node.token.span_id
 
     if hasattr(node, "children"):
         sub_spid = find_earliest_spid(node.children[0])
@@ -1001,6 +1044,21 @@ def find_earliest_spid(node):
     return min(node_spid, sub_spid) or node_spid or sub_spid
 
 
+def get_original_text(arena, location, positions):
+    text = list()
+    for loc in range(location, location + positions):
+        span = arena.GetLineSpan(loc)
+        line = arena.GetLine(span.line_id)
+        text.append(line[span.col : span.col + span.length])
+        logger.debug(
+            "identified span=%r, line=%r, text=%r",
+            span,
+            line,
+            text,
+        )
+    return "".join(text)
+
+
 def find_dynamic_token(part):
     # type: (word_part_t) -> token|bool
     """Recursive search for dynamic token.
@@ -1008,6 +1066,10 @@ def find_dynamic_token(part):
     This is patterned on oil's word_._EvalWordPart, but with
     roughly inverted boolean logic: it returns the token object
     if one is found, otherwise False.
+
+    TODO: I'm parroting oil's casting process here. IDK if it
+    is actually necessary for my use, nor what kind of behavior/
+    performance implications it has.
     """
     UP_part = part
     with tagswitch(part) as case:
@@ -1036,7 +1098,6 @@ def find_dynamic_token(part):
             return False
         elif case(word_part_e.CommandSub):
             return cast(Token, UP_part).left_token
-
         elif case(
             word_part_e.SimpleVarSub,
             word_part_e.BracedVarSub,
@@ -1911,6 +1972,7 @@ class Solution(object):
     """
 
     exception = kind = replacement = None
+    positions = 1
 
     def __repr__(self):
         if self.solved:
@@ -1923,9 +1985,10 @@ class Solution(object):
         else:
             return "Solution(unsolved {:})".format(self.kind)
 
-    def custom(self, kind, initial, replacement):
+    def custom(self, kind, initial, replacement, positions):
         self.replacement = (initial, replacement)
         self.kind = kind
+        self.positions = positions
         return self
 
     @property
@@ -2499,6 +2562,11 @@ class RecordCommandlike(object):
         self.solutions = dict()
         self.word_objects = dict()
 
+    @contextmanager
+    def consume_solutions(self):
+        yield self.solutions
+        self.solutions = dict()
+
     @classmethod
     def disable_alias_replacement(cls):
         cls.record_alias_cmd = cls._disabled_recorder
@@ -2507,7 +2575,13 @@ class RecordCommandlike(object):
         pass
 
     def get_word_position(self, word_object, position=None):
+        # see TODO/note above find_earliest_spid
         pos = position or word_.LeftMostSpanForWord(word_object)
+        if word_object.parts[0].__class__ in (
+            double_quoted,
+            single_quoted,
+        ):
+            pos += 1
         self.word_objects[pos] = word_object
         return pos
 
@@ -3325,7 +3399,6 @@ class ResolvedScript(RecordCommandlike):
         prologue=None,
         epilogue=None,
     ):
-        global evaluator
         # generally, defer work until we know the script loaded
         with (
             open(script_path) if script_path else io.BytesIO(sys.stdin.read())
@@ -3333,61 +3406,24 @@ class ResolvedScript(RecordCommandlike):
             if shebang:
                 script = self.replace_shebang(script, shebang)
 
-            arena = alloc.Arena()
-
-            # opts = state.InitOpts()
-
-            parse_ctx = parse_lib.ParseContext(
-                arena=arena,
-                parse_opts=optview.Parse(state.InitOpts(), NO_OPTIONS_OVERLAY),
-                aliases={},  # dummy
-                oil_grammar=None,
-            )
-            parse_ctx.Init_OnePassParse(True)
-
-            if script_path:
-                # TODO: is there a real difference between using mainfile and
-                # sourcedfile? (this gets re-used for sourced scripts)
-                arena.PushSource(source.MainFile(script_path))
-            else:
-                arena.PushSource(source.Stdin())
-
-            # Note: dict below is for envs, i.e. {"HOME": "/noplacelike"}
-            mem = state.Mem("", list(), dict(), arena)
-            parse_opts, exec_opts, mutable_opts = state.MakeOpts(mem, None)
-            mem.exec_opts = exec_opts
-
-            splitter = split.SplitContext(mem)
-            errfmt = ui.ErrorFormatter(arena)
-            # TODO: ask andy about these as well
-            evaluator = word_eval.CompletionWordEvaluator(
-                mem, exec_opts, mutable_opts, splitter, errfmt
-            )
-            evaluator.arith_ev = sh_expr_eval.ArithEvaluator(
-                mem, exec_opts, parse_ctx, errfmt
-            )
-            evaluator.arith_ev.word_ev = evaluator
-
-            # set([ (scope, identifier), ... ])
+            # each directive type is roughly:
+            # set([ (scope, ), (scope, identifier), ... ])
             self.directives = ResolutionDirectives()
             self.parse_directives(script, script_path)
 
-            try:
-                node = main_loop.ParseWholeFile(
-                    self._make_parser(parse_ctx, script, arena)
-                )
-            except error.Parse as e:
-                e.arena = arena
-                raise
+            # actually initialize
+            RecordCommandlike.__init__(self)
+            self.prologue = prologue
+            self.epilogue = epilogue
+
+            node = self.parse_script(script, script_path)
+            updated_script = self.substitute_vars()
+            if updated_script:
+                # if we substitute, parse again
+                node = self.parse_script(updated_script, script_path)
+                updated_script.close()
 
         assert node is not None
-
-        # actually initialize
-        RecordCommandlike.__init__(self)
-        self.arena = arena
-        self.root = node
-        self.prologue = prologue
-        self.epilogue = epilogue
 
         # "resolve"
         try:
@@ -3396,6 +3432,140 @@ class ResolvedScript(RecordCommandlike):
         except Forbid as e:
             e.print_if_needed()
             raise e
+
+    def parse_script(self, script, script_path):
+        global evaluator
+        self.arena = arena = alloc.Arena()
+
+        parse_ctx = parse_lib.ParseContext(
+            arena=arena,
+            parse_opts=optview.Parse(state.InitOpts(), NO_OPTIONS_OVERLAY),
+            aliases={},  # dummy
+            oil_grammar=None,
+        )
+        parse_ctx.Init_OnePassParse(True)
+
+        if script_path:
+            # TODO: is there a real difference between using mainfile and
+            # sourcedfile? (this gets re-used for sourced scripts)
+            arena.PushSource(source.MainFile(script_path))
+        else:
+            arena.PushSource(source.Stdin())
+
+        mem = state.Mem("", list(), arena, list())
+        parse_opts, exec_opts, mutable_opts = state.MakeOpts(mem, None)
+        mem.exec_opts = exec_opts
+        """
+        TODO:
+        I noted the dict below is for envs like {"HOME": "/noplacelike"}
+        but the underlying oil APIs have changed a little and I'm less
+        sure if this is still true or not. In any case, it wasn't the
+        place to deal with substituting vars.
+
+        Eventually, investigate/doc what this is doing (maybe it only
+        works for eval -> string?)
+        """
+        state._InitVarsFromEnv(mem, dict())
+
+        splitter = split.SplitContext(mem)
+        errfmt = ui.ErrorFormatter(arena)
+        # TODO: ask andy about these as well
+        evaluator = word_eval.CompletionWordEvaluator(
+            mem, exec_opts, mutable_opts, splitter, errfmt
+        )
+        evaluator.arith_ev = sh_expr_eval.ArithEvaluator(
+            mem, exec_opts, parse_ctx, errfmt
+        )
+        evaluator.arith_ev.word_ev = evaluator
+
+        try:
+            # TODO: sort out this node/root thing
+            self.root = node = main_loop.ParseWholeFile(
+                self._make_parser(parse_ctx, script, arena)
+            )
+        except error.Parse as e:
+            e.arena = arena
+            raise
+
+        return node
+
+    def substitute_vars(self):
+        """
+        This ties together a few parts, so here's the big picture:
+        1. monkey-patch oil's simple_var_sub and braced_var_sub to
+           get oil to compile a set of these for us so we don't have
+           to walk the node tree to find them.
+        2. iterate over these and create custom Solution objects for
+           any vars we got a --fix $var:sub directive for.
+        3. perform a distinct write cycle to flatten these subs back
+           down into the script and re-parse it before doing the main
+           resolution pass.
+
+        Caution:
+        - This replaces the entire varsub with what we specify, which
+        overwrites every braced expansion indiscriminately. It roughly
+        bets on a shaky assumption that the kinds of variables users
+        need to substitute won't often be subject to expansions that
+        change their case or otherwise substitute characters.
+        - This has no impact on vars that are set for the benefit of
+        executables that we'll invoke. We're just substituting *uses*
+        because we can do that ~statelessly without needing a complex
+        model for understanding what a variable is, and how it can
+        change and how it can't. I'm not sure how much of a problem
+        this will prove to be in practice. Fingers crossed.
+
+        TODO: I'm not sure what all of the tendrils are, but ideally
+        we make this as clear/salient for the user as possible, via
+        some combination of messaging when we encounter dynamic vars
+        in firstwords (i.e., when the user will discover the problem
+        and when we'll first suggest the replacement approach), and
+        "warnings" that we might print when we do the substitution.
+        These might do things like enumerate all lines that reference
+        this var
+        """
+        file_ob = None
+        # there are probably not any already, but we'll consume them
+        # just-in-case to make sure we don't
+        with self.consume_solutions() as solutions:
+            varsubs = self.directives.varsubs
+
+            for sub in braced_var_sub.members:
+                location = sub.spids[0]
+                positions = 1 + sub.spids[-1] - sub.spids[0]
+                token = sub.token.val
+
+                # if there's an explicit replacement, we'll use it
+                if token in varsubs:
+                    sol = Solution().custom(
+                        "var",
+                        get_original_text(self.arena, location, positions),
+                        varsubs[token],
+                        positions,
+                    )
+                    self.solutions[location] = sol
+
+            # just do simple/braced separate; their structures differ
+            for sub in simple_var_sub.members:
+                location = sub.token.span_id
+                positions = 1
+                token = sub.token.val.lstrip("$")  # normalize simple w/ braced
+
+                # if there's an explicit replacement, we'll use it
+                if token in varsubs:
+                    sol = Solution().custom(
+                        "var",
+                        get_original_text(self.arena, location, positions),
+                        varsubs[token],
+                        positions,
+                    )
+                    self.solutions[location] = sol
+
+            if len(self.solutions):
+                file_ob = io.BytesIO()
+                self.render(to=file_ob, full=False)
+                file_ob.seek(0)  # be kind
+
+        return file_ob
 
     def parse_directives(self, script, path):
         """
@@ -3499,7 +3669,11 @@ class ResolvedScript(RecordCommandlike):
         finally:
             f.close()
 
-    def render(self, to=sys.stdout):
+    # TODO: this ~full idiom smells like something that won't age well
+    # if the new 2-phase write flow holds (and doesn't turn into a 3?)
+    # look for an excuse to refactor render/write responsibilities.
+    # Probably a 2022 thing.
+    def render(self, to=sys.stdout, full=True):
         cursor = osh2oil.Cursor(self.arena, to)
 
         replacements = sorted(self.solutions.keys())
@@ -3510,16 +3684,26 @@ class ResolvedScript(RecordCommandlike):
 
         # if the user has specified a prepend string, find the first
         # actual code span, so that we can inject before it.
-        if self.prologue:
+        if full and self.prologue:
             first_span = find_earliest_spid(self.root)
             cursor.PrintUntil(first_span)
             to.write("\n# begin prologue inserted by resholve\n")
             to.write(self.prologue.read())
             to.write("\n# end prologue inserted by resholve\n")
-            cursor.PrintUntil(first_span + 1)
+            cursor.PrintUntil(first_span)
+
+        last = -1
 
         for location in replacements:
             solution = self.solutions[location]
+            if last > location:
+                logger.warning(
+                    "skipping solution %r because the cursor (%r) is already past its location (%r)",
+                    solution,
+                    last,
+                    location,
+                )
+                continue
 
             logger.debug("handling replacements: %r", location)
 
@@ -3534,14 +3718,10 @@ class ResolvedScript(RecordCommandlike):
                 cursor.PrintUntil(location)
 
                 logger.debug("printed up to %r", location)
-                span = self.arena.GetLineSpan(location)
-
-                line = self.arena.GetLine(span.line_id)
-                current = line[span.col : span.col + span.length]
+                positions = solution.positions
+                current = get_original_text(self.arena, location, positions)
                 logger.debug(
-                    "identified span=%r, line=%r, current=%r, replacement=%r",
-                    span,
-                    line,
+                    "identified current=%r, replacement=%r",
                     current,
                     solution.replace_in(current),
                 )
@@ -3551,10 +3731,14 @@ class ResolvedScript(RecordCommandlike):
                 else:
                     to.write(solution.replace_in(current))
 
-                logger.debug("replacement written and skipping to %r", location + 1)
+                last = location + positions
+                logger.debug(
+                    "replacement written and skipping to %r",
+                    last,
+                )
 
                 # we already wrote this one; leapfrog
-                cursor.SkipUntil(location + 1)
+                cursor.SkipUntil(last)
             elif e:
                 e.word = self.word_objects[location]
                 e.span_id = location
@@ -3563,12 +3747,14 @@ class ResolvedScript(RecordCommandlike):
 
         cursor.PrintUntil(self.arena.LastSpanId())
 
-        if self.epilogue:
-            to.write("\n# begin epilogue inserted by resholve\n")
-            to.write(self.epilogue.read())
-            to.write("\n# end epilogue inserted by resholve\n")
+        if full:
+            if self.epilogue:
+                to.write("\n# begin epilogue inserted by resholve\n")
+                to.write(self.epilogue.read())
+                to.write("\n# end epilogue inserted by resholve\n")
 
-        self.write_directives(cursor)
+            self.write_directives(cursor)
+
         self.arena.PopSource()
         return self
 
@@ -3661,6 +3847,7 @@ class ResolvedScript(RecordCommandlike):
         """
         Handle a word that didn't pass StaticEval
         """
+        logger.debug("allow dynamic executable word? %r", word_ob)
         dynamic = None
         for part in word_ob.parts:
             if part.tag == word_part_e.CommandSub:
@@ -3683,8 +3870,6 @@ class ResolvedScript(RecordCommandlike):
                     status=9,
                     arena=self.arena,
                 )
-            else:
-                return True
 
         if dynamic is None:
             # this can be logged if it is real, but I'm making it an exception for now to validate whether it is real?

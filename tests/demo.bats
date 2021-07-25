@@ -126,3 +126,9 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP < nested_execer.sh
 CASES
+
+@test "Can substitute a variable used as a command" {
+  demo "file_var.sh" <(status 0)
+} <<CASES
+resholve --interpreter $INTERP --fix '\$FILE_CMD:file' < file_var.sh
+CASES
