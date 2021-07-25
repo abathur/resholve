@@ -1352,6 +1352,13 @@ class NixSetuidWrapper(Detain):
     issue = 29
 
 
+class AwkSubCommand(Detain):
+    problem = "I don't know how to handle awk sub commands yet--sorry :("
+    solutions = ("- See the feedback issue for a workaround",)
+    status = 13
+    issue = 31
+
+
 class OshEvalProblem(Census):
     problem = "OSH eval error while looking for sub-exec in %s %r."
     issue = 30
@@ -1485,7 +1492,6 @@ class ExternalParser(theirparse.ArgumentParser):
         theirparse.ArgumentParser.__init__(
             self, prog="{:} ({:})".format(name, variant), add_help=False
         )
-        self.add_argument("external")
 
     def error(self, message):
         logger.warn("ExternalParser %r passing instead of %r", self, message)
@@ -1717,7 +1723,7 @@ class ExternalCommandParsers(object):
         """
         see also handle_external_sed()
         """
-        generic = ExternalParser("sed", "generic")
+        generic = ExternalParser("sed")
         # very unsure about this group part
         script = generic.add_mutually_exclusive_group(required=True)
         generic.add_argument("-a", action="store_true")  # BSD-only
@@ -1737,6 +1743,80 @@ class ExternalCommandParsers(object):
         generic.add_argument("-z", "--null-data", action="store_true")
         generic.add_argument("--sandbox", action="store_true")
         generic.add_argument("--version", action="store_true")
+        script.add_argument("script", nargs="?")
+        generic.add_argument("input_file", nargs="*")
+
+        return (generic,)
+
+    @staticmethod
+    def awk():
+        """
+        see also handle_external_awk()
+            -F fs           --field-separator=fs
+            -v var=val      --assign=var=val
+        Short options:      GNU long options: (extensions)
+            -b          --characters-as-bytes
+            -c          --traditional
+            -C          --copyright
+            -d[file]        --dump-variables[=file]
+            -E file         --exec=file
+            -g          --gen-pot
+            -h          --help
+            -i includefile      --include=includefile
+            -l library      --load=library
+            -L[fatal|invalid|no-ext]    --lint[=fatal|invalid|no-ext]
+            -M          --bignum
+            -N          --use-lc-numeric
+            -n          --non-decimal-data
+            -o[file]        --pretty-print[=file]
+            -O          --optimize
+            -p[file]        --profile[=file]
+            -P          --posix
+            -r          --re-interval
+            -s          --no-optimize
+            -S          --sandbox
+            -t          --lint-old
+            -V          --version
+
+        """
+        generic = ExternalParser("awk")
+        # very unsure about this group part
+        script = generic.add_mutually_exclusive_group(required=True)
+        generic.add_argument("-D", "--debug", action="store_true")
+        generic.add_argument("-F", "--field-separator")
+        # actually assign should be append, but strip_varlikes will
+        # pluck out the args it is looking for...
+        generic.add_argument("-v", "--assign", action="count")
+        script.add_argument("-e", "--source", action="append")
+        script.add_argument("-f", "--file")
+
+        generic.add_argument("-b", "--characters-as-bytes", action="store_true")
+        generic.add_argument("-c", "--traditional", action="store_true")
+        generic.add_argument("-C", "--copyright", action="store_true")
+        # technically argless form of below, but see nargs note on rlwrap...
+        generic.add_argument("-d", "--dump-variables")
+        generic.add_argument("-E", "--exec")
+        generic.add_argument("-g", "--gen-pot", action="store_true")
+        generic.add_argument("-h", "--help", action="store_true")
+        generic.add_argument("-i", "--include")
+        generic.add_argument("-l", "--load")
+        # arg and argless forms of this; see note on rlwrap; guessing argless?
+        generic.add_argument("-L", "--lint", action="store_true")
+        # generic.add_argument("-L", "--lint", choices=["fatal", "invalid", "no-ext"])
+        generic.add_argument("-M", "--bignum", action="store_true")
+        generic.add_argument("-N", "--use-lc-numeric", action="store_true")
+        generic.add_argument("-n", "--non-decimal-data", action="store_true")
+        generic.add_argument("-o", "--pretty-print")
+        generic.add_argument("-O", "--optimize", action="store_true")
+        generic.add_argument("-p", "--profile")
+
+        generic.add_argument("-P", "--posix", action="store_true")
+        generic.add_argument("-r", "--re-interval", action="store_true")
+        generic.add_argument("-s", "--no-optimize", action="store_true")
+        generic.add_argument("-t", "--lint-old", action="store_true")
+
+        generic.add_argument("-S", "--sandbox", action="store_true")
+        generic.add_argument("-V", "--version", action="store_true")
         script.add_argument("script", nargs="?")
         generic.add_argument("input_file", nargs="*")
 
@@ -2956,6 +3036,13 @@ class RecordCommandlike(object):
         be the first ~positional argument as long as -e or -f
         or --expression or --file weren't used.
 
+        (I guess there's a hole here, in that someone can construct
+        a heredoc or string and pass it into the script. I'm going
+        to call that the arbitrary line in the sand. I'd be tickled
+        pink to be able to hand off both these expressions *and* the
+        any heredocs/etc to another program that is ~resholve for
+        sed scripts/expressions.)
+
         This is also the main example of how to override a handler
         for a command that can't skate by with the generic handler.
         - return True if this is now handled (will try any additional
@@ -2983,6 +3070,87 @@ class RecordCommandlike(object):
                     arena=self.arena,
                 )
             return True
+        return True
+
+    def _find_awk_sub_cmd(self, expr):
+        """
+        $ awk --sandbox 'BEGIN { system("date"); close("date")}'
+        awk: cmd. line:1: fatal: 'system' function not allowed in sandbox mode
+
+        $ awk --sandbox 'BEGIN {
+            cmd = "ls -lrth"
+            while ( ( cmd | getline result ) > 0 ) {
+                print result
+            }
+            close(cmd);
+        }'
+        awk: cmd. line:3: fatal: redirection not allowed in sandbox mode
+        """
+        awk = lookup("awk")
+        if not awk:
+            raise Exception(
+                "Somehow I ended up trying to look for an awk sub command in %r when awk isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
+                expr,
+            )
+        p = Popen(
+            [awk, "--sandbox", expr],
+            shell=False,
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
+            close_fds=True,
+        )
+        stdout, stderr = p.communicate(input="something cute")
+
+        if p.returncode == 2:
+            if "fatal: 'system' function not allowed in sandbox mode" in stderr:
+                return True
+            elif "fatal: redirection not allowed in sandbox mode" in stderr:
+                return True
+            logger.debug("unhandled awk error: %r", stderr)
+            # TODO: maybe later we can do something smarter
+
+        return False
+
+    def handle_external_awk(self, parsed, cmd_ob, args, name, text):
+        """
+        We want to check awk expressions on the CLI. They can
+        either come after an -e/--source flag, or they can
+        be the first ~positional argument
+
+        TODO: validate this behavior for awk (as long as -e or -f
+        or --expression or --file weren't used.)
+
+        (I guess there's a hole here, in that someone could construct
+        a heredoc or something and pass it into the script. I'm going
+        to call that the arbitrary line in the sand. I'd be tickled
+        pink to be able to hand off both these expressions *and* the
+        any heredocs/files to another program that is ~resholve for
+        awk scripts/expressions.)
+        """
+        if parsed.source:
+            for expression in parsed.source:
+                if self._find_awk_sub_cmd(expression):
+                    word, pos = find_word_and_pos(expression, cmd_ob, args)
+                    observe(
+                        AwkSubCommand,
+                        word=word,
+                        span_id=pos,
+                        arena=self.arena,
+                    )
+            return True
+        elif not parsed.file and parsed.script:
+            # trailing positional expression
+            if self._find_awk_sub_cmd(parsed.script):
+                word, pos = find_word_and_pos(parsed.script, cmd_ob, args)
+                observe(
+                    AwkSubCommand,
+                    word=word,
+                    span_id=pos,
+                    arena=self.arena,
+                )
+            return True
+        return True
 
     def handle_external_generic(self, parsed, cmd_ob, args, name, text):
         if parsed.command:
@@ -3040,7 +3208,7 @@ class RecordCommandlike(object):
                 if not solution.solved:
                     cmdlike.resolve()
 
-                return True
+        return True  # TODO: confidence low
 
     def look_for_external_sub_execution(self, outer, cmd_object):
         global decided_execers, lore
@@ -3163,7 +3331,7 @@ class RecordCommandlike(object):
         if externals[name]:
             for parser in externals[name]:
                 parsed = _unparsed = None
-                parsed = parser.parse_known_args(args.argv)
+                parsed = parser.parse_known_args(args.argv[1:])
                 if not parsed:
                     logger.debug("parse failed (parser=%r, args=%r)", parser, args)
                     continue
