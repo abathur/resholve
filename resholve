@@ -2906,12 +2906,16 @@ class RecordCommandlike(object):
             if pos in self.solutions:
                 solution = self.solutions[pos]
             else:
-                solution = self.solutions[pos] = cmdlike.request_external_solution(
-                    self, subcmd_ob
-                )
-                self.word_objects[pos] = cmd_ob.words[1]
+                # TODO: not sure about this; it feels like it should
+                # be more intrinsic to recursing?
+                ok, subcmd_txt, quoted = word_.StaticEval(subcmd_ob)
+                if ok or self.allow_dynamic_executable_word(subcmd_ob.words[0], name):
+                    solution = self.solutions[pos] = cmdlike.request_external_solution(
+                        self, subcmd_ob
+                    )
+                    self.word_objects[pos] = cmd_ob.words[1]
 
-            if not solution.solved:
+            if solution and not solution.solved:
                 cmdlike.resolve()
 
         else:
