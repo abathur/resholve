@@ -21,9 +21,9 @@ $LS_PROGRAM
 # '${LS_PROGRAM}' # actual error
 
 $LS_PROGRAM /
-"$LS_PROGRAM /"
+# "$LS_PROGRAM /" # actual error
 "$LS_PROGRAM" /
-"${LS_PROGRAM} /"
+# "${LS_PROGRAM} /" # actual error
 "${LS_PROGRAM}" /
 # '$LS_PROGRAM /' # actual error
 # '$LS_PROGRAM' / # actual error
@@ -31,9 +31,9 @@ $LS_PROGRAM /
 # '${LS_PROGRAM}' / # actual error
 
 $LS_PROGRAM $HOME
-"$LS_PROGRAM $HOME"
+"$LS_PROGRAM $HOME" # actual error
 "$LS_PROGRAM" $HOME
-"${LS_PROGRAM} $HOME"
+"${LS_PROGRAM} $HOME" # actual error
 "${LS_PROGRAM}" $HOME
 # '$LS_PROGRAM $HOME' # actual error
 # '$LS_PROGRAM' $HOME # actual error
@@ -79,3 +79,8 @@ ${*}
 "${*}"
 # '$*' # actual error
 # '${*}' # actual error
+
+command $LS_PROGRAM
+command "$LS_PROGRAM"
+command -v $LS_PROGRAM
+command -v "$LS_PROGRAM"

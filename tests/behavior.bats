@@ -27,6 +27,19 @@ CASES
 resholve --interpreter $INTERP --keep '\$GIT_PROGRAM \$LS_PROGRAM \$STAT_HERE \$STAT_ELSEWHERE' variable_as_command.sh
 CASES
 
+@test "verify --fix '$varname:cmd' substitutes dynamic commands" {
+  require <({
+    status 0
+    line -11 contains '/bin/file'
+    line -10 contains '/bin/file"'
+    line -9 contains '/bin/file'
+    line -8 contains '/bin/file"'
+    line -6 equals '# resholve: fix $LS_PROGRAM:file'
+  })
+} <<CASES
+resholve --interpreter none --fix '\$LS_PROGRAM:file' --keep '\$GIT_PROGRAM \$HOME \$STAT_HERE \$STAT_ELSEWHERE' < variable_as_command.sh
+CASES
+
 @test "can resolve a simple coproc" {
   require <({
     status 0
