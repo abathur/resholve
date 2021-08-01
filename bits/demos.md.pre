@@ -1,0 +1,27 @@
+# Demos
+I've built two different demos to illustrate what you can do with resholve--one for resholve itself, and the other shows the Nix integration.
+
+If you'd like to run them yourself (you'll need Nix installed), start with:
+
+```shell
+git clone https://github.com/abathur/resholve.git
+cd resholve
+```
+
+## resholve demo
+This demo runs a handful of commands on a set of test `.sh` scripts (you can see the files in [tests/](tests/), though not all files there are used in the demo) to illustrate what happens when resholve successfully resolves dependencies, and what happens when it doesn't.
+
+- The top separator line shows what command was run and its exit status.
+- A status > 0 indicates the script couldn't be resolved. The body of the case report quotes the original file, and any feedback the command gives about why it can't resolve the script.
+- A status == 0 indicates the script was resolved. The body of the case report shows a diff of the input script, and the resolved output.
+
+To run this demo yourself:
+
+```shell
+nix-shell --run "./demo"
+```
+
+The demo output is colored for easier reading, but I've included an example of the output below as well:
+
+```shell
+$ nix-shell --run "./demo"
