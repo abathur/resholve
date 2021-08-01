@@ -10,21 +10,22 @@ In order to support a few new features, I've refactored a fair fraction of resho
     - Executables marked "might" or "can" must either have:
         - a command handler in resholve itself
         - a directive to tell resholve if there's anything else to resolve
-    - Aside from its record separator, the lore format (see [TODO: document lore directory format](TODO) for more) is simple to write or generate.
     - I'm developing the default/~reference lore provider as a separate project: https://github.com/abathur/binlore. (It is responsible for evaluating each executable and printing judgements in the appropriate format.)
+    - The lore format (see [Binlore: Lore Formats](https://github.com/abathur/binlore#lore-formats) for more) is simple to write or generate.
 - Block Nix builds if a script uses some executables that, in Nix land, must use setuid wrappers. Details in #29, but generally this exists to catch users at risk of falling into some Nix traps.
 
 ### Improved resolution
 - Separate per-command handlers (previously: shared handlers for ~similar builtins/commands) to better accommodate syntax/usage quirks of individual commands like variable assignments, flags, exec's fd behavior, varying sub-executable locations, etc.
     - builtins: builtin, command, coproc, eval, exec, source. (Note: `time` is technically a keyword. Thus far, the OSH parser's handling of time has sheltered resholve from needing to consider it.)
-    - externals: coreutils (chroot env install nice nohup runcon sort split stdbuf timeout), sed, sudo (but not w/ Nix), findutils (xargs), rlwrap, sqlite3
-    <!-- TODO: find belongs above, once done -->
+    - externals: coreutils (chroot env install nice nohup runcon sort split stdbuf timeout), sed, sudo (but not w/ Nix), findutils (find\*, xargs), rlwrap, sqlite3
+    - Most of these have their own Argparse syntax parser. In the first draft this was bespoke. I may eventually go back in that direction, but it was too much change-overhead in the short-run.
 - Recursively resolve command-executing commands (previously: a single level of sub-resolution).
 - Resolve backslash-escaped commands (used to skip alias expansion), leaving the backslash in place.
 - Unified handling of "dynamic" syntax handling (what kinds of substitutions and expansions resholve does and doesn't require exemptions for) across different contexts to make it more consistent. (These had ~speciated, so there's a higher risk of regressions and nonsense combinations here.)
 - resholve now handles its own PATH lookups to support two improvements:
     - Lookup will also match against full file paths in the inputs. This makes it easier to obtain one of resholve's big benefits--finding and declaring all external dependencies--even if you're using executables from general system directories.
     - Lookup won't match files in PWD unless PWD or the individual files are explicitly added to the inputs.
+- resholve can now substitute `$VARSUB` and `${VARSUB}` with a fix directive (i.e. `--fix '$VARSUB:replacement'). Replacements are made before resolution, so they will be subject to normal resolution rules during the primary pass. This makes it possible to fix variable-as-command cases, where you might do something like `--fix '$GIT_COMMAND:git'. (resholve should already force you to fix a variable used as a command.)
 
 
 ### Internal
@@ -42,7 +43,7 @@ In order to support a few new features, I've refactored a fair fraction of resho
         - unresolved source 7 -> 4
         - unresolvable dynamic command 9 -> 7
 - resholve's test runs now report timings, and I'm storing a generated copy in [timings.md](timings.md). I've wanted this for a while, but I've been waiting for a bats release this March that changed from second -> ms precision. I hope this will create some vague record of performance over time, but I may scrap it if even single-machine timings are too noisy to make sense of.
-
+- \* I lied a little about find's command handler. It actually uses an early regex-based draft of this functionality. I'm leaving it as the last use to keep the implementation from rotting until I decide whether to trash or repurpose it.
 
 
 ### Migrating
@@ -51,7 +52,6 @@ In order to support a few new features, I've refactored a fair fraction of resho
 - If you have any scripts that depend on resholve's non-0 error statuses, double-check them. Some (but not all) error statuses have changed.
 
     
-
 ## v0.5.1 (Mar 4 2021)
 Fix re-resolution of an existing abspath command (specified via --fix abspath), which was incorrectly replacing the basename with the new abspath instead of replacing the entire command path.
 
