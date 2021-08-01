@@ -24,7 +24,7 @@ CASES
     line -1 ends "variable_as_command.sh.resolved'"
   })
 } <<CASES
-resholve --interpreter $INTERP --keep '\$GIT_PROGRAM \$LS_PROGRAM \$STAT_HERE \$STAT_ELSEWHERE' variable_as_command.sh
+resholve --interpreter $INTERP --keep '\$GIT_PROGRAM \$LS_PROGRAM command:\$LS_PROGRAM \$STAT_HERE \$STAT_ELSEWHERE' variable_as_command.sh
 CASES
 
 @test "verify --fix '$varname:cmd' substitutes dynamic commands" {

@@ -9,5 +9,6 @@ echo wert | xargs file # resolve both
 
 builtin source gettext.sh # resolve last
 builtin command . gettext.sh # resolve last
+builtin command -v . gettext.sh # resolve last
 
-exec >&2 # resolve none
+echo wert | exec >&2 # resolve none

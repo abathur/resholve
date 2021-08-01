@@ -1143,7 +1143,7 @@ def find_word_and_pos(needle, cmd_ob, args):
                     )
                 else:
                     first_close_match = cmd_ob.words[i], args.arg_spids[i]
-    return first_close_match
+    return first_close_match or (None, None)
 
 
 # For optview.Parse. Oil does [False] * option_i.ARRAY_SIZE and
@@ -1569,7 +1569,7 @@ class BuiltinCommandParsers(object):
         generic.add_argument("-a")
         generic.add_argument("-c", action="store_true")
         generic.add_argument("-l", action="store_true")
-        generic.add_argument("command", nargs="+")
+        generic.add_argument("command", nargs="*")
         return (generic,)
 
     @staticmethod
@@ -2900,6 +2900,12 @@ class RecordCommandlike(object):
                 text,
             )
             subcmd = self.find_subcmd(parsed)
+            if not subcmd:
+                # smell that a $varsub is in the args; fallback
+                # TODO: note, low trust in this; good candidate for extensive
+                # testing.
+                subcmd = name
+
             if subcmd:
                 ok, sw_ob, sw_txt, _quoted = self._require_second_word(subcmd, cmd_ob)
                 if ok and not self.handle_first_pass_essentials(sw_txt, cmd_ob):
