@@ -25,7 +25,7 @@ In order to support a few new features, I've refactored a fair fraction of resho
 - resholve now handles its own PATH lookups to support two improvements:
     - Lookup will also match against full file paths in the inputs. This makes it easier to obtain one of resholve's big benefits--finding and declaring all external dependencies--even if you're using executables from general system directories.
     - Lookup won't match files in PWD unless PWD or the individual files are explicitly added to the inputs.
-- resholve can now substitute `$VARSUB` and `${VARSUB}` with a fix directive (i.e. `--fix '$VARSUB:replacement'). Replacements are made before resolution, so they will be subject to normal resolution rules during the primary pass. This makes it possible to fix variable-as-command cases, where you might do something like `--fix '$GIT_COMMAND:git'. (resholve should already force you to fix a variable used as a command.)
+- resholve can now substitute `$VARSUB` and `${VARSUB}` with a fix directive (i.e. `--fix '$VARSUB:replacement'). Replacements are made before resolution, so they will be subject to normal resolution rules during the primary pass. This makes it possible to fix variable-as-command cases, where you might do something like `--fix '$GIT_COMMAND:git'. (resholve should already force you to fix a variable used as a command.) This isn't dynamic; it replaces the whole varsub (even if it's an array access) with the provided value.
 
 
 ### Internal
