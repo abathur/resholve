@@ -73,7 +73,7 @@ CONTROLLING RESOLUTION
          Fix some things it it isn’t safe to fix/ignore by default. Directive
          forms:
 
-         $variable:command[;command]... (Note: $ may need escaping)
+         $variable:command (Note: $ may need escaping)
             replace parameter expansions of $variable with command
 
          absolute_path
@@ -222,4 +222,4 @@ SEE ALSO
 AUTHORS
      Travis A. Everett ⟨travis.a.everett@gmail.com⟩
 
-BSD                             August 01, 2021                            BSD
+BSD                             August 10, 2021                            BSD
