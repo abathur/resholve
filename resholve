@@ -3321,7 +3321,9 @@ class RecordCommandlike(object):
             logger.debug("subinvoke %r", subinvoke)
             cmdlike = cmdlikes[subinvoke.firstword]
             subcmd = subinvoke.firstword
-            if subcmd.ok or self.allow_dynamic_executable_word(subcmd):
+            if not subcmd.ok:
+                self.allow_dynamic_executable_word(subcmd, invocation.firstword)
+            else:
                 pos = subinvoke.first_spid
 
                 solution = None
@@ -3360,9 +3362,10 @@ class RecordCommandlike(object):
             # TODO: handle_external_generic needed this; not certain
             # this one _doesn't_, but I haven't been able to find a
             # test case that breaks on it (yet). rm in 2022.
-            # if subcmd.ok or self.allow_dynamic_executable_word(subcmd):
-            #     self.allow_dynamic_executable_word(subcmd)
-            #     remember that you have to indent the rest under
+            #     remember that you have to indent the rest under else?
+            # if not subcmd.ok:
+            #     self.allow_dynamic_executable_word(subcmd, invocation.firstword)
+            # else:
 
             cmdlike = cmdlikes[subcmd]
 
@@ -4020,7 +4023,7 @@ class ResolvedScript(RecordCommandlike):
         """
         Handle a word that didn't pass StaticEval
         """
-        logger.debug("allow dynamic executable word? %r", word)
+        logger.debug("allow dynamic executable word? '%s' -> %r", outer, word)
         if outer == "eval":
             logger.info(
                 "allowing eval with dynamic argument %r",
