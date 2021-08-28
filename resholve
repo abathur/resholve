@@ -1907,7 +1907,7 @@ class ExternalCommandParsers(object):
         if this doesn't work, we'll probably need N parsers...
         """
         generic = CommandParser("rlwrap")
-        generic.add_argument("-a", "--always-readline")
+        generic.add_argument("-a", "--always-readline", nargs="?")
         generic.add_argument("-A", "--ansi-colour-aware", action="store_true")
         generic.add_argument("-b", "--break-chars")
         generic.add_argument("-c", "--complete-filenames", action="store_true")
