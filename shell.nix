@@ -11,7 +11,7 @@ let
   resolveTimeDeps = [ coreutils file findutils gettext ];
 in
 pkgs.mkShell {
-  buildInputs = [ resholve bats nixpkgs-fmt ];
+  buildInputs = [ resholve bats nixpkgs-fmt cloc ];
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
   RESHOLVE_LORE = "${deps.binlore.collect { drvs = resolveTimeDeps; } }";
   INTERP = "${bash}/bin/bash";

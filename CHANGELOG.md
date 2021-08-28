@@ -43,7 +43,7 @@ In order to support a few new features, I've refactored a fair fraction of resho
         - unresolved source 7 -> 4
         - unresolvable dynamic command 9 -> 7
 - resholve's test runs now report timings, and I'm storing a generated copy in [timings.md](timings.md). I've wanted this for a while, but I've been waiting for a bats release this March that changed from second -> ms precision. I hope this will create some vague record of performance over time, but I may scrap it if even single-machine timings are too noisy to make sense of.
-- \* I lied a little about find's command handler. It actually uses an early regex-based draft of this functionality. I'm leaving it as the last use to keep the implementation from rotting until I decide whether to trash or repurpose it.
+- resholve has been directly interfacing with the Oil AST, but I've shimmed in our own abstraction, something like `Invocation([Word(AST), Word(AST), ...])`, to contain AST-related logic.
 
 
 ### Migrating

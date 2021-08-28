@@ -5,9 +5,9 @@ readonly ELSEWHERE=~/
 STAT_ELSEWHERE="stat $ELSEWHERE"
 
 $GIT_PROGRAM status
-"$GIT_PROGRAM status"
+# "$GIT_PROGRAM status" # actual error
 "$GIT_PROGRAM" status
-"${GIT_PROGRAM} status"
+# "${GIT_PROGRAM} status"
 "${GIT_PROGRAM}" status
 # '$GIT_PROGRAM status' # actual error
 # '$GIT_PROGRAM' status # actual error
@@ -31,9 +31,9 @@ $LS_PROGRAM /
 # '${LS_PROGRAM}' / # actual error
 
 $LS_PROGRAM $HOME
-"$LS_PROGRAM $HOME" # actual error
+# "$LS_PROGRAM $HOME" # actual error
 "$LS_PROGRAM" $HOME
-"${LS_PROGRAM} $HOME" # actual error
+# "${LS_PROGRAM} $HOME" # actual error
 "${LS_PROGRAM}" $HOME
 # '$LS_PROGRAM $HOME' # actual error
 # '$LS_PROGRAM' $HOME # actual error
