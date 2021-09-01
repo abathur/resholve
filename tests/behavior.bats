@@ -246,6 +246,7 @@ CASES
 @test "Buffalo buffalo Buffalo buffalo buffalo buffalo Buffalo buffalo" {
   require <({
     status 0
+    line 2 begins "builtin builtin builtin command command command /nix/store/"
     line 2 contains '/bin/find . -name buffalo -exec /nix/store/'
   })
 } <<CASES

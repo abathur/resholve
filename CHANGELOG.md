@@ -17,7 +17,7 @@ In order to support a few new features, I've refactored a fair fraction of resho
 ### Improved resolution
 - Separate per-command handlers (previously: shared handlers for ~similar builtins/commands) to better accommodate syntax/usage quirks of individual commands like variable assignments, flags, exec's fd behavior, varying sub-executable locations, etc.
     - builtins: builtin, command, coproc, eval, exec, source. (Note: `time` is technically a keyword. Thus far, the OSH parser's handling of time has sheltered resholve from needing to consider it.)
-    - externals: coreutils (chroot env install nice nohup runcon sort split stdbuf timeout), sed, sudo (but not w/ Nix), findutils (find\*, xargs), rlwrap, sqlite3
+    - externals: coreutils (chroot env install nice nohup runcon sort split stdbuf timeout), sed, sudo (but not w/ Nix), findutils (find\*, xargs), rlwrap, sqlite3, a number of shells
     - Most of these have their own Argparse syntax parser. In the first draft this was bespoke. I may eventually go back in that direction, but it was too much change-overhead in the short-run.
 - Recursively resolve command-executing commands (previously: a single level of sub-resolution).
 - Resolve backslash-escaped commands (used to skip alias expansion), leaving the backslash in place.

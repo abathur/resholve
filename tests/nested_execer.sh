@@ -12,3 +12,10 @@ builtin command . gettext.sh # resolve last
 builtin command -v . gettext.sh # resolve last
 
 echo wert | exec >&2 # resolve none
+
+# semi-nonsense, but should resolve bash, gettext, file, bash, file
+bash \
+	-c "source gettext.sh" \
+	"bop" \
+	-c "command file" \
+	-c "bash -c file"

@@ -193,13 +193,13 @@ rec {
     # LOGLEVEL="DEBUG";
 
     # default path
-    RESHOLVE_PATH = "${lib.makeBinPath [ file findutils gettext ]}";
+    RESHOLVE_PATH = "${lib.makeBinPath [ bash file findutils gettext ]}";
     # but separate packages for combining as needed
     PKG_FILE = "${lib.makeBinPath [ file ]}";
     PKG_FINDUTILS = "${lib.makeBinPath [ findutils ]}";
     PKG_GETTEXT = "${lib.makeBinPath [ gettext ]}";
     PKG_COREUTILS = "${lib.makeBinPath [ coreutils ]}";
-    RESHOLVE_LORE = "${binlore.collect { drvs = [ file findutils gettext coreutils ]; } }";
+    RESHOLVE_LORE = "${binlore.collect { drvs = [ bash file findutils gettext coreutils ]; } }";
 
     # explicit interpreter for demo suite; maybe some better way...
     INTERP = "${bash}/bin/bash";

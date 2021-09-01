@@ -304,13 +304,38 @@ def directive_keep(value):
 
 
 class InvocationsAction(theirparse._AppendAction):
+    """
+    Collect arg as a list of invocations.
+
+    Use kwarg split=True when the subexec arg is a single
+    shell word (usually quoted) that will be split on exec.
+    In this case, the arg will be split with shlex.split.
+
+    1-word behavior is more common with --options, while
+    using a collection of loose shell words is more common
+    at the end of an invocation--though exceptions, such as
+    the +/;-terminated -exec/-execdir/-ok/-okdir flags in
+    find, do exist.
+    """
+
+    split = False
+
     def __init__(self, *args, **kwargs):
         kwargs["default"] = list()
+        self.split = kwargs.pop("split", self.split)
         return super(InvocationsAction, self).__init__(*args, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
+        if self.split:
+            words = []
+            for val in values:
+                words.extend([Word(val.ast, x) for x in shlex.split(val)])
+            values = words
         return super(InvocationsAction, self).__call__(
-            parser, namespace, Invocation(words=values), option_string
+            parser,
+            namespace,
+            Invocation(words=values),
+            option_string,
         )
 
 
@@ -829,15 +854,6 @@ def punshow():
 
     try:
         to_write = set()
-        if len(args.scripts) == 0:
-            # None == <stdin>
-            with sourcePATH(dict()):
-                resolved_scripts[None] = ResolvedScript(
-                    shebang=args.shebang,
-                    prologue=args.prologue,
-                    epilogue=args.epilogue,
-                )
-                to_write.add(None)
 
         checked_scripts = list()
         script_map = dict()
@@ -859,21 +875,30 @@ def punshow():
             sys.stderr.write("  Distinct: %r\n" % set(checked_scripts))
             return 2
 
-        with sourcePATH(script_map):
-            for script in checked_scripts:
-                resolve_script(
-                    script,
+        if len(args.scripts) == 0:
+            # None == <stdin>
+            with sourcePATH(dict()):
+                resolved_scripts[None] = ResolvedScript(
                     shebang=args.shebang,
                     prologue=args.prologue,
                     epilogue=args.epilogue,
                 )
-                to_write.add(script)
+                to_write.add(None)
 
-        # cmdlikes are cross-source; try to resolve a single time
-        # with one big asterisk: all builtins that *might* lead to a
-        # source/alias during the first pass should be handled during
-        # resolve_script()
-        resolve_cmdlikes()
+                resolve_cmdlikes()
+        else:
+
+            with sourcePATH(script_map):
+                for script in checked_scripts:
+                    resolve_script(
+                        script,
+                        shebang=args.shebang,
+                        prologue=args.prologue,
+                        epilogue=args.epilogue,
+                    )
+                    to_write.add(script)
+
+                resolve_cmdlikes()
 
         for script_path in to_write:
             write_resolved_script(
@@ -1349,6 +1374,40 @@ class FindParser(CommandParser):
 
 
 """
+supporting sub-shell invocation for a wide slate of shells
+that I have access to via nix/macOS for now. i.e.,
+<sh> -c "subcommand".
+May have to revert some of these if they shadow a
+_more important_ command of the same name?
+"""
+
+INVOKABLE_SHELLS = (
+    "bash",
+    "csh",
+    "dash",
+    "dgsh",
+    "elvish",
+    "es",
+    "fish",
+    "hilbish",
+    "ion",
+    "jush",
+    "ksh",
+    "mksh",
+    "mrsh",
+    "nu",
+    "oh",
+    "oil",
+    "oksh",
+    "osh",
+    "rc",
+    "rush",
+    "sh",
+    "tcsh",
+    "zsh",
+)
+
+"""
 The next two classes collect functions for returning
 argparse parsers for some builtins and externals. We
 use the functions so that we don't have to pay setup
@@ -1780,6 +1839,8 @@ class ExternalCommandParsers(object):
 
         return (generic,)
 
+    _gawk = _awk
+
     @staticmethod
     def _sudo():
         """
@@ -1975,6 +2036,29 @@ class ExternalCommandParsers(object):
         )
         return (generic,)
 
+    @staticmethod
+    def _generic_shell():
+        generic = CommandParser("generic_shell")
+        generic.add_argument(
+            "-c",
+            # rest are nonstandard; leaving breadcrumbs;
+            # possible some of these will have to be broken out
+            # but let's make someone prove it first
+            "--commands",  # nushell
+            "--command",  # fish, hilbish, oh
+            "-C",  # fish
+            "--init-command",  # fish
+            dest="commands",
+            split=True,
+            action="invocations",
+            nargs=1,
+        )
+        return (generic,)
+
+    whoazard = locals()
+    for shell in INVOKABLE_SHELLS:
+        whoazard["_" + shell] = _generic_shell
+
 
 def generate_builtin_command_parser(cmdname):
     cmdname = "_" + cmdname
@@ -2029,30 +2113,33 @@ command resolution order--a sequence of the types of command this command-like
 would resolve to. (Resolution rules differ across different contexts, like
 inside an alias, and following certain commands). This call:
 
-- Maps the position of the command-like to resholve's "Word" object for it.
-  this Word is a string subclass abstracting the OSH AST into something that
-  is a better map for resholve's concerns, and gathers logic that was formerly
-  strewn all over the place. Originally, this just saved the literal AST
-  because it is useful for reporting (Oil has APIs for pretty-printing errors
-  that reference a word/token/spid.) This is one of those things I'm a little
-  skeptical of now. I suspect the new Invocation/Word abstractions can help
-  subsume this practice, but I'm brained-out after ~6 months of refactoring
-  and I just want to land this release and breathe before starting any more :)
-  See also the explanation before the Invocation / Word classes.
-  self.word_objects[position] = Word()
+- Maps the position of the command-like to a list of tuples pairing 2 things:
+  a "Solution" instance, and the "Word" object for it.
+
+  self.solutions[position].append((solution, Word()))
+
+  TODO: things have shuffled enough that it's worth re-verifying this dedupe
+        whenever I have more cells to brain this with.
+
+  - a Solution instance (obtained from the CommandLike) distinct for each
+    encountered resolution order. If the visitor encounters the same
+    commandlike 5 separate times but with the same resolution order, the
+    solutions dictionary will map *all 5* positions to the same object.
+
+  - a Word (a string subclass abstracting the OSH AST into something that
+    better maps to resholve's concerns, and gathers logic that was formerly
+    strewn all over the place). Originally, this just saved the literal AST
+    because it is useful for reporting (Oil APIs can pretty-print errors
+    that reference a word/token/spid.) This is one thing I'm a little
+    skeptical of now. I suspect the new Invocation/Word abstractions can help
+    subsume this practice, but I'm brained-out after ~6 months of refactoring
+    and I just want to land this release and breathe before starting any more.
+    See also the explanation before the Invocation / Word classes.
 
 - Checks defaultdict cmdlikes[Word()] for the CommandLike instance that
   corresponds to this word. This instance will accumulate information like
   which scripts it appears in, whether it's defined as a function or alias,
   and most importantly the distinct resolution orders where it was found.
-
-- Maps the command-like's position to a Solution instance (obtained from the
-  CommandLike) that is distinct for each encountered resolution order:
-  self.solutions[position] = Solution
-
-  If the visitor encounters the same commandlike 5 separate times but with the
-  same resolution order, the solutions dictionary will map *all 5* positions
-  to the same object.
 
 Once we visit every interesting node, we call CommandLike.resolve() on all
 CommandLike objects. Each CommandLike will "solve" for the distinct contexts
@@ -2480,14 +2567,19 @@ class CommandLike(object):
             logger.debug("unresolved clen2 %r %r", len(cls.unresolved), cls.unresolved)
 
     def chomp_invocations(self):
-        logger.debug("unresolved ilen1 %r %r", len(self.invocations), self.invocations)
+        logger.debug(
+            "unresolved ilen1 %r %r %r", self, len(self.invocations), self.invocations
+        )
         while len(self.invocations):
             invocations = self.invocations
             self.invocations = set()
             for invocation in invocations:
                 yield invocation
             logger.debug(
-                "unresolved ilen2 %r %r", len(self.invocations), self.invocations
+                "unresolved ilen2 %r %r %r",
+                self,
+                len(self.invocations),
+                self.invocations,
             )
 
     def scaffold_new_source(self, source):
@@ -2548,13 +2640,7 @@ class CommandLike(object):
 
     def _resolve_invocations(self, solution):
         if solution.solved:
-            # filter out first-pass, handle builtins, if it's a solved external, handle executions
-            if (
-                solution.kind in ("builtin", "keyword")
-                and self.name in FIRST_PASS_ESSENTIALS
-            ):
-                pass  # should already be resolved!
-            elif solution.kind == "builtin":
+            if solution.kind == "builtin":
                 """
                 TODO: there's a duplicate copy of ~90% of this logic;
                 should/can it be abstracted?
@@ -2631,7 +2717,6 @@ class CommandLike(object):
                 break
 
     def resolve(self):
-        global FIRST_PASS_ESSENTIALS, lore
         logger.debug("CALLING RESOLVE ON %r", self.name)
 
         # find solutions for observed types
@@ -2895,16 +2980,15 @@ class Invocation(PositionalObjectBase, tuple):
 # keeping it painfully explicit for now to make it easier to
 # think/search between different cases here
 class RecordCommandlike(object):
-    solutions = word_objects = invocations = None
+    solutions = invocations = None
 
     def __init__(self):
-        self.solutions = dict()
-        self.word_objects = dict()
+        self.solutions = defaultdict(list)
 
     @contextmanager
     def consume_solutions(self):
         yield self.solutions
-        self.solutions = dict()
+        self.solutions.clear()
 
     @classmethod
     def disable_alias_replacement(cls):
@@ -2968,7 +3052,8 @@ class RecordCommandlike(object):
     def handle_first_pass_essentials(self, invocation):
         global FIRST_PASS_ESSENTIALS, cmdlikes
         logger.debug("handle_first_pass_essentials %r ", invocation)
-        if invocation.firstword in sorted(FIRST_PASS_ESSENTIALS):
+
+        if invocation.firstword in FIRST_PASS_ESSENTIALS:
             cmdlike = cmdlikes[invocation.firstword]
             if not cmdlike.alias and not cmdlike.function:
                 self.look_for_essential_builtin_sub_execution(invocation)
@@ -2992,9 +3077,7 @@ class RecordCommandlike(object):
 
                 if subcmd.firstword.ok:
                     if not self.handle_first_pass_essentials(subcmd):
-                        pos = subcmd.first_spid
-                        if self.soluble(pos):
-                            recorder(subcmd)
+                        recorder(subcmd)
 
         return temp
 
@@ -3021,6 +3104,7 @@ class RecordCommandlike(object):
           the correct absolute URI.
         - post-substitute to replace the build-time-path with the install/output path
         """
+
         target = None
 
         firstword = parsed.commands[0].firstword
@@ -3317,6 +3401,9 @@ class RecordCommandlike(object):
         return True
 
     def handle_external_generic(self, parsed, invocation):
+        # TODO: shimming shells in here may be a bigger crime than
+        #       duplicating the logic in two functions would be?
+        shell = invocation.firstword in INVOKABLE_SHELLS
         for subinvoke in parsed.commands:
             logger.debug("subinvoke %r", subinvoke)
             cmdlike = cmdlikes[subinvoke.firstword]
@@ -3326,21 +3413,30 @@ class RecordCommandlike(object):
             else:
                 pos = subinvoke.first_spid
 
+                # TODO: 3x near-identical copies of this logic
                 solution = None
+                solutions = self.solutions[pos]
                 if pos in self.solutions:
-                    solution = self.solutions[pos]
-                else:
-                    solution = self.solutions[pos] = cmdlike.request_external_solution(
-                        self, subinvoke
-                    )
-                    self.word_objects[pos] = subcmd
+                    for solution, word_ob in solutions:
+                        if word_ob == subcmd:
+                            # keep matching solution
+                            break
+                        else:
+                            # otherwise, don't exit w/ solution set
+                            solution = None
+                if not solution:
+                    if shell:
+                        solution = cmdlike.request_full_solution(self, subinvoke)
+                    else:
+                        solution = cmdlike.request_external_solution(self, subinvoke)
+                    solutions.append((solution, subcmd))
 
-                logger.debug(
-                    "while handling external flag for %r, recorded solution=%r at pos=%r",
-                    subinvoke,
-                    solution,
-                    pos,
-                )
+                    logger.debug(
+                        "while handling external flag for %r, recorded solution=%r at pos=%r",
+                        subinvoke,
+                        solution,
+                        pos,
+                    )
 
                 if not solution.solved:
                     cmdlike.resolve()
@@ -3370,22 +3466,27 @@ class RecordCommandlike(object):
             cmdlike = cmdlikes[subcmd]
 
             solution = None
+            solutions = self.solutions[pos]
             if pos in self.solutions:
-                solution = self.solutions[pos]
-            else:
-                solution = self.solutions[pos] = cmdlike.request_external_solution(
-                    self, invocation
+                for solution, word_ob in solutions:
+                    if word_ob == subcmd:
+                        # keep matching solution
+                        break
+                    else:
+                        # otherwise, don't exit w/ solution set
+                        solution = None
+            if not solution:
+                # else:
+                solution = cmdlike.request_external_solution(self, invocation)
+                solutions.append((solution, subcmd))
+
+                logger.debug(
+                    "while seeking external subexec for %r, recorded solution=%r at pos=%r cmdlike=%r",
+                    invocation,
+                    solution,
+                    pos,
+                    cmdlike.name,
                 )
-
-                self.word_objects[pos] = subcmd
-
-            logger.debug(
-                "while seeking external subexec for %r, recorded solution=%r at pos=%r cmdlike=%r",
-                invocation,
-                solution,
-                pos,
-                cmdlike.name,
-            )
 
             if not solution.solved:
                 cmdlike.resolve()
@@ -3430,13 +3531,19 @@ class RecordCommandlike(object):
                 cmdlike = cmdlikes[subcmd]
 
                 solution = None
+                solutions = self.solutions[pos]
                 if pos in self.solutions:
-                    solution = self.solutions[pos]
-                else:
-                    solution = self.solutions[pos] = cmdlike.request_external_solution(
-                        self, invocation
-                    )
-                    self.word_objects[pos] = invocation[wordnum]
+                    for solution, word_ob in solutions:
+                        if word_ob == subcmd:
+                            # keep matching solution
+                            break
+                        else:
+                            # otherwise, don't exit w/ solution set
+                            solution = None
+                if not solution:
+                    # else:
+                    solution = cmdlike.request_external_solution(self, invocation)
+                    solutions.append((solution, invocation[wordnum]))
 
                 logger.debug(
                     "look_for_external_sub_execution2: %r %r %r %r %r",
@@ -3503,50 +3610,55 @@ class RecordCommandlike(object):
             arena=self.arena,
         )
 
-    def soluble(self, pos):
-        """
-        Don't take this too seriously. It's just wrapping up a common
-        pattern where code that doesn't otherwise need to touch the
-        solutions object is doing it just to save work and so on.
-        """
-        return pos and pos not in self.solutions
-
     def record_general_invocation(self, invocation):
         """Record command found in general namespace."""
         pos = invocation.firstword.first_spid
-        self.solutions[pos] = cmdlikes[invocation.firstword].request_full_solution(
-            self, invocation
+        self.solutions[pos].append(
+            (
+                cmdlikes[invocation.firstword].request_full_solution(self, invocation),
+                invocation.firstword,
+            )
         )
-        self.word_objects[pos] = invocation.firstword
 
     def record_slash_invocation(self, invocation):
         """Record \command in (general namespace - aliases)."""
         pos = invocation.firstword.first_spid
-        self.solutions[pos] = cmdlikes[invocation.firstword].request_slash_solution(
-            self, invocation
+        self.solutions[pos].append(
+            (
+                cmdlikes[invocation.firstword].request_slash_solution(self, invocation),
+                invocation.firstword,
+            )
         )
-        self.word_objects[pos] = invocation.firstword
 
     def record_alias_declaration(self, declaration, identifier, pos):
         """Record command found in alias definition namespace."""
-        self.solutions[pos] = cmdlikes[identifier].request_alias_solution(self)
-        self.word_objects[pos] = declaration
+        self.solutions[pos].append(
+            (cmdlikes[identifier].request_alias_solution(self), declaration)
+        )
 
     def record_builtin_invocation(self, invocation):
         """Record command argument to `builtin` builtin :)"""
         pos = invocation.firstword.first_spid
-        self.solutions[pos] = cmdlikes[invocation.firstword].request_builtin_solution(
-            self, invocation
+        self.solutions[pos].append(
+            (
+                cmdlikes[invocation.firstword].request_builtin_solution(
+                    self, invocation
+                ),
+                invocation.firstword,
+            )
         )
-        self.word_objects[pos] = invocation.firstword
 
     def record_command_invocation(self, invocation):
         """Record command argument to `command` builtin."""
         pos = invocation.firstword.first_spid
-        self.solutions[pos] = cmdlikes[invocation.firstword].request_command_solution(
-            self, invocation
+        self.solutions[pos].append(
+            (
+                cmdlikes[invocation.firstword].request_command_solution(
+                    self, invocation
+                ),
+                invocation.firstword,
+            )
         )
-        self.word_objects[pos] = invocation.firstword
 
         # TODO: I disabled this, but I'm not sure if this is right or not.
         # If this is still here after 2021, it can be removed.
@@ -3562,10 +3674,14 @@ class RecordCommandlike(object):
     def record_external_invocation(self, invocation):
         """Record command argument to commands known to run externals."""
         pos = invocation.firstword.first_spid
-        self.solutions[pos] = cmdlikes[invocation.firstword].request_external_solution(
-            self, invocation
+        self.solutions[pos].append(
+            (
+                cmdlikes[invocation.firstword].request_external_solution(
+                    self, invocation
+                ),
+                invocation.firstword,
+            )
         )
-        self.word_objects[pos] = invocation.firstword
 
     def record_external_source(self, source, replace_with=None, position=None):
         """
@@ -3582,7 +3698,8 @@ class RecordCommandlike(object):
         """
         global resolved_scripts
         pos = source.first_spid
-        sol = self.solutions[pos] = Solution()
+        sol = Solution()
+        self.solutions[pos].append((sol, source))
         if replace_with:
             # TODO: see note about constant cmdkind
             sol.replace_name_with("source", source, replace_with)
@@ -3781,6 +3898,7 @@ class ResolvedScript(RecordCommandlike):
         These might do things like enumerate all lines that reference
         this var
         """
+
         file_ob = None
         # there are probably not any already, but we'll consume them
         # just-in-case to make sure we don't
@@ -3800,7 +3918,7 @@ class ResolvedScript(RecordCommandlike):
                             replace_varsubs[token],
                             positions,
                         )
-                        self.solutions[location] = sol
+                        self.solutions[location].append((sol, Word(sub)))
 
             with simple_var_sub.consume_members() as simple_subs:
                 # just do simple/braced separate; their structures differ
@@ -3817,7 +3935,7 @@ class ResolvedScript(RecordCommandlike):
                             replace_varsubs[token],
                             positions,
                         )
-                        self.solutions[location] = sol
+                        self.solutions[location].append((sol, Word(sub)))
 
             if len(self.solutions):
                 file_ob = io.BytesIO()
@@ -3954,48 +4072,56 @@ class ResolvedScript(RecordCommandlike):
         last = -1
 
         for location in replacements:
-            solution = self.solutions[location]
-            if last > location:
-                logger.warning(
-                    "skipping solution %r because the cursor (%r) is already past its location (%r)",
-                    solution,
-                    last,
-                    location,
-                )
-                continue
+            solutions = self.solutions[location]
+            """
+            Making this a little wonky to support the possibility of
+            multiple replacements at the same SPID (i.e., edge-case
+            things like `bash -c "ls | xargs"`). So we'll retain
+            positions and current in case there are extra iterations
+            and then finally write to file once we know we're done
+            """
+            positions = current = None
+            for i, (solution, word_object) in enumerate(solutions):
+                if last > location:
+                    logger.warning(
+                        "skipping solution %r because the cursor (%r) is already past its location (%r)",
+                        solution,
+                        last,
+                        location,
+                    )
+                    continue
 
-            logger.debug("handling replacements: %r", location)
-            logger.debug("word objects: %r", self.word_objects)
+                logger.debug("handling replacements: %r", location)
 
-            e = solution.exception
-            if e:
-                # TODO: unsure about this; perhaps I *meant* to replace
-                # these if they were already set... drop if no bites by
-                # 2022
-                e.word = e.word or self.word_objects[location].ast
-                e.span_id = e.span_id or location
-                e.arena = e.arena or self.arena
-                raise e
-            elif solution.replacement:
-                logger.debug("pre-replacement %r", location)
-                cursor.PrintUntil(location)
+                e = solution.exception
+                if e:
+                    # TODO: unsure about this; perhaps I *meant* to replace
+                    # these if they were already set... drop if no bites by
+                    # 2022
+                    e.word = e.word or word_object.ast
+                    e.span_id = e.span_id or location
+                    e.arena = e.arena or self.arena
+                    raise e
+                elif solution.replacement:
+                    logger.debug("pre-replacement %r", location)
+                    if not current:
+                        cursor.PrintUntil(location)
+                        logger.debug("printed up to %r", location)
+                        positions = max(solution.positions, word_object.spid_len)
+                        current = get_original_text(self.arena, location, positions)
+                    logger.debug(
+                        "identified current=%r, replacement=%r",
+                        current,
+                        solution.replace_in(current),
+                    )
+                    if current[0:1] == "\\":
+                        current = current.replace(current[1:], solution.replacement[1])
+                        location += 1
+                    else:
+                        current = solution.replace_in(current)
 
-                logger.debug("printed up to %r", location)
-                word_ob_pos = float("-inf")
-                if location in self.word_objects:
-                    word_ob_pos = self.word_objects[location].spid_len
-                positions = max(solution.positions, word_ob_pos)
-                current = get_original_text(self.arena, location, positions)
-                logger.debug(
-                    "identified current=%r, replacement=%r",
-                    current,
-                    solution.replace_in(current),
-                )
-                if current[0:1] == "\\":
-                    to.write(current.replace(current[1:], solution.replacement[1]))
-                    location += 1
-                else:
-                    to.write(solution.replace_in(current))
+            if current:
+                to.write(current)
 
                 last = location + positions
                 logger.debug(
@@ -4105,12 +4231,13 @@ class ResolvedScript(RecordCommandlike):
                     if i > 0:
                         words.append(word)
                 invocation = Invocation(words=words)
-                self.record_slash_invocation(invocation)
-            else:
+                if invocation.firstword not in FIRST_PASS_ESSENTIALS:
+                    self.record_slash_invocation(invocation)
+            elif invocation.firstword not in FIRST_PASS_ESSENTIALS:
                 self.record_general_invocation(invocation)
 
             # handle essential builtins immediately
-            if invocation.firstword in sorted(FIRST_PASS_ESSENTIALS):
+            if invocation.firstword in FIRST_PASS_ESSENTIALS:
                 cmdlike = cmdlikes[invocation.firstword]
                 logger.debug(
                     "FIRST_PASS_ESSENTIAL (%r): %r %r",

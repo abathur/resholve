@@ -40,7 +40,7 @@ Output:
 >>> [ stdinNone ]:3: Couldn't resolve command 'which'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 1 'which' needs to be in RESHOLVE_PATH in 298ms
+ok 1 'which' needs to be in RESHOLVE_PATH in 354ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < command_in_function.sh (exit: 3) ]
 
@@ -56,10 +56,10 @@ Output:
 >>>               ^~~~~
 >>> [ stdinNone ]:5: Couldn't resolve command 'which'
 >>> #!/nix/store/...-bash-4.4-p23/bin/bash
->>> source /private/tmp/nix-build-resholve-test.drv-30/resholved/tests/file_simple.sh
+>>> source /private/tmp/nix-build-resholve-test.drv-1/resholved/tests/file_simple.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH in 307ms
+ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH in 475ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < absolute_path.sh (exit: 5) ]
 
@@ -74,7 +74,7 @@ Output:
 >>> Next step: patch/substitute it.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 3 Absolute executable paths need exemptions in 298ms
+ok 3 Absolute executable paths need exemptions in 468ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < absolute_path_nested.sh (exit: 5) ]
 
@@ -91,7 +91,7 @@ Output:
 >>> /nix/store/...-findutils-4.7.0/bin/find
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 4 Even nested-executable paths need exemptions in 303ms
+ok 4 Even nested-executable paths need exemptions in 436ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < source_var_pwd.sh (exit: 6) ]
 
@@ -109,7 +109,7 @@ Output:
 >>> [ stdinNone ]:6: Can't resolve dynamic argument in 'source'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 5 Source, among others, needs an exemption for arguments containing variables in 305ms
+ok 5 Source, among others, needs an exemption for arguments containing variables in 510ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < file_simple.sh (exit: 0) ]
 
@@ -128,7 +128,7 @@ Diff:
 >>> +# resholve: keep /nix/store/...-file-5.39/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 6 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 316ms
+ok 6 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 340ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < file_in_function.sh (exit: 0) ]
 
@@ -138,7 +138,7 @@ Diff:
 >>> @@ -1,5 +1,10 @@
 >>> -source which_simple.sh
 >>> +#!/nix/store/...-bash-4.4-p23/bin/bash
->>> +source /private/tmp/nix-build-resholve-test.drv-30/resholved/tests/which_simple.sh
+>>> +source /private/tmp/nix-build-resholve-test.drv-1/resholved/tests/which_simple.sh
 >>>  which() {
 >>>      # resolves file here too
 >>> -    file "$@"
@@ -147,10 +147,10 @@ Diff:
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
 >>> +# resholve: keep /nix/store/...-file-5.39/bin/file
->>> +# resholve: keep source:/private/tmp/nix-build-resholve-test.drv-30/resholved/tests/which_simple.sh
+>>> +# resholve: keep source:/private/tmp/nix-build-resholve-test.drv-1/resholved/tests/which_simple.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 7 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 311ms
+ok 7 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 322ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < file_home_source_pwd.sh (exit: 6) ]
 
@@ -167,7 +167,7 @@ Output:
 >>> [ stdinNone ]:6: Can't resolve dynamic argument in 'source'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 8 Only some commands ('source' but NOT 'file', here) are checked for variable arguments. in 307ms
+ok 8 Only some commands ('source' but NOT 'file', here) are checked for variable arguments. in 318ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash --keep 'source:$PWD' < file_home_source_pwd.sh (exit: 0) ]
 
@@ -188,7 +188,7 @@ Diff:
 >>> +# resholve: keep source:$PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 9 Add an exemption with --keep <scope>:<name> in 309ms
+ok 9 Add an exemption with --keep <scope>:<name> in 327ms
 
 --[ RESHOLVE_KEEP='source:$PWD' resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < file_home_source_pwd.sh (exit: 0) ]
 
@@ -209,7 +209,7 @@ Diff:
 >>> +# resholve: keep source:$PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 10 Add an exemption with RESHOLVE_ALLOW=source:$PWD in 312ms
+ok 10 Add an exemption with RESHOLVE_ALLOW=source:$PWD in 324ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < source_missing_target.sh (exit: 4) ]
 
@@ -223,7 +223,7 @@ Output:
 >>> [ stdinNone ]:3: Unable to resolve source target 'doesnt_exist.sh' to a known file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 11 'source' targets also need to be in RESHOLVE_PATH in 308ms
+ok 11 'source' targets also need to be in RESHOLVE_PATH in 311ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < source_present_target.sh (exit: 0) ]
 
@@ -242,7 +242,7 @@ Diff:
 >>> +# resholve: keep source:/nix/store/...-gettext-0.21/bin/gettext.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 12 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH in 330ms
+ok 12 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH in 345ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash --fix aliases < alias_riddle.sh (exit: 0) ]
 
@@ -278,14 +278,14 @@ Diff:
 >>> +# resholve: keep /nix/store/...-findutils-4.7.0/bin/find
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 13 Has (naive) context-specific resolution rules in 356ms
+ok 13 Has (naive) context-specific resolution rules in 364ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash < nested_execer.sh (exit: 0) ]
 
 Diff:
 >>> --- original
 >>> +++ resolved
->>> @@ -1,14 +1,21 @@
+>>> @@ -1,21 +1,29 @@
 >>> +#!/nix/store/...-bash-4.4-p23/bin/bash
 >>>  fargs(){
 >>>  	echo "nice $(type -ap file) you got there"
@@ -307,15 +307,27 @@ Diff:
 >>> +builtin command -v . /nix/store/...-gettext-0.21/bin/gettext.sh # resolve last
 >>>  
 >>>  echo wert | exec >&2 # resolve none
+>>>  
+>>>  # semi-nonsense, but should resolve bash, gettext, file, bash, file
+>>> -bash \
+>>> -	-c "source gettext.sh" \
+>>> +/nix/store/...-bash-4.4-p23/bin/bash \
+>>> +	-c "source /nix/store/...-gettext-0.21/bin/gettext.sh" \
+>>>  	"bop" \
+>>> -	-c "command file" \
+>>> -	-c "bash -c file"
+>>> +	-c "command /nix/store/...-file-5.39/bin/file" \
+>>> +	-c "/nix/store/...-bash-4.4-p23/bin/bash -c /nix/store/...-file-5.39/bin/file"
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 2
 >>> +# resholve: keep /nix/store/...-file-5.39/bin/file
 >>> +# resholve: keep /nix/store/...-findutils-4.7.0/bin/find
 >>> +# resholve: keep /nix/store/...-findutils-4.7.0/bin/xargs
+>>> +# resholve: keep /nix/store/...-bash-4.4-p23/bin/bash
 >>> +# resholve: keep source:/nix/store/...-gettext-0.21/bin/gettext.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 14 Has (rudimentary) support for resolving executable arguments in 353ms
+ok 14 Has (rudimentary) support for resolving executable arguments in 392ms
 
 --[ resholve --interpreter /nix/store/...-bash-4.4-p23/bin/bash --fix '$FILE_CMD:file' < file_var.sh (exit: 0) ]
 
@@ -352,7 +364,7 @@ Diff:
 >>> +# resholve: keep /nix/store/...-file-5.39/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 15 Can substitute a variable used as a command in 351ms
+ok 15 Can substitute a variable used as a command in 364ms
 ```
 
 ## Nix demo

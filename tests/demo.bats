@@ -122,6 +122,16 @@ CASES
     status 0
     line 5 contains '/bin/find $(type -p file) -name file -exec /nix/store/'
     line 5 contains "/bin/file {} +  "
+    line 14 begins '/nix/store'
+    line 14 ends '/bin/bash \'
+    line 15 contains '-c "source /nix/store'
+    line 15 ends '/bin/gettext.sh" \'
+    line 16 contains '"bop" \'
+    line 17 contains '-c "command /nix/store'
+    line 17 ends '/bin/file" \'
+    line 18 contains '-c "/nix/store/'
+    line 18 contains '/bin/bash -c /nix/store/'
+    line 18 ends '/bin/file"'
   })
 } <<CASES
 resholve --interpreter $INTERP < nested_execer.sh
