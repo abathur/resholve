@@ -1125,8 +1125,8 @@ class UnresolvedSource(Forbid):
 
 
 class UnexpectedAbsolutePath(Forbid):
-    problem = "Unexpected absolute %s path (not supplied by a listed dependency)."
-    ideas = ("patch/substitute it.",)
+    problem = "Unexpected absolute %s path."
+    ideas = ("keep, fix, or pre-patch/substitute it.",)
     status = 5
 
 

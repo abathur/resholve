@@ -17,7 +17,7 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 resholve --interpreter $INTERP eval_quoted.sh
 CASES
 
-@test "verify --keep '$varname' allows dynamic commands" {
+@test "verify --keep '\$varname' allows dynamic commands" {
   require <({
     status 0
     line -1 begins "Rewrote"
@@ -27,7 +27,7 @@ CASES
 resholve --interpreter $INTERP --keep '\$GIT_PROGRAM \$LS_PROGRAM command:\$LS_PROGRAM \$STAT_HERE \$STAT_ELSEWHERE' variable_as_command.sh
 CASES
 
-@test "verify --fix '$varname:cmd' substitutes dynamic commands" {
+@test "verify --fix '\$varname:cmd' substitutes dynamic commands" {
   require <({
     status 0
     line -11 contains '/bin/file'
@@ -65,7 +65,7 @@ CASES
 @test "objects to unexempted absolute source paths" {
   require <({
     status 5
-    line 3 ends "Unexpected absolute source path (not supplied by a listed dependency)."
+    line 3 ends "Unexpected absolute source path."
   })
 } <<CASES
 resholve --interpreter $INTERP < absolute_source.sh
@@ -84,7 +84,7 @@ CASES
 @test "allow (but do not parse) --fake 'source:path'" {
   require <({
     status 5
-    line 3 ends "Unexpected absolute source path (not supplied by a listed dependency)."
+    line 3 ends "Unexpected absolute source path."
   })
 } <<CASES
 resholve --interpreter $INTERP --fake 'source:/not/a/real/script' < absolute_source.sh
