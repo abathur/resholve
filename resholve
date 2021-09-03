@@ -168,7 +168,7 @@ directives = ResolutionDirectives()
 
 def parse_directive(value, scope_map=None):
     if not len(value):
-        return None
+        return set()
     out = set()
     try:
         """
@@ -228,8 +228,6 @@ def remap_fake_scope(scope):
 def directive_fake(value):
     global FAKE_DIRECTIVE_TYPES
     directives = parse_directive(value, remap_fake_scope)
-    if not directives:
-        return None
     for directive in directives:
         if len(directive) == 1:
             raise ourparse.ArgumentTypeError(
@@ -246,8 +244,6 @@ def directive_fake(value):
 
 def directive_fix(value):
     directives = parse_directive(value)
-    if not directives:
-        return None
     logger.debug("validating fix directives %r", directives)
     for directive in directives:
         if len(directive) == 1:
@@ -273,8 +269,6 @@ def directive_fix(value):
 
 def directive_keep(value):
     directives = parse_directive(value)
-    if not directives:
-        return None
     logger.debug("validating keep directives %r", directives)
     for directive in directives:
         if len(directive) == 1:

@@ -229,6 +229,18 @@ CASES
 # The 3rd case previously confirmed that envvars were merged with flags and
 # in-doc directives. I moved 'source:\$HOME' from RESHOLVE_KEEP into --keep
 
+@test "resholve accepts empty directives" {
+
+  require <({
+    status 0
+    line -1 begins "# resholve: keep /nix/store"
+    line -1 contains "-file-"
+    line -1 ends "/bin/file"
+  })
+} <<CASES
+resholve --interpreter $INTERP --keep '' --fix '' --fake '' < file_simple.sh
+CASES
+
 @test "don't resolve aliases without '--fix aliases'" {
   require <({
     status 0
