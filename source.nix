@@ -3,7 +3,7 @@
 }:
 
 rec {
-  version = "0.6.0-rc.4";
+  version = "0.6.0-rc.5";
   rSrc =
     # local build -> `make ci`; `make clean` to restore
     # return to remote source
@@ -14,6 +14,6 @@ rec {
         owner = "abathur";
         repo = "resholve";
         rev = "v${version}";
-        hash = "sha256-WWG3+wHQAAnw+62+IYeNdigOcGkgDezatbSwOI93pn8=";
+        hash = "sha256-n7l2vTYEw7ehSQ9wW1Stux3seLrpKtVKg9xCEMpykR4=";
       };
 }
