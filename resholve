@@ -2950,12 +2950,40 @@ class Invocation(PositionalObjectBase, tuple):
     def __new__(cls, ast=None, words=None):
         self = None
         if ast:
-            if hasattr(ast, "words"):
+            if hasattr(ast, "words") and len(ast.words):
                 self = tuple.__new__(cls, map(Word, ast.words))
             elif hasattr(ast, "ast"):
                 self = tuple.__new__(cls, (Word(ast.ast),))
+            elif hasattr(ast, "redirects"):
+                """
+                At least one idiom, <filename, can end up
+                here because it's a ~command, but we don't
+                want it going down the full pipeline because
+                it doesn't have any command words...
+                (command.Simple
+                  redirects: [
+                    (redir
+                      op: (Token
+                        id:Id.Redir_Less
+                        span_id:0
+                        val:'<')
+                      loc: (redir_loc.Fd fd:0)
+                      arg: (compound_word
+                        parts:[(Token
+                          id:Id.Lit_Chars
+                          span_id:1
+                          val:hehe)]
+                      )
+                    )
+                  ]
+                  do_fork: F
+                )
+                """
+                # skip this
+                return None
         elif words:
             self = tuple.__new__(cls, words)
+
         self.firstword = firstword = self[0]
         self.first_spid = firstword.first_spid
         self.last_spid = self[-1].last_spid
@@ -4268,7 +4296,9 @@ class ResolvedScript(RecordCommandlike):
     def visit_commands(self):
         with command.Simple.consume_members() as cmds:
             for sub in cmds:
-                self.visit_command_invocation(Invocation(sub))
+                inv = Invocation(sub)
+                if inv:
+                    self.visit_command_invocation(inv)
 
 
 if __name__ == "__main__":

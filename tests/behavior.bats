@@ -252,3 +252,13 @@ CASES
 } <<CASES
 RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_FINDUTILS" resholve --interpreter $INTERP < buffalo.sh
 CASES
+
+@test "don't get confused by input redirections" {
+  require <({
+    status 0
+    line 2 equals "exec >&2 # resolve none"
+    line 3 equals "<hehe # resolve none"
+  })
+} <<CASES
+resholve --interpreter $INTERP < redirects.sh
+CASES
