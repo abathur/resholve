@@ -2013,6 +2013,16 @@ class ExternalCommandParsers(object):
         """
         generic = FindParser("find")
         generic.add_argument("start")
+        # boolean predicates, not quite like normal flags...
+        # just capturing to ~ignore
+        generic.add_argument(
+            "-o",
+            "-or",
+            "-a",
+            "-and",
+            dest="ignored_boolean_predicates",
+            action="store_true",
+        )
         """
         This one arg doesn't use invocations;
         it has handling in the parser.
