@@ -18,8 +18,8 @@ rec {
     (fetchFromGitHub {
       owner = "abathur";
       repo = "binlore";
-      rev = "v0.1.1";
-      hash = "sha256-EOWxKC8daHTWQdl/KiQbJ3zXWOKGMHNho+gERDF8YUk=";
+      rev = "v0.1.3";
+      hash = "sha256-+rgv8gAQ3ptOpL/EhbKr/jq+k/4Lpn06/2qON+Ps2wE=";
     })
     { };
   # oil = callPackage ../oildev { };
