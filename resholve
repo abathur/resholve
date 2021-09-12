@@ -2063,6 +2063,141 @@ class ExternalCommandParsers(object):
     for shell in INVOKABLE_SHELLS:
         whoazard["_" + shell] = _generic_shell
 
+    @staticmethod
+    def _tar():
+        """
+          `--checkpoint-action=action`
+              Instruct tar to execute an action upon hitting a breakpoint. Here we give only a brief outline. See section Checkpoints, for a complete description.
+
+              The action argument can be one of the following:
+
+              bell
+              Produce an audible bell on the console.
+
+              dot
+              .
+              Print a single dot on the standard listing stream.
+
+              echo
+              Display a textual message on the standard error, with the status and number of the checkpoint. This is the default.
+
+              echo=string
+              Display string on the standard error. Before output, the string is subject to meta-character expansion.
+
+              exec=command
+              Execute the given command.
+
+              sleep=time
+              Wait for time seconds.
+
+              ttyout=string
+              Output string on the current console (`/dev/tty`).
+
+              totals
+              Print statistics (see see totals).
+
+              wait=signo
+              Wait for signal signo.
+
+              Several `--checkpoint-action` options can be specified. The supplied actions will be executed in order of their appearance in the command line.
+
+              Using `--checkpoint-action` without `--checkpoint` assumes default checkpoint frequency of one checkpoint per 10 records.
+        -F, --info-script=COMMAND, --new-volume-script=COMMAND
+          Run COMMAND at the end of each tape (implies -M).  The command can include arguments...
+          --to-command=COMMAND   pipe extracted files to another program
+          --rmt-command=COMMAND  use given rmt COMMAND instead of rmt
+        --rsh-command=COMMAND  use remote COMMAND instead of rsh
+          -I, --use-compress-program=COMMAND
+          Filter data through COMMAND.  It must accept the -d option, for decompression.  The argument can contain command line options.
+        """
+        generic = CommandParser("generic tar")
+        """
+        TODO: I'm technically missing one here, but it is a
+        bit harder than the rest.
+        "--checkpoint-action='exec=somecommand'"
+
+        slow-rolling this because it needs a custom parser &
+        I don't see any wild examples of this on GH:
+        https://github.com/search?q=%22--checkpoint-action%3Dexec%22&type=Code
+
+        CAUTION: bsdtar flags are different enough that it
+        may not tolerate living on the same parser like this
+        For example, -I in gnutar can lead to subexec as we
+        catch here, while -I in bsdtar is an alias for -T
+        aka --files-from.
+        """
+        generic.add_argument(
+            "-g",
+            "-f",
+            "-L",
+            "-b",
+            "-H",
+            "-V",
+            "-C",
+            "-K",
+            "-N",
+            "-T",
+            "-X",
+            dest="arg_ignored",
+            nargs=1,
+        )
+        generic.add_argument(
+            "-v",
+            "-A",
+            "-c",
+            "-d",
+            "-r",
+            "-t",
+            "-u",
+            "-x",
+            "-G",
+            "-n",
+            "-S",
+            "-k",
+            "-U",
+            "-W",
+            "-O",
+            "-m",
+            "-p",
+            "-s",
+            "-M",
+            "-B",
+            "-i",
+            "-a",
+            "-j",
+            "-J",
+            "-z",
+            "-Z",
+            "-h",
+            "-P",
+            "-l",
+            "-R",
+            "-v",
+            "-w",
+            "-o",
+            dest="argless_ignored",
+            action="store_true",
+        )
+        generic.add_argument(
+            "-F",
+            "--info-script",
+            "--new-volume-script",
+            "--to-commands",
+            "--rsh-command",
+            "--rmt-command",
+            "-I",
+            "--use-compress-program",
+            dest="commands",
+            split=True,
+            action="invocations",
+            nargs=1,
+        )
+        return (generic,)
+
+    # I think it only supports --use-compress-program
+    # but over-supporting should be fine.
+    _bsdtar = _tar
+
 
 def generate_builtin_command_parser(cmdname):
     cmdname = "_" + cmdname
