@@ -6,11 +6,12 @@ resholve replaces references to a bash/shell script's external
 dependencies (commands and sourced scripts) with absolute paths, ensuring
 they are declared, present, and don't shift if PATH changes.
 
-Others have called resholve "patchelf, but for shell scripts" and a "linker for bash scripts."
+Comparisons:
+- a linker for bash scripts
+- [patchelf](https://github.com/NixOS/patchelf) for shell scripts
 
-It treats references it can't resolve as errors (to block a build, 
-install, package, or deploy process) until you tell it how to handle 
-them, and then rewrites the script according to your instructions.
+It treats references it can't resolve as build-blocking errors
+until you tell it how to handle them, and then rewrites the script.
 
 Convinced? Jump to the [Quickstart](#quickstart). Otherwise, read on.
 
@@ -29,36 +30,32 @@ understand how you're thinking about this and refine the intro.)
 
 ## What problem(s) does this solve?
 
-I've designed resholve as a generic utility, but I'm building it to improve support for shell libraries/modules in [Nix](https://nixos.org/nix/)/[Nixpkgs](https://github.com/NixOS/nixpkgs).
+resholve is a generic tool, but I'm building it so [Nix](https://nixos.org/nix/)/[Nixpkgs](https://github.com/NixOS/nixpkgs) can have have great shell packaging.
 
-Here are a few things resholve is already helping us do in the Nix ecosystem:
+In the Nix ecosystem, resholve is already helping us:
 - discover and declare dependencies at package time instead of after runtime failures
     - keep unexpected versions of an executable or script from causing undefined behavior
 - avoid polluting PATH with all of a script's dependencies, which also means
-    - no conflicts between things different scripts need on PATH
-    - no conflicts with the packages a user expects on PATH
-    - no implicit (and potentially fragile) dependency on the content
-      and execution-order of a user's shell rc/profile
+    - no conflicts between tools different scripts need on PATH
+    - no conflicts with other packages a user expects on PATH
+    - no implicit dependency on the content fragile rc/profile scripts
 - work directly with "normal" shell scripts
     - no polluting *source* scripts with template variables/syntax
     - no inlining shell scripts to readily inject absolute paths
     - no fragile .patch files
     - no fragile sed/awk text substitutions that might over-match
 
-(feel free to open a PR/issue to document uses you discover!)
+(Please open a PR/issue to document uses you discover!)
 
 ## Quickstart
-> *Note:* resholve is a young project. It *works for a living* already, but not much is done beyond the golden path. For example, resholve is *only* packaged for the [Nix package manager](https://nixos.org/nix/). You may want to review the [limitations](#limitations) section for more.
+> *Note:* resholve *works for a living*, but it is young. For example, it is *only* packaged for the [Nix package manager](https://nixos.org/nix/). You may want to review the [limitations](#limitations) section for more.
 
-This section focuses on getting resholve to play with it. Once you have it, you should review `man resholve` (or the [plaintext](resholve.1.txt) copy).
+Here's how to get resholve to play with it. You should also review `man resholve` (or the [plaintext](resholve.1.txt) copy).
 
 ### CLI
-resholve isn't quite in nixpkgs yet, but once it is, you can try it
-out by running
 
 ```shell
 nix-shell -p resholve
-# I recommend nix-shell for 'man resholve' support.
 ```
 
 ### Nix builder
@@ -70,18 +67,17 @@ The best documentation on the Nix builder is currently in [nixpkgs](https://gith
 git clone https://github.com/abathur/resholve.git
 cd resholve
 nix-shell
-# or nix-build, but I recommend nix-shell for 'man resholve' support
+# I recommend nix-shell for 'man resholve' support
 ```
 
 ## Acknowledgements
 - resholve leverages the [Oil](https://github.com/oilshell/oil) shell's OSH parser) and wouldn't be feasible without Andy Chu's excellent work on that project.
 
 ## Limitations
-If you have short-term plans to *depend* on resholve, I recommend making sure you understand its limitations.
+We can't all be perfect :)
 
 ### Documentation
-- The manpage is currently the canonical reference to resholve's options and behavior; the only online format is [plaintext](resholve.1.txt). See #19.
-- The existing documentation doesn't really address the Nix API, though there are some examples.
+- The manpage is currently the canonical reference to resholve's options and behavior; the only online format is [plaintext](resholve.1.txt). See https://github.com/abathur/resholve/issues/19.
 
 ### Packaging
 - My short-term goal is to support packaging shell projects for the [Nix package manager](https://nixos.org/nix/) (and hopefully getting this support into Nixpkgs). As such, the current build process depends on Nix. 
@@ -95,7 +91,7 @@ Because Shell is a very flexible, tricky language, resholve necessarily focuses 
 
 The main areas I'm currently aware of:
 
-- In any Nix build, resholve now blocks resolution of some fundamental external utilities (such as su and sudo) that use run wrappers in NixOS. See #29 for more.
+- In any Nix build, resholve now blocks resolution of some fundamental external utilities (such as su and sudo) that use run wrappers in NixOS. See https://github.com/abathur/resholve/issues/29 for more.
 - Because resholve makes assumptions about the behavior of some builtins in order to resolve scripts, it blocks if it looks like one is overridden by a function or alias. (This can likely be relaxed once I have a better sense of who/what/when/where/why/how these are overridden).
 - resholve doesn't have robust handling of variables that get executed like commands (this includes things like `eval $variable` and `"$run_as_command"` and `$GIT_COMMAND status`). There's some room for improvement here, but I also want to manage expectations because some cases are completely intractable without evaluating the script.
     - there's a first-level complication about seeing-through the variables themselves
