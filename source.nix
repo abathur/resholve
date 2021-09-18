@@ -13,7 +13,8 @@ rec {
       fetchFromGitHub {
         owner = "abathur";
         repo = "resholve";
-        rev = "v${version}";
-        hash = "sha256-GfhhU9f5kiYcuYTPKWXCIkAGsz7GhAUGjAmIZ8Ww5X4=";
+        # rev = "v${version}";
+        rev = "1e98669761ecb0d0741a6da0f73c8988b3b5497d";
+        hash = "sha256-hkXLKvaeoURKLghzgMrbl5hJpCSn3MFzV1wmlYWAcn0=";
       };
 }
