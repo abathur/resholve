@@ -11,10 +11,11 @@ let
     inherit (deps) binlore;
     runDemo = true;
   })
-    module1 module2 module3 cli;
+    module1 module2 module3 cli resholvedScript resholvedScriptBin;
 
 in
 runCommand "resholve-ci" { } ''
+  diff ${resholvedScript} ${resholvedScriptBin}/bin/resholved-script-bin
   mkdir $out
   printf "\033[33m============================= resholve Nix demo ===============================\033[0m\n"
   env -i ${module3}/bin/conjure.sh |& tee nix-demo.ansi
