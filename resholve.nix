@@ -4,7 +4,6 @@
 , installShellFiles
 , rSrc
 , version
-, bash
 , oildev
 , binlore
 }:
@@ -18,7 +17,7 @@ python27Packages.buildPythonApplication {
 
   nativeBuildInputs = [ installShellFiles ];
 
-  propagatedBuildInputs = [ oildev python27Packages.ConfigArgParse ];
+  propagatedBuildInputs = [ oildev python27Packages.configargparse ];
 
   patchPhase = ''
     for file in resholve; do
