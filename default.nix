@@ -20,34 +20,27 @@ with pkgs; rec
     inherit resholve;
     inherit resholve-utils;
   };
-  resholveScript = name: partialSolution: body:
+  resholveScript = name: partialSolution: text:
     writeTextFile {
-      inherit name;
+      inherit name text;
       executable = true;
-      text = ''
-        #!${runtimeShell}
-        ${body}'';
       checkPhase = ''
         (
           PS4=$'\x1f'"\033[33m[resholve context]\033[0m "
           set -x
           ${resholve-utils.makeInvocation name (partialSolution // {
             scripts = [ "${placeholder "out"}" ];
-            interpreter = "${runtimeShell}";
           })}
         )
         ${stdenv.shell} -n $out
       '';
     };
   # writeResholveBin "foo" { ... } '' echo "Hello" ''
-  resholveScriptBin = name: partialSolution: body:
+  resholveScriptBin = name: partialSolution: text:
     writeTextFile rec {
-      inherit name;
+      inherit name text;
       executable = true;
       destination = "/bin/${name}";
-      text = ''
-        #!${runtimeShell}
-        ${body}'';
       checkPhase = ''
         (
           cd "$out"
@@ -56,7 +49,6 @@ with pkgs; rec
           : changing directory to $PWD
           ${resholve-utils.makeInvocation name (partialSolution // {
             scripts = [ "bin/${name}" ];
-            interpreter = "${runtimeShell}";
           })}
         )
         ${stdenv.shell} -n $out/bin/${name}

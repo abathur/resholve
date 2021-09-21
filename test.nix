@@ -226,11 +226,17 @@ rec {
   };
 
   # Caution: ci.nix asserts the equality of both of these w/ diff
-  resholvedScript = resholveScript "resholved-script" { inputs = [ file ]; } ''
+  resholvedScript = resholveScript "resholved-script" {
+    inputs = [ file ];
+    interpreter = "${bash}/bin/bash";
+  } ''
     echo "Hello"
     file .
   '';
-  resholvedScriptBin = resholveScriptBin "resholved-script-bin" { inputs = [ file ]; } ''
+  resholvedScriptBin = resholveScriptBin "resholved-script-bin" {
+    inputs = [ file ];
+    interpreter = "${bash}/bin/bash";
+  } ''
     echo "Hello"
     file .
   '';
