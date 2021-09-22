@@ -36,7 +36,7 @@ python27Packages.buildPythonApplication {
     rm $out/nix-support/propagated-build-inputs
   '';
 
-  passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc; inherit binlore; };
+  passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc binlore; };
 
   meta = with lib; {
     description = "Resolve external shell-script dependencies";

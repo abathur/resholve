@@ -7,8 +7,7 @@ in
 with pkgs; rec
 {
   resholve = callPackage ./resholve.nix {
-    inherit (source) rSrc;
-    inherit (source) version;
+    inherit (source) rSrc version;
     inherit (deps) binlore;
     inherit (deps.oil) oildev;
   };
@@ -17,8 +16,7 @@ with pkgs; rec
     inherit (deps) binlore;
   };
   resholvePackage = callPackage ./resholve-package.nix {
-    inherit resholve;
-    inherit resholve-utils;
+    inherit resholve resholve-utils;
   };
   resholveScript = name: partialSolution: text:
     writeTextFile {
