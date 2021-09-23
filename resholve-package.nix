@@ -10,7 +10,6 @@
 let
   inherit stdenv;
 
-
   self = (stdenv.mkDerivation ((removeAttrs attrs [ "solutions" ])
     // {
     inherit pname version src;
