@@ -30,10 +30,9 @@ with pkgs; rec
             scripts = [ "${placeholder "out"}" ];
           })}
         )
-        ${stdenv.shell} -n $out
+        ${partialSolution.interpreter} -n $out
       '';
     };
-  # writeResholveBin "foo" { ... } '' echo "Hello" ''
   resholveScriptBin = name: partialSolution: text:
     writeTextFile rec {
       inherit name text;
@@ -49,7 +48,7 @@ with pkgs; rec
             scripts = [ "bin/${name}" ];
           })}
         )
-        ${stdenv.shell} -n $out/bin/${name}
+        ${partialSolution.interpreter} -n $out/bin/${name}
       '';
     };
 }
