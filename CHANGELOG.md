@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.4 (Sep 25 2021)
+- Fix & refine awk handler
+
 ## v0.6.3 (Sep 25 2021)
 - support single-part keep directives for PWD-relative `./paths`
 
