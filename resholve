@@ -320,6 +320,10 @@ class InvocationsAction(theirparse._AppendAction):
         return super(InvocationsAction, self).__init__(*args, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
+        if not values:
+            # bail; see https://github.com/abathur/resholve/issues/34
+            # for more context/motive
+            return None
         if self.split:
             words = []
             for val in values:
