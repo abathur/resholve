@@ -83,9 +83,6 @@ rec {
             "/usr/bin/od" = true;
           };
           keep = {
-            # dynamically defined in shunit2:_shunit_mktempFunc
-            eval = [ "shunit_condition_" "_shunit_test_" "_shunit_prepForSourcing" ];
-
             # variables invoked as commands; long-term goal is to
             # resolve the *variable*, but that is complexish, so
             # this is where we are...
