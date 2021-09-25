@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.6.0 (IDK ? 2021)
+## v0.6.2 (Sep 25 2021)
+- Fix https://github.com/abathur/resholve/issues/34
+
+## v0.6.1 (Sep 23 2021)
+- Extract Nix utility funcs from `resholvePackage` in order to add `resholveScript` and `resholveScriptBin`
+
+## v0.6.0 (Sep 14 2021)
 
 In order to support a few new features, I've refactored a fair fraction of resholve's command-visitor and resolution process. I'll focus on what I've added, but fair warning: slips/regressions are more likely with this update.
 
@@ -12,7 +18,7 @@ In order to support a few new features, I've refactored a fair fraction of resho
         - a directive to tell resholve if there's anything else to resolve
     - I'm developing the default/~reference lore provider as a separate project: https://github.com/abathur/binlore. (It is responsible for evaluating each executable and printing judgements in the appropriate format.)
     - The lore format (see [Binlore: Lore Formats](https://github.com/abathur/binlore#lore-formats) for more) is simple to write or generate.
-- Block Nix builds if a script uses some executables that, in Nix land, must use setuid wrappers. Details in #29, but generally this exists to catch users at risk of falling into some Nix traps.
+- Block Nix builds if a script uses some executables that, in Nix land, must use setuid wrappers. Details in https://github.com/abathur/resholve/issues/29, but generally this exists to catch users at risk of falling into some Nix traps.
 
 ### Improved resolution
 - Separate per-command handlers (previously: shared handlers for ~similar builtins/commands) to better accommodate syntax/usage quirks of individual commands like variable assignments, flags, exec's fd behavior, varying sub-executable locations, etc.
