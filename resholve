@@ -3528,7 +3528,11 @@ class RecordCommandlike(object):
         if p.returncode == 2:
             if "fatal: 'system' function not allowed in sandbox mode" in stderr:
                 return True
-            elif "fatal: redirection not allowed in sandbox mode" in stderr:
+            # test for | since normal > redirects also trigger
+            elif (
+                "fatal: redirection not allowed in sandbox mode" in stderr
+                and "|" in expr
+            ):
                 return True
             logger.debug("unhandled awk error: %r", stderr)
             # TODO: maybe later we can do something smarter
@@ -3556,7 +3560,7 @@ class RecordCommandlike(object):
                 if self._find_awk_sub_cmd(expression):
                     observe(
                         AwkSubCommand,
-                        word=expression.firstword.ast,
+                        word=expression.ast,
                         span_id=expression.first_spid,
                         arena=self.arena,
                     )
@@ -3566,7 +3570,7 @@ class RecordCommandlike(object):
             if self._find_awk_sub_cmd(parsed.script):
                 observe(
                     AwkSubCommand,
-                    word=parsed.script.firstword.ast,
+                    word=parsed.script.ast,
                     span_id=parsed.script.first_spid,
                     arena=self.arena,
                 )
