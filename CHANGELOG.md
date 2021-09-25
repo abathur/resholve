@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.3 (Sep 25 2021)
+- support single-part keep directives for PWD-relative `./paths`
+
 ## v0.6.2 (Sep 25 2021)
 - Fix https://github.com/abathur/resholve/issues/34
 

@@ -278,11 +278,13 @@ def directive_keep(value):
                 os.path.expanduser(directive[0])
             ):
                 pass
+            elif directive[0][0:2] == "./":
+                pass
             elif os.path.isabs(directive[0]):
                 pass  # ok absolute path
             else:
                 raise ourparse.ArgumentTypeError(
-                    "valid single-part keep directives: $variable, absolute path, ~/path"
+                    "valid single-part keep directives: $variable, absolute path, ~/path, ./path"
                 )
         elif len(directive) == 2:
             pass
