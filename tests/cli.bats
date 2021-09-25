@@ -172,7 +172,7 @@ CASES
 
   require <({
     status 2
-    line -1 ends "valid single-part keep directives: \$variable, absolute path, ~/path"
+    line -1 ends "valid single-part keep directives: \$variable, absolute path, ~/path, ./path"
   })
 } <<CASES
 resholve --interpreter $INTERP --keep source PWD source_var_pwd.sh
