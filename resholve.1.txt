@@ -82,7 +82,7 @@ CONTROLLING RESOLUTION
          aliases
             resolve into alias definitions
 
-         Ex: −−fix ’aliases xargs:ls $GIT:gix’
+         Ex: −−fix ’aliases $GIT:gix /bin/bash’
 
      −−keep ’directives’ | RESHOLVE_KEEP=’directives’
          Ignore (omit errors for) some things it isn’t safe to fix/ignore by
@@ -90,6 +90,9 @@ CONTROLLING RESOLUTION
 
          outer_command:inner_command[;inner_command]...
             ignore inner_command(s) in the arguments to outer_command
+
+         command:$variable[;$variable]... (Note: $ may need escaping)
+            ignore $variable(s) in the arguments to command
 
          $variable (Note: $ may need escaping)
             ignore $variable or ${variable} used as all or part of a first
@@ -103,7 +106,10 @@ CONTROLLING RESOLUTION
          ~/path
             ignore a specific home‐relative_path
 
-         Ex: −−keep ’which:git;ls source:$HOME $LS:exa /etc/bashrc ~/.bashrc’
+         ./path
+            ignore a specific PWD‐relative_path
+
+         Ex: −−keep ’which:git;ls source:$HOME /etc/bashrc ~/.bashrc’
 
 NESTED RESOLUTION
      Initially, resolution of commands in the arguments to command‐executing
@@ -222,4 +228,4 @@ SEE ALSO
 AUTHORS
      Travis A. Everett ⟨travis.a.everett@gmail.com⟩
 
-BSD                             August 10, 2021                            BSD
+BSD                           September 25, 2021                           BSD

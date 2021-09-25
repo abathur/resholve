@@ -140,10 +140,6 @@ or
 .It Fl Fl fix Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_FIX= Eo ' Ns Ar directives Ec Ns '
 Fix some things it it isn't safe to fix/ignore by default. Directive forms:
 .Bl -tag -width 1n
-.\".It Ar outer_command : Ns Ar inner_command Ns [; Ns Ar inner_command ] Ns ...
-.\"resolve
-.\".Ar inner_command Ns (s)
-.\"in the arguments to outer_command
 .It $ Ns Ar variable : Ns Ar command No (Note: $ may need escaping)
 replace parameter expansions of
 .No $ Ns Ar variable
@@ -155,26 +151,16 @@ treat
 as a bare reference that must be resolved
 .It Cm aliases
 resolve into alias definitions
-.It Ex: Fl Fl fix No 'aliases xargs:ls $GIT:gix'
+.It Ex: Fl Fl fix No 'aliases $GIT:gix /bin/bash'
 .El
 .It Fl Fl keep Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_KEEP= Eo ' Ns Ar directives Ec Ns '
 Ignore (omit errors for) some things it isn't safe to fix/ignore by default. Directive forms:
 .Bl -tag -width 1n
-.It Ar outer_command : Ns Ar inner_command Ns [; Ns Ar inner_command ] Ns ...
+.It Ar command : Ns $ Ns Ar variable Ns [; Ns $ Ns Ar variable ] Ns ... No (Note: $ may need escaping)
 ignore
-.Ar inner_command Ns (s)
+.No $ Ns Ar variable Ns (s)
 in the arguments to
-.Ar outer_command
-.\".It Ar command : Ns $ Ns Ar variable Ns [; Ns $ Ns Ar variable ] Ns ... No (Note: $ may need escaping)
-.\"ignore
-.\".No $ Ns Ar variable Ns (s)
-.\"in the arguments to
-.\".Ar command
-.\".It $ Ns Ar variable : Ns Ar command Ns [; Ns Ar command ] Ns ... No (Note: $ may need escaping)
-.\"ignore
-.\".Ar command Ns (s)
-.\"in the definition of
-.\".No $ Ns Ar variable
+.Ar command
 .It $ Ns Ar variable No (Note: $ may need escaping)
 ignore
 .No $ Ns Ar variable
@@ -192,7 +178,7 @@ ignore a specific
 .It Ar ./path
 ignore a specific
 .Ar PWD-relative_path
-.It Ex: Fl Fl keep No 'which:git;ls source:$HOME $LS:exa /etc/bashrc ~/.bashrc'
+.It Ex: Fl Fl keep No 'source:$HOME /etc/bashrc ~/.bashrc'
 .El
 .El
 .\".Xr sudo 1 Ns ,
