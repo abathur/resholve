@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.5 (Sep 26 2021)
+- Let awk handler time out (in case the awk script won't complete) without input conditions we can't understand)
+- Apply the same handler to gawk
+
 ## v0.6.4 (Sep 25 2021)
 - Fix & refine awk handler
 
