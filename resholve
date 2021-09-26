@@ -14,6 +14,7 @@ import re
 import csv
 import shlex
 
+from threading import Timer
 from subprocess import Popen, PIPE
 from contextlib import contextmanager
 
@@ -3510,11 +3511,15 @@ class RecordCommandlike(object):
         awk: cmd. line:3: fatal: redirection not allowed in sandbox mode
         """
         awk = lookup("awk")
+
         if not awk:
             raise Exception(
                 "Somehow I ended up trying to look for an awk sub command in %r when awk isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
                 expr,
             )
+
+        # TODO: abstract this pattern
+        # close dupe in sed
         p = Popen(
             [awk, "--sandbox", expr],
             shell=False,
@@ -3523,7 +3528,19 @@ class RecordCommandlike(object):
             stderr=PIPE,
             close_fds=True,
         )
-        stdout, stderr = p.communicate(input="something cute")
+
+        try:
+            timer = Timer(2, p.kill)
+            timer.start()
+            stdout, stderr = p.communicate(input="something cute")
+        finally:
+            if timer.is_alive():
+                timer.cancel()
+            else:
+                logger.warning(
+                    "timeout after 1s waiting for awk expression test: \n%s\ncontinuing but I'm not certain it doesn't contain external commands.",
+                    expr,
+                )
 
         if p.returncode == 2:
             if "fatal: 'system' function not allowed in sandbox mode" in stderr:
@@ -3576,6 +3593,9 @@ class RecordCommandlike(object):
                 )
             return True
         return True
+
+    # TODO: maybe a better way for the caller to find these
+    handle_external_gawk = handle_external_awk
 
     def handle_external_generic(self, parsed, invocation):
         # TODO: shimming shells in here may be a bigger crime than
