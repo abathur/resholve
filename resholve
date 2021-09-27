@@ -4475,3 +4475,5 @@ class ResolvedScript(RecordCommandlike):
 if __name__ == "__main__":
     # punshow()  # DEBUG: toggle comments here when you want exceptions
     sys.exit(punshow())
+
+export to Mu
