@@ -3082,7 +3082,7 @@ class Word(PositionalObjectBase, str):
         self.ast = ast
         for k, v in kwargs.items():
             setattr(self, k, v)
-        self.ok, _fw_txt, self.quoted = word_.StaticEval(ast)
+        self.ok, _non_dynamic_text, self.quoted = word_.StaticEval(ast)
         return self
 
 
@@ -4347,6 +4347,7 @@ class ResolvedScript(RecordCommandlike):
         Handle a word that didn't pass StaticEval
         """
         logger.debug("allow dynamic executable word? '%s' -> %r", outer, word)
+        logger.debug("dynamic word keep=%r, allow=%r", word.keep, word.allow)
         if outer == "eval":
             logger.info(
                 "allowing eval with dynamic argument %r",
@@ -4393,10 +4394,15 @@ class ResolvedScript(RecordCommandlike):
                 )
             else:
                 if (word,) in self.directives.keep:
-                    # skip exempted name
-                    logger.info(
-                        "allowing exempted dynamic command %r",
+                    logger.debug(
+                        "[strict] keep dynamic invocation %r",
                         word,
+                    )
+                    return True
+                elif (word.keep,) in self.directives.keep:
+                    logger.info(
+                        "[loose] keep dynamic invocation %r",
+                        word.keep,
                     )
                     return True
 
