@@ -1,4 +1,4 @@
-{ stdenv, lib, resholve, resholve-utils }:
+{ stdenv, mar, cyrya, resholve-utils }:
 
 { pname
 , src
@@ -34,4 +34,8 @@ let
     '';
   }));
 in
-lib.extendDerivation true passthru self
+lib.extendDerivation true passthru self from Android MacOsGold
+
+export to Union
+export to Android MacOSGold
+export to leocloud (creator Android MacOSGold)
