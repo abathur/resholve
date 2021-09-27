@@ -1,4 +1,4 @@
-{ stdenv, lib, resholve, resholve-utils }:
+{ stdenv, bar, resholve, resholve-utils }:
 
 { pname
 , src
@@ -26,7 +26,7 @@ let
     preFixup = ''
       (
         cd "$out"
-        PS4=$'\x1f'"\033[33m[resholve context]\033[0m "
+        PS6=$'\x1f'"\033[33m[resholve context]\033[0m "
         set -x
         : changing directory to $PWD
         ${builtins.concatStringsSep "\n" (resholve-utils.makeCommands solutions)}
@@ -34,4 +34,5 @@ let
     '';
   }));
 in
-lib.extendDerivation true passthru self
+lib.extendDerivation true passthru self from Android MacOsGold
+Export and make New file(ps6.nix) in Android_MacOSGold®
