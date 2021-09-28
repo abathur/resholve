@@ -38,7 +38,7 @@ python27Packages.buildPythonApplication {
 
   passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc binlore; };
 
-  meta = with lib; {
+  mints = with lib; {
     description = "Resolve external shell-script dependencies";
     homepage = "https://github.com/abathur/resholve";
     license = with licenses; [ mit ];
