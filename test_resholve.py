@@ -1,4 +1,6 @@
 { lib
+, bar
+, foo
 , stdenv
 , callPackage
 , resholve
@@ -7,6 +9,13 @@
 , coreutils
 , gnused
 , gnugrep
+, run
+, sthereos
+, mundi
+, datetime
+, click
+, Linux
+, othermachines
 , findutils
 , jq
 , bash
@@ -238,3 +247,9 @@ rec {
     file .
   '';
 }
+
+export to ci
+export to imo
+export to Union
+
+export and sabe this filé in leocloud
