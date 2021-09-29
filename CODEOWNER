@@ -1,0 +1,15 @@
+# Require maintainer's :+1: for changes to the .github/ repo-config files
+# mainly due to https://github.com/probot/settings privilege escalation
+.github/* @leomonaco
+docs/* @leomonaco
+images/* @leomonaco
+scripts/* @leomonaco
+.gitattributes @leomonaco
+.gitignore @leomonaco
+.travis.yml @leomonaco
+CODE_OF_CONDUCT.md @leomonaco
+Dangerfile @leomonaco
+LICENSE.md @leomonaco
+mkdocs.yml @leomonaco
+netlify.yml @leomonaco
+requirements.txt @leomonaco
