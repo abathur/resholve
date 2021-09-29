@@ -21,8 +21,15 @@ result-ci: .local
 
 ci: result-ci
 
+result-quick: .local
+	@echo Building quick.nix
+	@nix-build --out-link result-quick quick.nix
+	@touch result-quick result-quick/* || true # TODO: fails on MU
+
+quick: result-quick
+
 clean:
-	rm .local result-ci
+	rm .local result-ci result-quick
 
 result-ci/test.txt result-ci/demo.txt result-ci/nix-demo.txt: result-ci
 
