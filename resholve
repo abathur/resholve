@@ -1750,7 +1750,7 @@ class ExternalCommandParsers(object):
         """
         generic = CommandParser("sed")
         # very unsure about this group part
-        script = generic.add_mutually_exclusive_group(required=True)
+        script = generic.add_mutually_exclusive_group()
         generic.add_argument("-a", action="store_true")  # BSD-only
         generic.add_argument("-n", "--quiet", "--silent", action="store_true")
         generic.add_argument("--debug", action="store_true")
@@ -1768,8 +1768,7 @@ class ExternalCommandParsers(object):
         generic.add_argument("-z", "--null-data", action="store_true")
         generic.add_argument("--sandbox", action="store_true")
         generic.add_argument("--version", action="store_true")
-        script.add_argument("script", nargs="?")
-        generic.add_argument("input_file", nargs="*")
+        generic.add_argument("input_files", nargs="*")
 
         return (generic,)
 
@@ -3499,17 +3498,17 @@ class RecordCommandlike(object):
                 if self._find_sed_e_cmd(expression):
                     observe(
                         SedECommand,
-                        word=expression.firstword.ast,
+                        word=expression.ast,
                         span_id=expression.first_spid,
                         arena=self.arena,
                     )
             return True
-        elif not parsed.file and parsed.script:
+        elif not parsed.file and parsed.input_files:
             # trailing positional expression
-            if self._find_sed_e_cmd(parsed.script):
+            if self._find_sed_e_cmd(parsed.input_files[0]):
                 observe(
                     SedECommand,
-                    word=parsed.script.firstword.ast,
+                    word=parsed.script.ast,
                     span_id=parsed.script.first_spid,
                     arena=self.arena,
                 )
