@@ -1199,6 +1199,13 @@ class AwkSubCommand(Detain):
     issue = 31
 
 
+class DcBangCommand(Detain):
+    problem = "I don't know how to handle dc `!` commands yet--sorry :("
+    ideas = ("- See the feedback issue for a workaround",)
+    status = 14
+    issue = 40
+
+
 # preserving exception for now, but currently unused
 # rm anytime after 2021
 # class OshEvalProblem(Census):
@@ -2204,6 +2211,19 @@ class ExternalCommandParsers(object):
     # I think it only supports --use-compress-program
     # but over-supporting should be fine.
     _bsdtar = _tar
+
+    @staticmethod
+    def _dc():
+        """
+        We need to sub-search expressions for ! commands
+        """
+        generic = CommandParser("dc")
+        generic.add_argument("-e", "--expression", action="append")
+        generic.add_argument("-f", "--file")
+        generic.add_argument("-V", "--version", action="store_true")
+        generic.add_argument("scripts", nargs="*")
+
+        return (generic,)
 
 
 def generate_builtin_command_parser(cmdname):
@@ -3596,6 +3616,24 @@ class RecordCommandlike(object):
 
     # TODO: maybe a better way for the caller to find these
     handle_external_gawk = handle_external_awk
+
+    def handle_external_dc(self, parsed, invocation):
+        """
+        check dc expressions for ! cmds
+        """
+        if parsed.expression:
+            for expression in parsed.expression:
+                if "!" in expression:
+                    bangpos = expression.index("!")
+                    if expression[bangpos + 1] not in ("<", "=", ">"):
+                        observe(
+                            DcBangCommand,
+                            word=expression.ast,
+                            span_id=expression.first_spid,
+                            arena=self.arena,
+                        )
+            return True
+        return True
 
     def handle_external_generic(self, parsed, invocation):
         # TODO: shimming shells in here may be a bigger crime than
