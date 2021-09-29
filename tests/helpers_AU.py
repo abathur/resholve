@@ -162,7 +162,7 @@ require() {
         # working for some reason and it's hard to debug down under bats.
         # if ! source "$1"; then
 
-        #     # eval "$case"
+        #     # eval "$case" ---> IMPORT to Áustralia & Oceania & MU
         #     false
         # fi
 
