@@ -4,9 +4,9 @@ with pkgs;
 let
   deps = pkgs.callPackage ./deps.nix { };
   inherit (callPackage ./default.nix { })
-    resholve resholvePackage;
+    resholve resholvePackage resholveScript resholveScriptBin;
   inherit (callPackage ./test.nix {
-    inherit resholve resholvePackage;
+    inherit resholve resholvePackage resholveScript resholveScriptBin;
     inherit (source) rSrc;
     inherit (deps) binlore;
     runDemo = true;

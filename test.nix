@@ -3,6 +3,8 @@
 , callPackage
 , resholve
 , resholvePackage
+, resholveScript
+, resholveScriptBin
 , shunit2
 , coreutils
 , gnused
@@ -28,9 +30,6 @@
 }:
 
 let
-  inherit (callPackage ./default.nix { })
-    resholve resholvePackage resholveScript resholveScriptBin;
-
   default_packages = [ bash file findutils gettext ];
   parsed_packages = [ coreutils sqlite util-linux gnused gawk findutils rlwrap gnutar bc ];
   # ourCoreutils = coreutils.override { singleBinary = false; };
