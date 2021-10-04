@@ -80,10 +80,10 @@ We can't all be perfect :)
 - The manpage is currently the canonical reference to resholve's options and behavior; the only online format is [plaintext](resholve.1.txt). See https://github.com/abathur/resholve/issues/19.
 
 ### Packaging
-- My short-term goal is to support packaging shell projects for the [Nix package manager](https://nixos.org/nix/) (and hopefully getting this support into Nixpkgs). As such, the current build process depends on Nix. 
-    - The Nix API probably isn't granular enough, yet. It doesn't handle scripts in a single package that need different config/interpreters/etc.
-- *If you're interested in using resholve without Nix, I'll appreciate contributions that fill in traditional Python build support.*
-- For simplicity, resholve technically cheats by using nixpkgs python2 rather than Oil's fork of python2. I haven't noticed any issues that look like this, but there's always some nonzero chance that this is causing problems that I just haven't noticed.
+- My short-term goal is to support packaging shell projects for the [Nix package manager](https://nixos.org/nix/). As such, the current build process depends on Nix. 
+    - The Nix API probably isn't granular enough, yet.
+- *If you're interested in using resholve without Nix, I'll appreciate contributions that fill in build support for other environments.*
+- For simplicity, resholve uses nixpkgs' python2 rather than Oil's fork of python2. This may cause subtle problems.
 
 ### Known Gaps & Edge Cases in the utility itself
 
