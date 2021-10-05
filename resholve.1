@@ -1,4 +1,4 @@
-.Dd September 25, 2021
+.Dd October 04, 2021
 .Dt RESHOLVE 1
 .Os
 .\" coolcomment
@@ -155,11 +155,6 @@ resolve into alias definitions
 .It Fl Fl keep Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_KEEP= Eo ' Ns Ar directives Ec Ns '
 Ignore (omit errors for) some things it isn't safe to fix/ignore by default. Directive forms:
 .Bl -tag -width 1n
-.It Ar outer_command : Ns Ar inner_command Ns [; Ns Ar inner_command ] Ns ...
-ignore
-.Ar inner_command Ns (s)
-in the arguments to
-.Ar outer_command
 .It Ar command : Ns $ Ns Ar variable Ns [; Ns $ Ns Ar variable ] Ns ... No (Note: $ may need escaping)
 ignore
 .No $ Ns Ar variable Ns (s)
@@ -182,7 +177,7 @@ ignore a specific
 .It Ar ./path
 ignore a specific
 .Ar PWD-relative_path
-.It Ex: Fl Fl keep No 'which:git;ls source:$HOME /etc/bashrc ~/.bashrc'
+.It Ex: Fl Fl keep No 'source:$HOME /etc/bashrc ~/.bashrc'
 .El
 .El
 .\".Xr sudo 1 Ns ,

@@ -1,5 +1,4 @@
-
-RESHOLVE(1)               BSD General Commands Manual              RESHOLVE(1)
+RESHOLVE(1)             Nixpkgs General Commands Manual            RESHOLVE(1)
 
 NAME
      resholve — resolve external command/script references in shell scripts
@@ -12,65 +11,64 @@ DESCRIPTION
      resholve replaces bare references (subject to a PATH search at runtime)
      to external commands and scripts with absolute paths.
 
-     This small super‐power helps ensure script dependencies are declared,
-     present, and don’t unexpectely shift when the PATH changes.
+     This small super-power helps ensure script dependencies are declared,
+     present, and don't unexpectely shift when the PATH changes.
 
      resholve is developed to enable the Nix package manager to package and
-     integrate Shell projects, but its features are not Nix‐specific and
-     inevitably have other applications.
+     integrate Shell projects, but its features are not Nix-specific and in‐
+     evitably have other applications.
 
 REQUIRED ARGUMENTS
      script
-        ·   given as input on <stdin>, write resolved script to <stdout>
-        ·   given a path, write to script.resolved (unless −−overwrite is
+        •   given as input on <stdin>, write resolved script to <stdout>
+        •   given a path, write to script.resolved (unless --overwrite is
             used, in which case the script is replaced)
 
-     −−interpreter none | path
-        The absolute interpreter path for the script’s shebang. The special
+     --interpreter none | path
+        The absolute interpreter path for the script's shebang. The special
         value none ensures there is no shebang. See execve(2)
 
-     −−path path | RESHOLVE_PATH=path
-        A PATH‐format list of directories and/or files to resolve external
-        dependencies from. You may also use aliases −−inputs or
-        RESHOLVE_INPUTS.
+     --path path | RESHOLVE_PATH=path
+        A PATH-format list of directories and/or files to resolve external de‐
+        pendencies from. You may also use aliases --inputs or RESHOLVE_INPUTS.
 
 OPTIONS
-     −−fake directives
-     −−fix directives
-     −−keep directives
+     --fake directives
+     --fix directives
+     --keep directives
         Adjust how resolution is performed. See CONTROLLING RESOLUTION.
 
-     −−lore directory
-     −−execers directives
-     −−wrappers directives
+     --lore directory
+     --execers directives
+     --wrappers directives
         Adjust when nested resolution is performed. See NESTED RESOLUTION.
 
-     −−overwrite
-        Resolve script in‐place (useful for out‐of‐tree builds).
+     --overwrite
+        Resolve script in-place (useful for out-of-tree builds).
 
-     −−version
+     --version
         Show brief syntax help.
 
-     −−help
+     --help
         Show usage summary.
 
 CONTROLLING RESOLUTION
-     If resholve can’t figure something out, you can often help it along with
+     If resholve can't figure something out, you can often help it along with
      a mix of fake, fix, and keep directives. If quoted, directives can be
-     separated by a space: ’directive[ directive]...’
+     separated by a space: 'directive[ directive]...'
 
-     −−fake ’directives’ | RESHOLVE_FAKE=’directives’
-         Pretend some things exist (if there’s a good reason resholve doesn’t
+     --fake 'directives' | RESHOLVE_FAKE='directives'
+         Pretend some things exist (if there's a good reason resholve doesn't
          know about them). There is one directive form:
 
          type:name[;name]...
             Treat name(s) of type as defined; type is the full word or first
             letter of: alias, builtin, external, function, keyword, or source.
 
-         Ex: −−fake ’f:setUp;tearDown builtin:setopt source:/etc/bashrc’
+         Ex: --fake 'f:setUp;tearDown builtin:setopt source:/etc/bashrc'
 
-     −−fix ’directives’ | RESHOLVE_FIX=’directives’
-         Fix some things it it isn’t safe to fix/ignore by default. Directive
+     --fix 'directives' | RESHOLVE_FIX='directives'
+         Fix some things it it isn't safe to fix/ignore by default. Directive
          forms:
 
          $variable:command (Note: $ may need escaping)
@@ -82,14 +80,11 @@ CONTROLLING RESOLUTION
          aliases
             resolve into alias definitions
 
-         Ex: −−fix ’aliases $GIT:gix /bin/bash’
+         Ex: --fix 'aliases $GIT:gix /bin/bash'
 
-     −−keep ’directives’ | RESHOLVE_KEEP=’directives’
-         Ignore (omit errors for) some things it isn’t safe to fix/ignore by
+     --keep 'directives' | RESHOLVE_KEEP='directives'
+         Ignore (omit errors for) some things it isn't safe to fix/ignore by
          default. Directive forms:
-
-         outer_command:inner_command[;inner_command]...
-            ignore inner_command(s) in the arguments to outer_command
 
          command:$variable[;$variable]... (Note: $ may need escaping)
             ignore $variable(s) in the arguments to command
@@ -98,78 +93,78 @@ CONTROLLING RESOLUTION
             ignore $variable or ${variable} used as all or part of a first
             word (command)
 
-            Such as: ‘$GIT status‘ or ‘$BUSYBOX/ls‘
+            Such as: `$GIT status` or `$BUSYBOX/ls`
 
          absolute_path
             ignore a specific absolute_path
 
          ~/path
-            ignore a specific home‐relative_path
+            ignore a specific home-relative_path
 
          ./path
-            ignore a specific PWD‐relative_path
+            ignore a specific PWD-relative_path
 
-         Ex: −−keep ’which:git;ls source:$HOME /etc/bashrc ~/.bashrc’
+         Ex: --keep 'source:$HOME /etc/bashrc ~/.bashrc'
 
 NESTED RESOLUTION
-     Initially, resolution of commands in the arguments to command‐executing
-     commands was limited to one level for a hard‐coded list of builtins and
+     Initially, resolution of commands in the arguments to command-executing
+     commands was limited to one level for a hard-coded list of builtins and
      external commands. Version 0.6.0 (June 2021) adds recursive resolution.
 
      This task is complex. The main components of the current approach are:
 
-     ·   To pick out a sub‐command among other flags, options, and arguments,
-         resholve has a small collection per‐command rules.
+     •   To pick out a sub-command among other flags, options, and arguments,
+         resholve has a small collection per-command rules.
 
          This collection will need to grow, but I only intend to include
-         fairly‐common commands. I’m not sure yet if there will be a user‐fac‐
-         ing mechanism for customizing this; I’m not sure the current imple‐
-         mentation is fully‐baked, and I’d like to see how often it’s needed.
+         fairly-common commands. I'm not sure yet if there will be a user-fac‐
+         ing mechanism for customizing this; I'm not sure the current imple‐
+         mentation is fully-baked, and I'd like to see how often it's needed.
          If you encounter instances of commands you think deserve explicit
          support, please report them.
 
-     ·   To meet the goal of blocking builds when all dependencies are not
-         known, resholve needs a way to discover command‐executing executables
-         that it lacks per‐command rules for (a sub‐command might be present,
+     •   To meet the goal of blocking builds when all dependencies are not
+         known, resholve needs a way to discover command-executing executables
+         that it lacks per-command rules for (a sub-command might be present,
          but it is unable to disambiguate).
 
-         The discovery process is outsourced. Only the result‐‐a directory of
-         "lore"‐‐is passed via the −−lore flag or RESHOLVE_LORE.
+         The discovery process is outsourced. Only the result--a directory of
+         "lore"--is passed via the --lore flag or RESHOLVE_LORE.
 
          resholve requires lore for every executable it finds in a script. See
          Lore for more on this format.
 
-     Nested resolution is much more rigorous‐‐but (at least for now) it adds
+     Nested resolution is much more rigorous--but (at least for now) it adds
      complexity that some users will need to wrestle with.
 
    Lore
-     Outsourcing discovery makes it easy to save/cache this lore and avoid
-     repeating expensive work each run. It also makes it possible to hand‐
-     write or even generate it with tools that meet your own needs.
+     Outsourcing discovery makes it easy to save/cache this lore and avoid re‐
+     peating expensive work each run. It also makes it possible to hand-write
+     or even generate it with tools that meet your own needs.
 
      Most users of the Nix API should be spared from needing to understand
      lore in detail. It automatically uses binlore
      (https://github.com/abathur/binlore) to generate lore for the executables
-     in each input’s bin/ directory, merge them into a combined copy, and pass
-     it via RESHOLVE_LORE. If you find mis‐identified executables, please
-     report them to the binlore project.
+     in each input's bin/ directory, merge them into a combined copy, and pass
+     it via RESHOLVE_LORE. If you find mis-identified executables, please re‐
+     port them to the binlore project.
 
-     On the command‐line, you can supply lore directly with two flags:
+     On the command-line, you can supply lore directly with two flags:
 
-     −−execer ’directives’ | RESHOLVE_EXECER=’directives’
-        Each execer‐lore directive indicates whether an executable sub‐exe‐
+     --execer 'directives' | RESHOLVE_EXECER='directives'
+        Each execer-lore directive indicates whether an executable sub-exe‐
         cutes its arguments with a verdict:abspath pair, where verdict is one
         of can, cannot, or might. This information enables resholve to raise
         an error when it encounters a command with a can|might verdict unless
         it has rules for figuring out whether the invocation includes a nested
         command.
 
-     −−wrapper ’directives’ | RESHOLVE_WRAPPER=’directives’
-        Each wrapper‐lore directive indicates whether one executable is just
+     --wrapper 'directives' | RESHOLVE_WRAPPER='directives'
+        Each wrapper-lore directive indicates whether one executable is just
         an exec wrapper for another with a wrapper_abspath:wrapped_abspath
-        pair. .Nm uses this information to substitute the wrapped executable’s
+        pair. .Nm uses this information to substitute the wrapped executable's
         verdict whenever it encounters a wrapper. (Executables are often
-        wrapped in nixpkgs, but it’s also common in packages. In gnugrep, for
+        wrapped in nixpkgs, but it's also common in packages. In gnugrep, for
         example, both egrep and fgrep are wrappers of grep.)
 
 ENVIRONMENT
@@ -193,9 +188,9 @@ EXIT STATUS
      The resholve utility exits 0 on success, and >0 if an error occurs.
 
      Error statuses are not yet systematic or stable (use them if they help
-     you‐‐but expect changes). Generally:
+     you--but expect changes). Generally:
 
-     1   indicates a non‐resholve error occurred (such as an error from the
+     1   indicates a non-resholve error occurred (such as an error from the
          OSH parser)
 
      2   indicates invocation/argument errors
@@ -205,27 +200,27 @@ EXIT STATUS
 EXAMPLES
      Basic invocations:
 
-     $ resholve ‐‐interpreter "$(which bash)" ‐‐path "$PATH" script.sh
-     $ resholve ‐‐interpreter "$(which bash)" ‐‐path "$PATH" < script.sh
-     $ resholve ‐‐interpreter "$(which bash)" ‐‐path "$PATH" script1.sh script2.sh
+     $ resholve --interpreter "$(which bash)" --path "$PATH" script.sh
+     $ resholve --interpreter "$(which bash)" --path "$PATH" < script.sh
+     $ resholve --interpreter "$(which bash)" --path "$PATH" script1.sh script2.sh
 
 LIMITATIONS
-     resholve is built on the bash‐compatible OSH parser (from the Oil shell
-     project). It can’t handle any script OSH can’t parse.
+     resholve is built on the bash-compatible OSH parser (from the Oil shell
+     project). It can't handle any script OSH can't parse.
 
-     ·   Support for non‐bash shells is a happy side‐effect of how similar
-         POSIX‐ish shell languages are. If you run into a parse error with any
-         non‐bash syntax, your only real option is changing the script.
+     •   Support for non-bash shells is a happy side-effect of how similar
+         POSIX-ish shell languages are. If you run into a parse error with any
+         non-bash syntax, your only real option is changing the script.
 
-     ·   If you run into a parse error with valid bash syntax, check Oil’s
-         issue tracker (https://github.com/oilshell/oil/issues) to see if the
-         issue is known and whether it is likely to be fixed. If it won’t be
+     •   If you run into a parse error with valid bash syntax, check Oil's is‐
+         sue tracker (https://github.com/oilshell/oil/issues) to see if the
+         issue is known and whether it is likely to be fixed. If it won't be
          fixed, your only recourse is changing the script.
 
 SEE ALSO
      bash(1), osh(1), sh(1), execve(2)
 
 AUTHORS
-     Travis A. Everett ⟨travis.a.everett@gmail.com⟩
+     Travis A. Everett <travis.a.everett@gmail.com>
 
-BSD                           September 25, 2021                           BSD
+Nixpkgs                        October 04, 2021                        Nixpkgs

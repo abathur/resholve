@@ -1,4 +1,5 @@
 #! /usr/bin/env make
+export PATH := $(shell nix-shell -p nix coreutils gnused groff util-linux --run 'echo $$PATH')
 
 .PHONY: apologeez ci clean update
 
@@ -10,7 +11,7 @@ all: apologeez
 install: apologeez
 uninstall: apologeez
 
-.local : resholve *.nix test.sh demo tests/*
+.local : resholve *.nix test.sh demo tests/* resholve.1
 	touch .local
 
 
