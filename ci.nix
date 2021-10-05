@@ -3,12 +3,12 @@
 with pkgs;
 let
   deps = pkgs.callPackage ./deps.nix { };
-  inherit (callPackage ./default.nix { })
+    inherit (callPackage ./default.nix { })
     resholve resholvePackage resholveScript resholveScriptBin;
-  inherit (callPackage ./test.nix {
-    inherit resholve resholvePackage resholveScript resholveScriptBin;
-    inherit (source) rSrc;
-    inherit (deps) binlore;
+         (callPackage ./test.nix {
+            resholve resholvePackage resholveScript resholveScriptBin;
+            (source) rSrc;
+            (deps) binlore;
     runDemo = true;
   })
     module1 module2 module3 cli resholvedScript resholvedScriptBin;
