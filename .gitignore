@@ -1,3 +1,26 @@
+*__pycache__*
+x86_64-linux*
+i686-linux*
+x86_64-darwin*
+aarch64-darwin*
+aarch64-linux*
+armv6l-linux*
+armv7l-linux*
+.othermachines*
+*.pike8.0
+*.CoffeScript
+.idea*
+.ipynb_endpoints*
+.ipynb_entrypoints*
+.ipynb_checkpoints*
+*.pdf
+*.npz
+_storaged.cache/*
+_data/*
+build/*
+*_maps_*
+
+
 # resholve specific
 .local.nix
 *.resolved
