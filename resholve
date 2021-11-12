@@ -313,6 +313,15 @@ class InvocationsAction(theirparse._AppendAction):
     at the end of an invocation--though exceptions, such as
     the +/;-terminated -exec/-execdir/-ok/-okdir flags in
     find, do exist.
+
+    I think (but am not certain; I forgot to doc this earlier)
+    that this should always be used with nargs (whether a
+    specific number, or the remainder constant).
+
+    TODO: there's a gremlin in here wrt the above; if it isn't
+    done you can get obtuse failures like in #70. This likely
+    needs fixing or a backstop or better error-handing--
+    something to sand down that sharp corner.
     """
 
     split = False
@@ -1656,7 +1665,11 @@ class ExternalCommandParsers(object):
         """
         generic = CommandParser("sort")
         generic.add_argument(
-            "--compress-program", dest="commands", action="invocations"
+            "--compress-program",
+            dest="commands",
+            action="invocations",
+            split=True,
+            nargs=1,
         )
         return (generic,)
 
@@ -1666,7 +1679,13 @@ class ExternalCommandParsers(object):
         coreutils src/split.c:execl
         """
         generic = CommandParser("split")
-        generic.add_argument("--filter", dest="commands", action="invocations")
+        generic.add_argument(
+            "--filter",
+            dest="commands",
+            action="invocations",
+            split=True,
+            nargs=1,
+        )
         return (generic,)
 
     @staticmethod
@@ -1705,7 +1724,13 @@ class ExternalCommandParsers(object):
     def _sqlite3():
         """ """
         generic = CommandParser("sqlite3")
-        generic.add_argument("--cmd", dest="commands", action="invocations")
+        generic.add_argument(
+            "-cmd",
+            dest="commands",
+            action="invocations",
+            split=True,
+            nargs=1,
+        )
         return (generic,)
 
     @staticmethod
@@ -1725,7 +1750,14 @@ class ExternalCommandParsers(object):
         linux.add_argument("-t", "--timing")
         linux.add_argument("-q", "--quiet", action="store_true")
         linux.add_argument("-V", "--version", action="store_true")
-        linux.add_argument("-c", "--command", dest="commands", action="invocations")
+        linux.add_argument(
+            "-c",
+            "--command",
+            dest="commands",
+            action="invocations",
+            split=True,
+            nargs=1,
+        )
         linux.add_argument("file", nargs="?")
 
         bsd = CommandParser("script", "bsd")
