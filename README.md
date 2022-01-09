@@ -38,7 +38,7 @@ In the Nix ecosystem, resholve is already helping us:
 - avoid polluting PATH with all of a script's dependencies, which also means
     - no conflicts between tools different scripts need on PATH
     - no conflicts with other packages a user expects on PATH
-    - no implicit dependency on the content fragile rc/profile scripts
+    - no implicit dependency on the content of fragile rc/profile scripts
 - work directly with "normal" shell scripts
     - no polluting *source* scripts with template variables/syntax
     - no inlining shell scripts to readily inject absolute paths

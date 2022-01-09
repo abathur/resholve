@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.8 (Nov 12 2021)
+- Fix script parser bug (https://github.com/abathur/resholve/issues/70)
+
+## v0.6.7 (Oct 4 2021)
+- Fix sed parser bug
+- Add dc handler/parser
+
+## v0.6.6 (Sep 26 2021)
+- resholvePackage now respects/merges additional buildInputs supplied by the caller
+- fix "keep" directive for a variable _part_ of a firstword
+
 ## v0.6.5 (Sep 26 2021)
 - Let awk handler time out (in case the awk script won't complete) without input conditions we can't understand)
 - Apply the same handler to gawk
