@@ -97,8 +97,8 @@ CASES
   demo "alias_riddle.sh" <({
     status 0
     line 4 !contains "/nix/store"
-    line 5 contains 'find="/nix/store'
-    line 5 contains 'find2="/nix/store'
+    line 5 contains 'alias find="/nix/store'
+    line 5 contains 'find -H" find2="/nix/store'
     line 7 !contains "/nix/store"
     line 9 !contains "/nix/store"
     line 10 contains "\file # the function!"
