@@ -1390,6 +1390,29 @@ class FindParser(CommandParser):
         return ns, rest
 
 
+class GnuSedParser(CommandParser):
+    """
+    gnused's -i/--in-place options can be bare, or have the
+    argument directly attached (it CANNOT be a separate
+    shell word).
+    """
+
+    def _parse_known_args(self, arg_strings, namespace):
+        simplified = list()
+        capturing = False
+        captures = list()
+        for i, arg in enumerate(arg_strings):
+            if arg.startswith("--in-place="):
+                continue
+            elif arg.startswith("-i"):
+                if len(arg) > 2:
+                    continue
+            else:
+                simplified.append(arg)
+        ns, rest = super(GnuSedParser, self)._parse_known_args(simplified, namespace)
+        return ns, rest
+
+
 """
 supporting sub-shell invocation for a wide slate of shells
 that I have access to via nix/macOS for now. i.e.,
@@ -1779,30 +1802,49 @@ class ExternalCommandParsers(object):
     def _sed():
         """
         see also handle_external_sed()
-        """
-        generic = CommandParser("sed")
-        # very unsure about this group part
-        script = generic.add_mutually_exclusive_group()
-        generic.add_argument("-a", action="store_true")  # BSD-only
-        generic.add_argument("-n", "--quiet", "--silent", action="store_true")
-        generic.add_argument("--debug", action="store_true")
-        script.add_argument("-e", "--expression", action="append")
-        script.add_argument("-f", "--file")
-        generic.add_argument("--follow-symlinks", action="store_true")
-        generic.add_argument("-i", "--in-place", nargs="?", const=True)
-        # gnu always has the arg, but BSD uses this for line-buffered
-        # I think we can wrangle both w/ one arg
-        generic.add_argument("-l", "--line-length", nargs="?", const=True)
-        generic.add_argument("--posix", action="store_true")
-        generic.add_argument("-E", "-r", "--regexp-extended", action="store_true")
-        generic.add_argument("-s", "--separate", action="store_true")
-        generic.add_argument("-u", "--unbuffered", action="store_true")
-        generic.add_argument("-z", "--null-data", action="store_true")
-        generic.add_argument("--sandbox", action="store_true")
-        generic.add_argument("--version", action="store_true")
-        generic.add_argument("input_files", nargs="*")
 
-        return (generic,)
+        It might be possible to handle this with a
+        single parser, but since only one of them
+        requires the GnuSedParser hack-around, I'll
+        split them to be a little clearer...
+        """
+        gnu = GnuSedParser("sed")
+        # very unsure about this group part
+        gscript = gnu.add_mutually_exclusive_group()
+        gnu.add_argument("-a", action="store_true")  # BSD-only
+        gnu.add_argument("-n", "--quiet", "--silent", action="store_true")
+        gnu.add_argument("--debug", action="store_true")
+        gscript.add_argument("-e", "--expression", action="append")
+        gscript.add_argument("-f", "--file")
+        gnu.add_argument("--follow-symlinks", action="store_true")
+
+        gnu.add_argument("-i", "--in-place")
+        # gnu always has the arg
+        gnu.add_argument("-l", "--line-length")
+        gnu.add_argument("--posix", action="store_true")
+        gnu.add_argument("-E", "-r", "--regexp-extended", action="store_true")
+        gnu.add_argument("-s", "--separate", action="store_true")
+        gnu.add_argument("-u", "--unbuffered", action="store_true")
+        gnu.add_argument("-z", "--null-data", action="store_true")
+        gnu.add_argument("--sandbox", action="store_true")
+        gnu.add_argument("--version", action="store_true")
+        gnu.add_argument("input_files", nargs="*")
+
+        bsd = CommandParser("sed")
+        # very unsure about this group part
+        bscript = bsd.add_mutually_exclusive_group()
+        bsd.add_argument("-a", action="store_true")  # BSD-only
+        bsd.add_argument("-n", action="store_true")
+        bscript.add_argument("-e", "--expression", action="append")
+        bscript.add_argument("-f")
+        bsd.add_argument("-i")
+        # BSD uses this for line-buffered
+        bsd.add_argument("-l", action="store_true")
+        bsd.add_argument("-E", action="store_true")
+
+        bsd.add_argument("input_files", nargs="*")
+
+        return (gnu, bsd)
 
     @staticmethod
     def _awk():
@@ -3537,11 +3579,12 @@ class RecordCommandlike(object):
             return True
         elif not parsed.file and parsed.input_files:
             # trailing positional expression
-            if self._find_sed_e_cmd(parsed.input_files[0]):
+            first = parsed.input_files[0]
+            if self._find_sed_e_cmd(first):
                 observe(
                     SedECommand,
-                    word=parsed.script.ast,
-                    span_id=parsed.script.first_spid,
+                    word=first.ast,
+                    span_id=first.first_spid,
                     arena=self.arena,
                 )
             return True
