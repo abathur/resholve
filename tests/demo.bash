@@ -59,7 +59,11 @@ if [[ -n $RESHOLVE_DEMO ]]; then
                 else
                     # resolved fine
                     rule "-" "36" "$casename (exit: $status)"
-                    diff --color=always --label "original" --label "resolved" --unified=-1 "$1" - <<< "$output" | quote "Diff:"
+                    # We'd like to use something like MAX/all/infinite lines
+                    # of context, which we could express with -1 up through
+                    # diffutils 3.7, but 3.8 has broken this. Will use
+                    # probably-too-big instead...
+                    diff --color=always --label "original" --label "resolved" --unified=10000 "$1" - <<< "$output" | quote "Diff:"
                     rule "^" "36"
                 fi
             } >&3 # FD3 is where bats lets us write to term
