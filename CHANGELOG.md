@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.9 (Jan 20 2022)
+- Fix sed parser bug (https://github.com/abathur/resholve/issues/71)
+- Fix alias-substitution regression (https://github.com/abathur/resholve/issues/72)
+
 ## v0.6.8 (Nov 12 2021)
 - Fix script parser bug (https://github.com/abathur/resholve/issues/70)
 
