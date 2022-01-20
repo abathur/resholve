@@ -2430,12 +2430,35 @@ class Solution(object):
         self.replacement = False
         self.kind = cmdkind
 
+    def replace_name_or_alias_def_with(
+        self, cmdkind, initial, replacement, external=False
+    ):
+        """
+        Special-case cmdlikes that are known to have an alias so we can use a
+        regex.sub to fix them a little more precisely.
+
+        Caution: this might end up being fragile. It will only match the
+        initial term if a space follows before the next `=`.
+
+        TODO: should probably find a less-hacky way to handle these.
+        """
+        self.replacement = (
+            re.compile(initial + r"(?!\S*?=)"),
+            replacement,
+        )
+        self.kind = cmdkind
+
     def replace_name_with(self, cmdkind, initial, replacement, external=False):
         self.replacement = (initial, replacement)
         self.kind = cmdkind
 
     def replace_in(self, current):
-        return current.replace(*self.replacement)
+        initial, replacement = self.replacement
+        # if it's a regex (a sign this identifier is an alias), sub it
+        if isinstance(initial, re._pattern_type):
+            return initial.sub(replacement, current)
+        else:
+            return current.replace(initial, replacement)
 
     def causes_exception(self, exception):
         self.exception = exception
@@ -2949,7 +2972,12 @@ class CommandLike(object):
                 break
             elif test:
                 # only external can return more than just t/f
-                solution.replace_name_with(cmdkind, self.path or self.name, test)
+                if self.alias:
+                    solution.replace_name_or_alias_def_with(
+                        cmdkind, self.path or self.name, test
+                    )
+                else:
+                    solution.replace_name_with(cmdkind, self.path or self.name, test)
                 for source in self.order_to_source[distinct_cro]:
                     source.directives.keep.add((test,))
                 logger.debug("break because replacement")
