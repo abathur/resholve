@@ -1,0 +1,128 @@
+* {
+	display: block;
+}
+/**::before {
+	content: "<" attr(name) " id='" attr(id) "'>";
+}
+*::after {
+	content: "</" attr(name) ">";
+}*/
+literal::before,
+literal_arg::before {
+	content: "`" attr(quote);
+	space: '';
+}
+literal::after,
+literal_arg::after {
+	content: attr(quote) "`";
+	space: '';
+}
+/*TODO: might deserve promotion?*/
+literal.nospace {
+	space: '';
+}
+arg::before {
+	content: "`<";
+	space: '';
+}
+arg::after {
+	content: ">`";
+	space: '';
+}
+me, argument {
+	display: word;
+}
+description > para {
+	margin: 1;
+}
+me {
+	content: "resholve";
+}
+synopsis::before {
+	content: "resholve ";
+}
+argument[optional=true]::before {
+	content: "[";
+}
+argument[optional=true]::after {
+	content: "]";
+}
+insert::before {
+	content: "```" attr(language);
+	display: line;
+}
+insert::after {
+	content: "```";
+	display: line;
+}
+arguments.table::before {
+	display: line;
+	content:
+		"| Option | Type | Containing |\A"
+		"|--------|------|------------|";
+}
+arguments.table flag, arguments.table argument {
+	display: line;
+}
+arguments.table flag::before, arguments.table argument::before {
+	content: "| " attr(id);
+	display: word;
+}
+arguments.table flag::after,
+arguments.table > flag *,
+arguments.table > flag *::before,
+arguments.table > flag *::after,
+arguments.table argument::after,
+arguments.table > argument *,
+arguments.table > argument *::before,
+arguments.table > argument *::after {
+	display: word;
+}
+arguments.table > flag > purpose, arguments.table > argument > purpose {
+	display: char;
+}
+arguments.table > argument#script > purpose > *:not(terse),
+arguments.table > .directives > forms,
+arguments.table > flag.meta,
+arguments.table > flag#overwrite
+  {
+	display: none;
+}
+arguments.table flag[nix_name]::before,
+arguments.table argument[nix_name]::before  {
+	content: "| " attr(nix_name);
+}
+arguments.table > flag#path > :not(.nix) {
+	display: none;
+}
+/*
+TODO: just a proof; should be in a test?
+*/
+flag#fake, flag#wrapper {
+	order: 11;
+}
+/*.table > *:not(flag){
+	display: none;
+}*/
+/*.table .lore {
+	display: word;
+}*/
+/*.table flag:not(.lore){
+	content: "hehe";
+}*/
+.table > ::before {
+	content: "| ";
+}
+.table > ::after {
+	content: " |";
+}
+.table > flag > :not(api):first-of-type::before,
+.table > argument > :not(api):first-of-type::before,
+.table > flag > api > *:first-of-type::before,
+.table > argument > api > *:first-of-type::before {
+	content: "| ";
+}
+
+arguments.table > flag > purpose > seealso {
+	display: none;
+}

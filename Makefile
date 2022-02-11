@@ -56,8 +56,13 @@ resholve.1: manpage.wwst manpage.css content.wwst
 	@wordswurst manpage.wwst > resholve.1
 
 
+README.nixpkgs.md: markdown.wwst markdown.css content.wwst
+	@echo "Building Nixpkgs README (markdown)"
+	@wordswurst markdown.wwst > README.nixpkgs.md
+
+
 resholve.1.txt: resholve.1
 	@echo Building plain-text copy of manpage
 	@groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt
 
-update: timings.md demos.md resholve.1.txt
+update: timings.md demos.md resholve.1.txt README.nixpkgs.md
