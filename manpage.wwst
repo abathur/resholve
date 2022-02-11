@@ -1,0 +1,118 @@
+#compose content.wwst manpage.css
+  #today
+  .Dt RESHOLVE 1
+  .Os
+  .Sh NAME
+  .Nm resholve
+  %select{tagline}
+  %select{synopses}
+  %select{description}
+  .Sh REQUIRED ARGUMENTS
+  .Bl -tag -width 1n
+  %select.required{arguments > .required}
+  .El
+  .Sh OPTIONS
+  .Bd -literal
+  %select.options{arguments > .directives}
+  .Ed
+  .Bd -ragged -offset 3n -compact
+  Adjust how resolution is performed. See
+  .Sx CONTROLLING RESOLUTION .
+  .Ed
+  .Bd -literal
+  %select.options{arguments > .lore}
+  .Ed
+  .Bd -ragged -offset 3n -compact
+  Adjust when nested resolution is performed. See
+  .Sx NESTED RESOLUTION .
+  .Ed
+  .Bl -tag -width x
+  %select.overwrite{arguments > #overwrite}
+  %select.meta{arguments > .meta}
+  .El
+  .Sh CONTROLLING RESOLUTION
+  If resholve can't figure something out, you can often help it along with a mix
+  of fake, fix, and keep
+  .Ar directives Ns
+  \&. \
+  If quoted, directives can be separated
+  by a space:
+  .Eo ' Ns Ar directive Ns [
+  .Ar directive ] Ns ... Ec Ns '
+  .Bl -tag -width 1n
+  %select.idk{arguments > flag.directives}
+  .El
+  .Sh NESTED RESOLUTION
+  Initially, resolution of commands in the arguments to command-executing commands was limited to one level for a hard-coded list of builtins and external commands. Version 0.6.0 (June 2021) adds recursive resolution.
+  .Pp
+  This task is complex. The main components of the current approach are:
+  .Bl -bullet
+  .It
+  To pick out a sub-command among other flags, options, and arguments,
+  .Nm
+  has a small collection per-command rules.
+  .Pp
+  This collection will need to grow, but I only intend to include fairly-common commands. I'm not sure yet if there will be a user-facing mechanism for customizing this; I'm not sure the current implementation is fully-baked, and I'd like to see how often it's needed. If you encounter instances of commands you think deserve explicit support, please report them.
+  .It
+  To meet the goal of blocking builds when all dependencies are not known,
+  .Nm
+  needs a way to discover command-executing executables that it lacks per-command rules for (a sub-command might be present, but it is unable to disambiguate).
+  .Pp
+  The discovery process is outsourced. Only the result--a directory of "lore"--is passed via the
+  .Fl Fl lore
+  flag or
+  .Ev RESHOLVE_LORE .
+  .Pp
+  .Nm
+  requires lore for every executable it finds in a script. \
+  See
+  .Sx Lore
+  for more on this format.
+  .El
+  .Pp
+  Nested resolution is much more rigorous--but (at least for now) it adds complexity that some users will need to wrestle with.
+  .Ss Lore
+  .Pp
+  Outsourcing discovery makes it easy to save/cache this lore and avoid repeating expensive work each run. \
+  It also makes it possible to hand-write or even generate it with tools that meet your own needs.
+  .Pp
+  Most users of the Nix API should be spared from needing to understand lore in detail. \
+  It automatically uses binlore (https://github.com/abathur/binlore) to generate lore for the executables in each input's bin/ directory, merge them into a combined copy, and pass it via RESHOLVE_LORE. \
+  If you find mis-identified executables, please report them to the binlore project.
+  .Pp
+  On the command-line, you can supply lore directly with two flags:
+  .Bl -tag -width x
+  .It Fl Fl execer Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_EXECER= Eo ' Ns Ar directives Ec Ns '
+  Each execer-lore directive indicates whether an executable sub-executes its arguments with a verdict:abspath pair, where verdict is one of can, cannot, or might. \
+  This information enables
+  .Nm
+  to raise an error when it encounters a command with a can|might verdict unless it has rules for figuring out whether the invocation includes a nested command.
+  .It Fl Fl wrapper Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_WRAPPER= Eo ' Ns Ar directives Ec Ns '
+  Each wrapper-lore directive indicates whether one executable is just an exec wrapper for another with a wrapper_abspath:wrapped_abspath pair. \
+  .Nm
+  uses this information to substitute the wrapped executable's verdict whenever it encounters a wrapper. \
+  (Executables are often wrapped in nixpkgs, but it's also common in packages. In gnugrep, for example, both egrep and fgrep are wrappers of grep.)
+  .El
+  .Sh ENVIRONMENT
+  Most options can also be passed via environment variables. For example,
+  all of the following are supported:
+  .Pp
+  .Bl -tag -width "RESHOLVE_INTERPRETER" -compact
+  %select.envs{arguments}
+  .El
+  .Sh EXIT STATUS
+  .Ex -std
+  .Pp
+  Error statuses are not yet systematic or stable (use them if they help you--but expect changes). Generally:
+  %select{exits}
+  .Sh EXAMPLES
+  Basic invocations:
+  .Bd -literal
+  %select{examples > cli > basic}
+  .Ed
+  .Sh LIMITATIONS
+  %select{limitations}
+  .Sh "SEE ALSO"
+  %select{related}
+  .Sh AUTHORS
+  .An Travis A. Everett Aq Mt travis.a.everett@gmail.com

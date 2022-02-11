@@ -51,10 +51,9 @@ demos.md: bits/demos.md.pre bits/demos.md.mid bits/demos.md.post result-ci/demo.
 		bits/demos.md.post \
 		| sed -E 's@/nix/store/[a-z0-9]{32}-@/nix/store/...-@g' > demos.md
 
-resholve.1: resholve.1.in
+resholve.1: manpage.wwst manpage.css content.wwst
 	@echo Building manpage
-	@date +'.Dd %B %d, %Y' > resholve.1
-	@tail -n +3 resholve.1.in >> resholve.1
+	@wordswurst manpage.wwst > resholve.1
 
 
 resholve.1.txt: resholve.1

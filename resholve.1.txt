@@ -12,7 +12,7 @@ DESCRIPTION
      to external commands and scripts with absolute paths.
 
      This small super-power helps ensure script dependencies are declared,
-     present, and don't unexpectely shift when the PATH changes.
+     present, and don't unexpectedly shift when the PATH changes.
 
      resholve is developed to enable the Nix package manager to package and
      integrate Shell projects, but its features are not Nix-specific and in‐
@@ -21,16 +21,16 @@ DESCRIPTION
 REQUIRED ARGUMENTS
      script
         •   given as input on <stdin>, write resolved script to <stdout>
-        •   given a path, write to script.resolved (unless --overwrite is
-            used, in which case the script is replaced)
+        •   as a path, write to script.resolved (or script if --overwrite is
+            used)
 
      --interpreter none | path
         The absolute interpreter path for the script's shebang. The special
-        value none ensures there is no shebang. See execve(2)
+        value none ensures there is no shebang.  See execve(2)
 
      --path path | RESHOLVE_PATH=path
         A PATH-format list of directories and/or files to resolve external de‐
-        pendencies from. You may also use aliases --inputs or RESHOLVE_INPUTS.
+        pendencies from.  You may also use aliases --inputs or RESHOLVE_INPUTS
 
 OPTIONS
      --fake directives
@@ -39,18 +39,18 @@ OPTIONS
         Adjust how resolution is performed. See CONTROLLING RESOLUTION.
 
      --lore directory
-     --execers directives
-     --wrappers directives
+     --execer statements
+     --wrapper statements
         Adjust when nested resolution is performed. See NESTED RESOLUTION.
 
      --overwrite
         Resolve script in-place (useful for out-of-tree builds).
 
-     --version
+     --help
         Show brief syntax help.
 
-     --help
-        Show usage summary.
+     --version
+        Show version number.
 
 CONTROLLING RESOLUTION
      If resholve can't figure something out, you can often help it along with
@@ -58,53 +58,50 @@ CONTROLLING RESOLUTION
      separated by a space: 'directive[ directive]...'
 
      --fake 'directives' | RESHOLVE_FAKE='directives'
-         Pretend some things exist (if there's a good reason resholve doesn't
-         know about them). There is one directive form:
+        Pretend some commands exist. There are 2 directive forms:
 
-         type:name[;name]...
-            Treat name(s) of type as defined; type is the full word or first
-            letter of: alias, builtin, external, function, keyword, or source.
+        type:name[;name]...
+           Treat name(s) of type as defined; type is the full word or first
+           letter of: alias, builtin, external, function, keyword, or source
 
-         Ex: --fake 'f:setUp;tearDown builtin:setopt source:/etc/bashrc'
+        Ex: --fake 'f:setUp;tearDown builtin:setopt source:/etc/bashrc'
 
      --fix 'directives' | RESHOLVE_FIX='directives'
-         Fix some things it it isn't safe to fix/ignore by default. Directive
-         forms:
+        Fix things we can't auto-fix/ignore. There are 4 directive forms:
 
-         $variable:command (Note: $ may need escaping)
-            replace parameter expansions of $variable with command
+        $variable:command (Note: $ may need escaping)
+           replace parameter expansions of $variable with command
 
-         absolute_path
-            treat absolute_path as a bare reference that must be resolved
+        absolute_path
+           treat absolute_path as a bare reference that must be resolved
 
-         aliases
-            resolve into alias definitions
+        aliases
+           resolve into alias definitions
 
-         Ex: --fix 'aliases $GIT:gix /bin/bash'
+        Ex: --fix 'aliases $GIT:gix /bin/bash'
 
      --keep 'directives' | RESHOLVE_KEEP='directives'
-         Ignore (omit errors for) some things it isn't safe to fix/ignore by
-         default. Directive forms:
+        Keep things we can't auto-fix/ignore. There are 6 directive forms:
 
-         command:$variable[;$variable]... (Note: $ may need escaping)
-            ignore $variable(s) in the arguments to command
+        command:$variable[;$variable]... (Note: $ may need escaping)
+           ignore $variable in the arguments to command
 
-         $variable (Note: $ may need escaping)
-            ignore $variable or ${variable} used as all or part of a first
-            word (command)
+        $variable (Note: $ may need escaping)
+           ignore $variable or ${variable} used as all or part of a first word
+           (command)
 
-            Such as: `$GIT status` or `$BUSYBOX/ls`
+           Such as: `$GIT status` or `$BUSYBOX/ls`
 
-         absolute_path
-            ignore a specific absolute_path
+        absolute_path
+           ignore a specific absolute_path
 
-         ~/path
-            ignore a specific home-relative_path
+        ~/path
+           ignore a specific home-relative_path
 
-         ./path
-            ignore a specific PWD-relative_path
+        ./path
+           ignore a specific PWD-relative_path
 
-         Ex: --keep 'source:$HOME /etc/bashrc ~/.bashrc'
+        Ex: --keep 'source:$HOME /etc/bashrc ~/.bashrc'
 
 NESTED RESOLUTION
      Initially, resolution of commands in the arguments to command-executing
@@ -173,16 +170,15 @@ ENVIRONMENT
 
      RESHOLVE_INTERPRETER
      RESHOLVE_PATH
-     RESHOLVE_INPUTS
      RESHOLVE_FAKE
      RESHOLVE_FIX
      RESHOLVE_KEEP
      RESHOLVE_LORE
      RESHOLVE_EXECER
      RESHOLVE_WRAPPER
-     RESHOLVE_OVERWRITE
      RESHOLVE_PROLOGUE
      RESHOLVE_EPILOGUE
+     RESHOLVE_OVERWRITE
 
 EXIT STATUS
      The resholve utility exits 0 on success, and >0 if an error occurs.
@@ -190,12 +186,11 @@ EXIT STATUS
      Error statuses are not yet systematic or stable (use them if they help
      you--but expect changes). Generally:
 
-     1   indicates a non-resholve error occurred (such as an error from the
-         OSH parser)
+     1   non-resholve error (ex: from the OSH parser)
 
-     2   indicates invocation/argument errors
+     2   invocation/argument error
 
-     3+  indicates a resolution error
+     3+  resolution error
 
 EXAMPLES
      Basic invocations:
@@ -205,8 +200,8 @@ EXAMPLES
      $ resholve --interpreter "$(which bash)" --path "$PATH" script1.sh script2.sh
 
 LIMITATIONS
-     resholve is built on the bash-compatible OSH parser (from the Oil shell
-     project). It can't handle any script OSH can't parse.
+     •   resholve is built on the bash-compatible OSH parser (from the Oil
+         shell project). It can't handle any script OSH can't parse.
 
      •   Support for non-bash shells is a happy side-effect of how similar
          POSIX-ish shell languages are. If you run into a parse error with any
@@ -223,4 +218,4 @@ SEE ALSO
 AUTHORS
      Travis A. Everett <travis.a.everett@gmail.com>
 
-Nixpkgs                        October 04, 2021                        Nixpkgs
+Nixpkgs                        February 10, 2022                       Nixpkgs

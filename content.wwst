@@ -1,0 +1,137 @@
+#description
+  #para %me{} replaces bare references (subject to a PATH search at runtime) to external commands and scripts with absolute paths.
+  #para This small super-power helps ensure script dependencies are declared, present, and don't unexpectedly shift when the PATH changes.
+
+  #para %me{} is developed to enable the Nix package manager to package and integrate Shell projects, but its features are not Nix-specific and inevitably have other applications.
+#tagline resolve external command/script references in shell scripts
+#synopses
+  #synopsis %arg[optional=true]{options} %arg{script} %furniture{...}
+  #synopsis %arg[optional=true]{options} %furniture{<} %arg{script}
+#arguments
+  #argument#script.required[nix_name=scripts]
+    #value %arg{list}
+    #purpose
+      #terse
+        scripts to resolve
+        #extra.nix (%literal.nospace{$out}-relative paths)
+      #stdin
+        given as input on %literal{<stdin>}, write resolved script to %literal{<stdout>}
+      #path
+        as a path, write to %arg{script.resolved} (or %arg{script} if %option{overwrite} is used)
+  #flag#interpreter.required
+    #value %literal_arg[quote="]{none}
+    #value %arg{path}
+    #purpose
+      The absolute interpreter %arg{path} for the script's shebang. The special value %literal_arg{none} ensures there is no shebang.
+      #seealso See %topic[man=2]{execve}
+  #flag#path.required[nix_name=inputs]
+    #api.cli
+      #value %arg{path}
+      #value %envvar{RESHOLVE_PATH}=%arg{path}
+      #purpose
+        A PATH-format list of directories and/or files to resolve external dependencies from.
+        #aliases You may also use aliases %option{inputs} or %envvar[fafter=.]{RESHOLVE_INPUTS}
+    #api.nix
+      #value %arg{packages}
+      #purpose
+        Packages to resolve external dependencies from.
+  #flag#fake.directives[type=directives]
+    #value %arg{directives}
+    #purpose pretend some commands exist
+    #forms
+      #form
+        #part %arg{type}
+        #part[repeatable=true] %arg{name}
+        #purpose Treat %arg{name(s)} of %arg{type} as defined; %arg{type} is the full word or first letter of: %shortform{alias}, %shortform{builtin}, %shortform{external}, %shortform{function}, %shortform{keyword}, or %shortform{source}
+      #example[flag=fake] f:setUp;tearDown builtin:setopt source:/etc/bashrc
+  #flag#fix.directives[type=directives]
+    #value %arg{directives}
+    #purpose fix things we can't auto-fix/ignore
+    #forms
+      #form
+        #part %shell_var{variable}
+        #part %arg{command}
+        #note $ may need escaping
+        #purpose replace parameter expansions of %shell_var{variable} with %arg{command}
+      #form
+        #part %arg{absolute_path}
+        #purpose treat %arg{absolute_path} as a bare reference that must be resolved
+      #form
+        #part %literal_arg{aliases}
+        #purpose resolve into alias definitions
+      #example[flag=fix] aliases $GIT:gix /bin/bash
+  #flag#keep.directives[type=directives]
+    #value %arg{directives}
+    #purpose keep things we can't auto-fix/ignore
+    #forms
+      #form
+        #part %arg{command}
+        #part[repeatable=true] %shell_var{variable}
+        #note $ may need escaping
+        #purpose ignore %shell_var{variable}in the arguments to %arg{command}
+      #form
+        #part %shell_var{variable}
+        #note $ may need escaping
+        #purpose
+          #para ignore %shell_var{variable} or %shell_var{{variable%}} used as all or part of a first word (command)
+
+          #para Such as: `$GIT status` or `$BUSYBOX/ls`
+      #form
+        #part %arg{absolute_path}
+        #purpose ignore a specific %arg{absolute_path}
+      #form
+        #part %arg{~/path}
+        #purpose ignore a specific %arg{home-relative_path}
+      #form
+        #part %arg{./path}
+        #purpose ignore a specific %arg{PWD-relative_path}
+      #example[flag=keep] source:$HOME /etc/bashrc ~/.bashrc
+  #flag#lore.lore
+    #value %arg{directory}
+    #purpose control nested resolution
+  #flag#execer.lore
+    #value %arg{statements}
+    #purpose modify nested resolution
+  #flag#wrapper.lore
+    #value %arg{statements}
+    #purpose modify nested resolution
+  #flag#prologue.extend
+    #value %arg{file}
+    #purpose insert file before resolved script
+  #flag#epilogue.extend
+    #value %arg{file}
+    #purpose insert file after resolved script
+  #flag#overwrite.overwrite
+    #purpose Resolve script in-place (useful for out-of-tree builds).
+  #flag#help.meta
+    #purpose Show brief syntax help.
+  #flag#version.meta
+    #purpose Show version number.
+#exits
+  #code 1
+    #purpose non-resholve error (ex: from the OSH parser)
+  #code 2
+    #purpose invocation/argument error
+  #code 3+
+    #purpose resolution error
+#examples
+  #cli
+    #basic
+      $ resholve --interpreter "$(which bash)" --path "$PATH" script.sh
+      $ resholve --interpreter "$(which bash)" --path "$PATH" < script.sh
+      $ resholve --interpreter "$(which bash)" --path "$PATH" script1.sh script2.sh
+  #nix
+#limitations
+  #limit %me{} is built on the bash-compatible OSH parser (from the Oil shell project). It can't handle any script OSH can't parse.
+  #limit Support for non-bash shells is a happy side-effect of how similar POSIX-ish shell languages are. If you run into a parse error with any non-bash syntax, your only real option is changing the script.
+  #limit If you run into a parse error with valid bash syntax, check Oil's issue tracker (https://github.com/oilshell/oil/issues) to see if the issue is known and whether it is likely to be fixed. If it won't be fixed, your only recourse is changing the script.
+#belated
+  #topic#bash[man=1]
+  #topic#osh[man=1]
+  #topic#sh[man=1]
+  #topic#execve[man=2]
+#related
+  #topic[man=1] bash
+  #topic[man=1] osh
+  #topic[man=1] sh
+  #topic[man=2] execve
