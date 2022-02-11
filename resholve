@@ -1,8 +1,9 @@
 #!/usr/bin/env python2
 from __future__ import print_function
 
-__version__ = "@version@"
-__version_info__ = (x for x in __version__.split("."))
+from _resholve import strings
+from _resholve.version import __version__
+
 DIRECTIVE_FORMAT = "2"
 
 import sys
@@ -23,6 +24,7 @@ import configargparse as ourparse  # resholve's own parser
 import logging
 
 from collections import defaultdict, Iterable
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
@@ -534,8 +536,8 @@ class LookSee(dict):
 
 def make_arg_parser(module):
     parser = module.ArgumentParser(
-        description="Resolve external command/script references in a shell script to absolute paths. This is a terse reminder of flag names; see 'man resholve' for usage.",
-        usage="resholve [options] script ...",
+        description=strings.description,
+        usage=strings.synopsis,
         auto_env_var_prefix="RESHOLVE_",
         add_env_var_help=False,
         add_help=False,
@@ -552,21 +554,21 @@ def make_arg_parser(module):
         metavar="script",
         type=str,
         nargs="*",
-        help="script paths to resolve",
+        help=strings.scripts,
     )
     req_path.add_argument(
         "--path",
         metavar="str",
         dest="path",
         type=LookSee,
-        help="paths to resolve commands from",
+        help=strings.path,
     )
     req_path.add_argument(
         "--inputs",
         metavar="str",
         dest="path",
         type=LookSee,
-        help="alias for --path",
+        help=strings.inputs,
     )
 
     req.add_argument(
@@ -574,7 +576,7 @@ def make_arg_parser(module):
         dest="shebang",
         type=interpreter_to_shebang,
         metavar="p",
-        help="specify interpreter for shebang; does NOT otherwise impact how resholve interprets a script",
+        help=strings.interpreter,
         required=True,
     )
 
@@ -587,21 +589,21 @@ def make_arg_parser(module):
         metavar="str",
         action="append",
         type=directive_fake,
-        help="pretend some commands exist",
+        help=strings.fake,
     )
     res.add_argument(
         "--fix",
         metavar="str",
         action="append",
         type=directive_fix,
-        help="fix things we can't auto-fix/ignore",
+        help=strings.fix,
     )
     res.add_argument(
         "--keep",
         metavar="str",
         action="append",
         type=directive_keep,
-        help="keep things we can't auto-fix/ignore",
+        help=strings.keep,
     )
     """
     TODO: disabling some options that I sketched out but that
@@ -629,21 +631,21 @@ def make_arg_parser(module):
         "--lore",
         type=LoreType(("execers", "wrappers")),
         metavar="d",
-        help="lore directory",
+        help=strings.lore,
     )
     res.add_argument(
         "--execer",
         type=LoreType(("execers",)),
         metavar="str",
         action="accumulate",
-        help="single execer directive",
+        help=strings.execer,
     )
     res.add_argument(
         "--wrapper",
         type=LoreType(("wrappers",)),
         metavar="str",
         action="accumulate",
-        help="single wrapper directive",
+        help=strings.wrapper,
     )
     res.add_argument(
         "--assay",
@@ -659,20 +661,20 @@ def make_arg_parser(module):
         "--prologue",
         type=ourparse.FileType("r"),
         metavar="f",
-        help="insert file before resolved script",
+        help=strings.prologue,
     )
     other.add_argument(
         "--epilogue",
         type=ourparse.FileType("r"),
         metavar="f",
-        help="insert file after resolved script",
+        help=strings.epilogue,
     )
 
     other.add_argument(
         "--overwrite",
         action="store_true",
         dest="overwrite",
-        help="Replace script files instead of writing to script.resolved.",
+        help=strings.overwrite,
     )
     # other.add_argument(
     #     "--faff", type=int, metavar="int", help="fuzz n times for missed commands",
