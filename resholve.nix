@@ -12,21 +12,18 @@ python27Packages.buildPythonApplication {
   pname = "resholve";
   inherit version;
   src = rSrc;
-  format = "other";
-  dontBuild = true;
 
   nativeBuildInputs = [ installShellFiles ];
 
   propagatedBuildInputs = [ oildev python27Packages.configargparse ];
 
   patchPhase = ''
-    for file in resholve; do
+    for file in setup.cfg _resholve/version.py; do
       substituteInPlace $file --subst-var-by version ${version}
     done
   '';
 
-  installPhase = ''
-    install -Dm755 resholve $out/bin/resholve
+  postInstall = ''
     installManPage resholve.1
   '';
 

@@ -12,7 +12,7 @@ all: apologeez
 install: apologeez
 uninstall: apologeez
 
-.local : resholve *.nix test.sh demo tests/* resholve.1
+.local : resholve *.nix test.sh demo tests/* resholve.1 _resholve/strings.py
 	touch .local
 
 
@@ -64,5 +64,8 @@ README.nixpkgs.md: markdown.wwst markdown.css content.wwst
 resholve.1.txt: resholve.1
 	@echo Building plain-text copy of manpage
 	@groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt
+
+_resholve/strings.py: strings.wwst strings.css content.wwst
+	@wordswurst strings.wwst > _resholve/strings.py
 
 update: timings.md demos.md resholve.1.txt README.nixpkgs.md
