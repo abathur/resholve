@@ -1,5 +1,6 @@
 #! /usr/bin/env make
-export PATH := $(shell nix-shell -p nix coreutils gnused groff util-linux --run 'echo $$PATH')
+#export PATH := $(shell nix-shell -p nix coreutils gnused groff util-linux --run 'echo $$PATH')
+export PATH := $(shell nix-shell make.nix --run 'echo $$PATH')
 
 .PHONY: apologeez ci clean update
 
