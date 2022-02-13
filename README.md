@@ -50,7 +50,7 @@ In the Nix ecosystem, resholve is already helping us:
 ## Quickstart
 > *Note:* resholve *works for a living*, but it is young. For example, it is *only* packaged for the [Nix package manager](https://nixos.org/nix/). You may want to review the [limitations](#limitations) section for more.
 
-Here's how to get resholve to play with it. You should also review `man resholve` (or the [plaintext](resholve.1.txt) copy).
+Here's how to get resholve to play with it. You should also review `man resholve` (or the [plaintext](docs/resholve.1.txt) copy).
 
 ### CLI
 

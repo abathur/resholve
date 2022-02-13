@@ -122,14 +122,14 @@ that the `resholve` CLI expects. Here's an overview:
 | scripts | `<list>` | scripts to resolve (`$out`-relative paths) |
 | interpreter | `"none"` `<path>` | The absolute interpreter `<path>` for the script's shebang. The special value `none` ensures there is no shebang. |
 | inputs | `<packages>` | Packages to resolve external dependencies from. |
+| fake | `<directives>` | pretend some commands exist |
 | fix | `<directives>` | fix things we can't auto-fix/ignore |
 | keep | `<directives>` | keep things we can't auto-fix/ignore |
 | lore | `<directory>` | control nested resolution |
 | execer | `<statements>` | modify nested resolution |
+| wrapper | `<statements>` | modify nested resolution |
 | prologue | `<file>` | insert file before resolved script |
 | epilogue | `<file>` | insert file after resolved script |
-| fake | `<directives>` | pretend some commands exist |
-| wrapper | `<statements>` | modify nested resolution |
 
 <!-- TODO: section below is largely custom for nixpkgs, but I would LIKE to wurst it. -->
 

@@ -218,4 +218,4 @@ SEE ALSO
 AUTHORS
      Travis A. Everett <travis.a.everett@gmail.com>
 
-Nixpkgs                        February 10, 2022                       Nixpkgs
+Nixpkgs                        February 13, 2022                       Nixpkgs
