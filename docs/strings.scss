@@ -1,39 +1,41 @@
+@import 'plaintext';
+
 *, *::before, *::after {
 	display: word;
 }
-me {
-	content: "resholve";
-	display: word;
-}
+
 synopsis {
 	display: word;
 	space: '';
-}
-synopsis::before {
-	content: "resholve";
-	display: char;
+
+	&::before {
+		content: "resholve";
+		display: char;
+	}
 }
 
-argument[optional=true]::before {
-	content: "[";
-	display: char;
-}
-argument[optional=true]::after {
-	content: "]";
-	display: char;
+argument[optional=true] {
+	&::before, &::after {
+		display: char;
+	}
+	&::before {
+		content: "[";
+	}
+	&::after {
+		content: "]";
+	}
 }
 
 description > para {
 	margin: 1;
 	display: word;
 }
-flag#interpreter > purpose > seealso,
-flag#path purpose > aliases {
-	display: none;
-}
-literal.nospace {
-	space: '';
-}
-flag#path.alias {
-	content: "an alias for --" attr(id);
+flag {
+	&#interpreter > purpose > seealso,
+	&#path purpose > aliases {
+		display: none;
+	}
+	&#path.alias {
+		content: "an alias for --" attr(id);
+	}
 }
