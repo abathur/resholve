@@ -1,16 +1,24 @@
 * {
 	/* TODO: probably "line" default for everyone in a roff format? */
 	display: line;
+	&::before, &::after {
+		display: word;
+	}
 }
-*::before, *::after {
-	display: word;
+
+me {
+	content: ".Nm";
 }
-/**::before {
-	content: "<" attr(name) " id='" attr(id) "'>";
+
+synopses::before {
+	content: ".Sh SYNOPSIS";
+	display: line;
 }
-*::after {
-	content: "</" attr(name) ">";
-}*/
+synopsis::before {
+	content: ".Nm";
+	display: line;
+}
+
 nix {
 	display: none;
 }
@@ -20,9 +28,7 @@ tagline::before {
 today {
 	content: today(".Dd %B %d, %Y");
 }
-description {
-	/*display: block;*/
-}
+
 description::before {
 	content: ".Sh DESCRIPTION";
 	display: line;
@@ -31,244 +37,252 @@ para:not(:first-child)::before {
 	content: ".Pp";
 	display: line;
 }
-me {
-	content: ".Nm";
-}
-synopses {
-	/*display: block;*/
-}
-synopses::before {
-	content: ".Sh SYNOPSIS";
-	display: line;
-}
-synopsis::before {
-	content: ".Nm";
-	display: line;
-}
-/*argument::before {
-	content: ".Ar ";
-}*/
 
-arg[optional=true]::before {
-	content: ".Op Ar ";
+arg {
+	&::before {
+		content: ".Ar";
+	}
+	&[optional=true]::before {
+		content: ".Op Ar ";
+	}
 }
 furniture::before {
 	content: ".No ";
 }
-arguments > argument::before {
-	content: ".It Ar " attr(id);
-	display: line;
-}
-arguments > flag::before {
-	content: ".It Fl Fl " attr(id);
-	/*display: line;*/
-}
-argument#script > purpose.terse,
-argument#script > value {
-	display: none;
-}
-/*argument#script > #purpose > #terse {
-	display: none;
-}
-argument#script > #purpose > #context {
-	display: none;
-}*/
-arguments > *.options::before {
-	content: ".Fl Fl " attr(id);
-	/*display: line;*/
-}
-arguments > *.options > purpose,
-arguments > *.options > forms,
-arguments > *.required > api:not(.cli),
-arguments > *.required > purpose > terse {
-	display: none;
-}
-arguments > flag > value,
-arguments > flag > value > arg,
-arguments > flag > * > value,
-arguments > flag > * > value > arg {
-	display: word;
-}
-/*flag > value:not(:first-child)::before {
-	content: "|";
-}*/
-arguments > flag > value:not(:first-of-type)::before, arguments > flag > * > value:not(:first-of-type)::before {
-	content: "|";
-}
+
 literal, literal_arg {
 	display: char;
 }
 literal_arg::before {
 	content: ".Cm";
 }
-value > literal_arg::before,
-part literal_arg::before {
-	content: "Cm";
+part, value > {
+	literal_arg::before {
+		content: "Cm";
+	}
+	arg::before {
+		content: "Ar";
+	}
+	shell_var::before {
+		content: "$ Ns Ar";
+	}
 }
-arg::before {
-	content: ".Ar";
-}
+
 shell_var::before {
 	content: ".No $ Ns Ar";
 }
-value > arg::before,
-part arg::before {
-	content: "Ar";
-}
-value > shell_var::before,
-part shell_var::before {
-	content: "$ Ns Ar";
-}
+
 envvar::before {
 	content: ".Ev";
 }
-/*envvar::after {
-	content: "x";
-}*/
-/*goal:
-.It Fl Fl path Ar path | Pf RESHOLVE_PATH= Ar path
-*/
-/*
-TODO: below model the kind of thing that could
-be solved by freedom to specify independent
-left/right bound types
-*/
-flag.idk::before {
-	content: ".It Fl Fl " attr(id) " Eo ' Ns Ar " attr(type) " Ec Ns ' | Pf RESHOLVE_" uppercase(attr(id)) "= Eo ' Ns Ar " attr(type) " Ec Ns '";
-	display: line;
+
+
+arguments {
+	argument {
+		&::before {
+			content: ".It Ar " attr(id);
+			display: line;
+		}
+		purpose {
+			&::before {
+				content: '.Bl -bullet -compact';
+				display: line;
+			}
+			&::after {
+				content: '.El';
+				display: line;
+			}
+			> *::before {
+				content: '.It';
+				display: line;
+			}
+		}
+	}
+	> {
+		* > purpose,
+		* > purpose > * {
+			display: line;
+		}
+		.options {
+			&::before {
+				content: ".Fl Fl " attr(id);
+			}
+			purpose, forms {
+				display: none;
+			}
+		}
+		.required {
+			api:not(.cli),
+			purpose > terse {
+				display: none;
+			}
+		}
+		flag {
+			&::before {
+				content: ".It Fl Fl " attr(id);
+			}
+		 	> value,
+			> value > arg,
+			> * > value,
+			> * > value > arg {
+				display: word;
+			}
+			value:not(:first-of-type)::before {
+				content: "|";
+			}
+			&.overwrite::before,
+			&.meta::before {
+				display: line;
+			}
+		}
+	}
 }
-flag.idk > value {
+arguments.envs > {
+	argument,
+	flag.meta,
+	flag > * {
+		display: none;
+	}
+	flag::before {
+		content: ".It RESHOLVE_" uppercase(attr(id));
+		display: line;
+	};
+}
+argument#script > purpose.terse,
+argument#script > value {
 	display: none;
 }
-flag.idk > purpose {
-	/* single slash to keep man from double-spacing */
-	content: sentencecase(content()) ". \\";
+flag.idk {
+	&::before {
+		/*
+		TODO: the kind of thing that could
+		be solved by freedom to specify independent
+		left/right boundary types?
+		*/
+		content: ".It Fl Fl " attr(id) " Eo ' Ns Ar " attr(type) " Ec Ns ' | Pf RESHOLVE_" uppercase(attr(id)) "= Eo ' Ns Ar " attr(type) " Ec Ns '";
+		display: line;
+	}
+	> {
+		value {
+			display: none;
+		}
+		purpose {
+			/* single slash to keep man from double-spacing */
+			content: sentencecase(content()) ". \\";
+		}
+		forms {
+			&::before {
+				display: line;
+				/*
+				TODO: I don't love sticking this in the ~css, but it's
+				going to be less frustrating with the template next to
+				the call signatures. Unless I create a meta-parser that
+				converts some *other* format into inflect executions, it
+				should be done here to reduce pain.
+				*/
+				/*content: inflect(attr(memplate), children()) nl() ".Bl -tag -width 1n";*/
+				content: inflect("There plural('is', {0}) {0} directive plural('form', {0}):", children()) nl() ".Bl -tag -width 1n";
+			}
+			&::after {
+				display: line;
+				content: ".El";
+			}
+			> form {
+				> *,
+				> *::before,
+				> *::after,
+				part > *,
+				part > *::before,
+				part > *::after {
+					display: word;
+				}
+				&::before {
+					content: ".It";
+				}
+				> part:nth-child(2)::before {
+					content: " : Ns ";
+				}
+				> note {
+					&::before {
+						content: "No (Note: ";
+					}
+					&::after {
+						content: ")";
+					}
+				}
+				> part[repeatable=true]::after {
+					content: "Ns [; Ns " content() " ] Ns ...";
+				}
+				> purpose {
+					display: line;
+
+					shortform {
+						content: ".Ar " slice(content(), 0, 1) " Ns " slice(content(), 1, None) " Ns ";
+					}
+				}
+			}
+		}
+	}
+	example {
+		display: char;
+		&::before, &::after {
+			display: char;
+		}
+		&::before {
+			content: ".It Ex: Fl Fl " attr(flag) " No '";
+		}
+		&::after {
+			/* single slash to keep man from double-spacing */
+			content: "'";
+		}
+	}
 }
-flag.idk example::before {
-	content: ".It Ex: Fl Fl " attr(flag) " No '";
+exits {
+	&::before {
+		content: '.Bl -tag -width "xx"';
+		display: line;
+	}
+	&::after {
+		content: '.El';
+		display: line;
+	}
+	> code::before {
+		content: '.It Sy';
+		display: word;
+	}
 }
-flag.idk example,
-flag.idk example::before,
-flag.idk example::after {
-	display: char;
-}
-flag.idk example::after {
-	/* single slash to keep man from double-spacing */
-	content: "'";
-}
-flag.idk > forms::before {
-	display: line;
-	/*
-	TODO: I don't love sticking this in the ~css, but it's
-	going to be less frustrating with the template next to
-	the call signatures. Unless I create a meta-parser that
-	converts some *other* format into inflect executions, it
-	should be done here to reduce pain.
-	*/
-	/*content: inflect(attr(memplate), children()) nl() ".Bl -tag -width 1n";*/
-	content: inflect("There plural('is', {0}) {0} directive plural('form', {0}):", children()) nl() ".Bl -tag -width 1n";
-}
-flag.idk > forms::after {
-	display: line;
-	content: ".El";
+limitations {
+	&::before {
+		content: ".Bl -bullet";
+		display: line;
+	}
+	&::after {
+		content: ".El";
+		display: line;
+	}
+	> limit::before {
+		content: '.It';
+		display: line;
+	}
 }
 
-flag.idk > forms > form > *,
-flag.idk > forms > form > *::before,
-flag.idk > forms > form > *::after,
-flag.idk > forms > form > part > *,
-flag.idk > forms > form > part > *::before,
-flag.idk > forms > form > part > *::after
-{
-	display: word;
-}
-flag.idk > forms > form::before {
-	content: ".It";
-}
-flag.idk > forms > form > part:nth-child(2)::before {
-	content: " : Ns ";
-}
-flag.idk > forms > form > note::before {
-	content: "No (Note: ";
-}
-flag.idk > forms > form > note::after {
-	content: ")";
-}
-flag.idk > forms > form > part[repeatable=true]::after {
-	content: "Ns [; Ns " content() " ] Ns ...";
-}
-flag.idk > forms > form > purpose {
-	display: line;
-}
-flag.idk > forms > form > purpose > shortform {
-	content: ".Ar " slice(content(), 0, 1) " Ns " slice(content(), 1, None) " Ns ";
-}
-value > envvar::before {
-	content: "Pf";
-	display: word;
-}
 value > envvar {
 	display: char;
-}
-arguments > argument > purpose::before {
-	content: '.Bl -bullet -compact';
-	display: line;
-}
-arguments > argument > purpose::after {
-	content: '.El';
-	display: line;
-}
-arguments > * > purpose,
-arguments > * > purpose > * {
-	display: line;
-}
-arguments > flag.overwrite::before,
-arguments > flag.meta::before {
-	display: line;
+
+	&::before {
+		content: "Pf";
+		display: word;
+	}
 }
 
-arguments > argument > purpose > *::before,
-limitations > limit::before {
-	content: '.It';
-	display: line;
-}
 option::before {
 	content: '.Fl Fl';
 }
 
-arguments.envs > argument,
-arguments.envs > flag.meta,
-arguments.envs > flag > * {
-	display: none;
-}
-arguments.envs > flag::before{
-	content: ".It RESHOLVE_" uppercase(attr(id));
-	display: line;
-}
-exits::before {
-	content: '.Bl -tag -width "xx"';
-	display: line;
-}
-exits::after {
-	content: '.El';
-	display: line;
-}
-exits > code::before {
-	content: '.It Sy';
-	display: word;
-}
 topic {
 	content: '.Xr ' content() ' ' attr(man);
 	display: line;
 }
 related > topic:not(:last-of-type)::after {
 	content: ' ,';
-}
-limitations::before {
-	content: ".Bl -bullet";
-	display: line;
-}
-limitations::after {
-	content: ".El";
-	display: line;
 }
