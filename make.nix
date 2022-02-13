@@ -5,5 +5,5 @@ let
   wordswurst = callPackage ../wordswurst { };
 in
 pkgs.mkShell {
-  buildInputs = [ nix coreutils gnused groff util-linux wordswurst ];
+  buildInputs = [ nix coreutils gnused groff util-linux wordswurst sassc ];
 }

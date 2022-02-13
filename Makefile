@@ -51,21 +51,24 @@ demos.md: bits/demos.md.pre bits/demos.md.mid bits/demos.md.post result-ci/demo.
 		bits/demos.md.post \
 		| sed -E 's@/nix/store/[a-z0-9]{32}-@/nix/store/...-@g' > demos.md
 
-resholve.1: manpage.wwst manpage.css content.wwst
+resholve.1: docs/manpage.wwst docs/manpage.css docs/content.wwst
 	@echo Building manpage
-	@wordswurst manpage.wwst > resholve.1
+	@wordswurst $< > $@
 
-
-README.nixpkgs.md: markdown.wwst markdown.css content.wwst
+docs/README.nixpkgs.md: docs/markdown.wwst docs/markdown.css docs/content.wwst
 	@echo "Building Nixpkgs README (markdown)"
-	@wordswurst markdown.wwst > README.nixpkgs.md
+	@wordswurst $< > $@
 
+docs/%.css: docs/%.scss
+	@echo Sassing $@ from $<
+	@sassc --omit-map-comment $< $@
 
-resholve.1.txt: resholve.1
+docs/resholve.1.txt: resholve.1
 	@echo Building plain-text copy of manpage
-	@groff -m mdoc -T utf8 resholve.1 | col -bx > resholve.1.txt
+	@groff -m mdoc -T utf8 $< | col -bx > $@
 
-_resholve/strings.py: strings.wwst strings.css content.wwst
-	@wordswurst strings.wwst > _resholve/strings.py
+_resholve/strings.py: docs/strings.wwst docs/strings.css docs/content.wwst
+	@echo Wursting $@ from $<
+	@wordswurst $< > $@
 
-update: timings.md demos.md resholve.1.txt README.nixpkgs.md
+update: timings.md demos.md docs/resholve.1.txt docs/README.nixpkgs.md

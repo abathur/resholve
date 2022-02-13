@@ -34,14 +34,14 @@
 
   <!-- TODO: figure out how to pull this externally? -->
 
-  #insert[language=nix] ../nixpkgs/pkgs/tools/misc/dgoss/default.nix
+  #insert[language=nix] ../../nixpkgs/pkgs/tools/misc/dgoss/default.nix
 
   ## Basic `resholveScript` and `resholveScriptBin` examples
 
   Both of these functions have the same basic API. This example is a little
   trivial for now. If you have a real usage that you find helpful, please PR it.
 
-  #insert[language=nix] resholveScript.example.nix
+  #insert[language=nix] examples/resholveScript.nix
 
   ## Options
 
@@ -96,7 +96,7 @@
   This will hopefully make more sense when you see it. Here are CLI examples
   from the manpage, and the Nix equivalents:
 
-  #insert[language=nix] directive.example.nix
+  #insert[language=nix] examples/directive.nix
 
   > **Note:** For now, at least, you'll need to reference the manpage to completely understand these examples.
 
@@ -127,7 +127,7 @@
   the main lever is the ability to substitute your own lore. This is how you'd
   do it piecemeal:
 
-  #insert[language=nix] lore.example.nix
+  #insert[language=nix] examples/lore.nix
 
   The format is fairly simple to generate--you can script your own generator if
   you need to modify the lore.

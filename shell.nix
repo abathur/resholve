@@ -12,7 +12,7 @@ let
   wordswurst = callPackage ../wordswurst { };
 in
 pkgs.mkShell {
-  buildInputs = [ resholve bats nixpkgs-fmt cloc wordswurst ];
+  buildInputs = [ resholve bats nixpkgs-fmt cloc wordswurst sassc scss-lint ];
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
   RESHOLVE_LORE = "${deps.binlore.collect { drvs = resolveTimeDeps; } }";
   INTERP = "${bash}/bin/bash";
