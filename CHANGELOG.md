@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.0 (UNRELEASED)
+- First draft of documentation single-sourcing via wordswurst. There's still a lot left to do (I skimped on effort/principle in a large part of the Nixpkgs-README, for example).
+- As part of the above, take the first teeny-tiny step towards breaking resholve up into more than one Python file. (I don't have much zeal for this--it's busywork when there's plenty of feature-work--but I think it makes sense to pilot here because I'm pushing these bits out to make them easier to generate.)
+
 ## v0.6.9 (Jan 20 2022)
 - Fix sed parser bug (https://github.com/abathur/resholve/issues/71)
 - Fix alias-substitution regression (https://github.com/abathur/resholve/issues/72)
