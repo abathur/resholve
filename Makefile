@@ -12,7 +12,7 @@ all: apologeez
 install: apologeez
 uninstall: apologeez
 
-.local : resholve *.nix test.sh demo tests/* resholve.1 _resholve/strings.py
+.local : *.nix setup.cfg setup.py test.sh demo tests/* resholve.1 _resholve/*
 	touch .local
 
 
