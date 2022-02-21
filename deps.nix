@@ -27,8 +27,8 @@ rec {
     (fetchFromGitHub {
       owner = "abathur";
       repo = "nix-py-dev-oil";
-      rev = "v0.8.12.1";
-      hash = "sha256-7JVnosdcvmVFN3h6SIeeqcJFcyFkai//fFuzi7ThNMY=";
+      rev = "v0.8.12.2";
+      hash = "sha256-+dVxzPKMGNKFE+7Ggzx9iWjjvwW2Ow3UqmjjUud9Mqo=";
     })
     { };
 }
