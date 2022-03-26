@@ -19,3 +19,9 @@ bash \
 	"bop" \
 	-c "command file" \
 	-c "bash -c file"
+
+if type -p find; then
+	type -p find
+elif ! type -p find; then
+	! type -p find
+fi

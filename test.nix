@@ -153,6 +153,9 @@ rec {
         scripts = [ "bin/conjure.sh" ];
         interpreter = "${bash}/bin/bash";
         inputs = [ module1 ];
+        fake = {
+          external = [ "jq" "openssl" ];
+        };
       };
     };
   };

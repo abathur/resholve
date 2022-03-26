@@ -1549,6 +1549,17 @@ class BuiltinCommandParsers(object):
         )
         return (generic,)
 
+    @staticmethod
+    def _type():
+        generic = CommandParser("type", "builtin")
+        generic.add_argument("-p", action="store_true")
+        generic.add_argument("-v", action="store_true")
+        generic.add_argument("-V", action="store_true")
+        generic.add_argument(
+            "commands", nargs=theirparse.REMAINDER, action="invocations"
+        )
+        return (generic,)
+
 
 class ExternalCommandParsers(object):
     @staticmethod
@@ -3386,6 +3397,7 @@ class RecordCommandlike(object):
     # - substituting command -v -> echo?
     # - possibly warning on and requiring an override for `-p`
     handle_builtin_command = builtin_handler("command", "command")
+    handle_builtin_type = builtin_handler("type", "command")
     # TODO: no rush, but maybe we can help the weird coproc
     # situation with a handler that throws better errors
     handle_builtin_coproc = builtin_handler("coproc", "command")

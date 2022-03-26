@@ -120,7 +120,8 @@ CASES
 @test "Has (rudimentary) support for resolving executable arguments" {
   demo "nested_execer.sh" <({
     status 0
-    line 5 contains '/bin/find $(type -p file) -name file -exec /nix/store/'
+    line 5 contains '/bin/find $(type -p'
+    line 5 contains '/bin/file) -name file -exec /nix/store/'
     line 5 contains "/bin/file {} +  "
     line 14 begins '/nix/store'
     line 14 ends '/bin/bash \'
