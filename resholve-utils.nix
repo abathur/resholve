@@ -10,6 +10,7 @@ rec {
 
   # for brevity / line length
   spaces = l: builtins.concatStringsSep " " l;
+  colons = l: builtins.concatStringsSep ":" l;
   semicolons = l: builtins.concatStringsSep ";" l;
 
   /* Throw a fit with dotted attr path context */
