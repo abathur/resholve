@@ -505,6 +505,7 @@ class LookSee(dict):
       - Lazily lookup and cache others
     """
 
+    pwd = os.getcwd()
     paths = None
     __call__ = dict.__getitem__
 
@@ -517,10 +518,19 @@ class LookSee(dict):
         dict.__init__(self)
         paths = set()
         for path in set(path.split(os.pathsep)):
-            if os.path.isfile(path):
-                self[os.path.basename(path)] = path
+            if os.path.isabs(path):
+                if os.path.isfile(path):
+                    self[os.path.basename(path)] = path
+                else:
+                    paths.add(path)
             else:
-                paths.add(path)
+                x = os.path.join(self.pwd, path)
+                if os.path.isfile(x):
+                    self[path] = x
+                elif os.path.exists(x):
+                    paths.add(x)
+                else:
+                    paths.add(path)
         self.paths = paths
 
     def __missing__(self, basename):
@@ -2764,7 +2774,13 @@ class OrderedCommandResolver(object):
             # if we don't
             # - either require triage, or outright fail due to the lack of lore
             if executable not in lore:
-                observe(MissingLore, executable)
+                if (
+                    executable.startswith(LookSee.pwd)
+                    and executable.replace(LookSee.pwd + "/", "") in lore
+                ):
+                    lore[executable] = lore[executable.replace(LookSee.pwd + "/", "")]
+                else:
+                    observe(MissingLore, executable)
 
             return executable
 
