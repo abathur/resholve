@@ -31,9 +31,15 @@ rec {
   makeDirectives = solution: env: val:
     lib.mapAttrsToList (makeDirective solution env) val;
 
+  /* Custom ~search-path routine to handle relative path strings */
+  relSafeBinPath = input:
+    if lib.isDerivation input then ((lib.getOutput "bin" input) + "/bin")
+    else if builtins.isString input then input
+    else throw "unexpected type for input: ${builtins.typeOf input}";
+
   /* Special-case value representation by type/name */
   makeEnvVal = solution: env: val:
-    if env == "inputs" then lib.makeBinPath val
+    if env == "inputs" then (colons (map relSafeBinPath val))
     else if builtins.isString val then val
     else if builtins.isList val then spaces val
     else if builtins.isAttrs val then spaces (makeDirectives solution env val)
