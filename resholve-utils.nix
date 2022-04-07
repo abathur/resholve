@@ -53,29 +53,43 @@ rec {
   makeEnv = solution: env: value:
     "RESHOLVE_${lib.toUpper env}=${shellEnv solution env value}";
 
-  /* Discard attrs claimed by makeArgs */
-  removeCliArgs = value:
-    removeAttrs value [ "scripts" "flags" ];
+  /* Discard attrs:
+  - claimed by makeArgs
+  - only needed for binlore.collect
+  */
+  removeUnneededArgs = value:
+    removeAttrs value [ "scripts" "flags" "unresholved" ];
 
   /* Verify required arguments are present */
   validateSolution = { scripts, inputs, interpreter, ... }: true;
 
   /* Pull out specific solution keys to build ENV=val pairs */
   makeEnvs = solution: value:
-    spaces (lib.mapAttrsToList (makeEnv solution) (removeCliArgs value));
+    spaces (lib.mapAttrsToList (makeEnv solution) (removeUnneededArgs value));
 
   /* Pull out specific solution keys to build CLI argstring */
   makeArgs = { flags ? [ ], scripts, ... }:
     spaces (flags ++ scripts);
 
+  makeBinloreArgs = value:
+    let
+      hasUnresholved = builtins.hasAttr "unresholved" value;
+    in {
+      drvs = value.inputs ++
+        lib.optionals hasUnresholved [ value.unresholved ];
+      strip = if hasUnresholved then [ value.unresholved ] else [ ];
+    };
+
   /* Build a single resholve invocation */
   makeInvocation = solution: value:
     if validateSolution value then
     # we pass resholve a directory
-      "RESHOLVE_LORE=${binlore.collect { drvs = value.inputs; } } ${makeEnvs solution value} ${resholve}/bin/resholve --overwrite ${makeArgs value}"
+      "RESHOLVE_LORE=${binlore.collect (makeBinloreArgs value) } ${makeEnvs solution value} ${resholve}/bin/resholve --overwrite ${makeArgs value}"
     else throw "invalid solution"; # shouldn't trigger for now
 
+  injectUnresholved = solutions: unresholved: (builtins.mapAttrs (name: value: value // { inherit unresholved; } ) solutions);
+
   /* Build resholve invocation for each solution. */
-  makeCommands = solutions:
-    lib.mapAttrsToList makeInvocation solutions;
+  makeCommands = solutions: unresholved:
+    lib.mapAttrsToList makeInvocation (injectUnresholved solutions unresholved);
 }
