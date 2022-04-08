@@ -31,7 +31,7 @@ result-quick: .local
 quick: result-quick
 
 clean:
-	rm .local result-ci result-quick
+	rm .local result-ci result-quick docs/README.nixpkgs.md
 
 result-ci/test.txt result-ci/demo.txt result-ci/nix-demo.txt: result-ci
 
