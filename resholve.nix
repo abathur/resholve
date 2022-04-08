@@ -7,6 +7,7 @@
 , version
 , oildev
 , binlore
+, resholve-utils
 }:
 
 python27Packages.buildPythonApplication {
@@ -45,7 +46,10 @@ python27Packages.buildPythonApplication {
     rm $out/nix-support/propagated-build-inputs
   '';
 
-  passthru.tests = callPackage (rSrc + /test.nix) { inherit rSrc binlore; };
+  passthru = {
+    inherit (resholve-utils) mkDerivation phraseSolution writeScript writeScriptBin;
+    tests = callPackage (rSrc + /test.nix) { inherit rSrc binlore; };
+  };
 
   meta = with lib; {
     description = "Resolve external shell-script dependencies";

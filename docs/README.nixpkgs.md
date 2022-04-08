@@ -8,8 +8,11 @@ resholve is developed to enable the Nix package manager to package and integrate
 <!-- generated from resholve's repo; best to suggest edits there (or at least notify me) -->
 
 This will hopefully make its way into the Nixpkgs manual soon, but
-until then I'll outline how to use the `resholvePackage`, `resholveScript`,
-and `resholveScriptBin` functions.
+until then I'll outline how to use the functions:
+- `resholve.mkDerivation` (formerly `resholvePackage`)
+- `resholve.writeScript` (formerly `resholveScript`)
+- `resholve.writeScriptBin` (formerly `resholveScriptBin`)
+- `resholve.phraseSolution` (new in resholve 0.8.0)
 
 > Fair warning: resholve does *not* aspire to resolving all valid Shell
 > scripts. It depends on the OSH/Oil parser, which aims to support most (but
@@ -17,7 +20,7 @@ and `resholveScriptBin` functions.
 
 ## API Concepts
 
-The main difference between `resholvePackage` and other builder functions
+The main difference between `resholve.mkDerivation` and other builder functions
 is the `solutions` attrset, which describes which scripts to resolve and how.
 Each "solution" (k=v pair) in this attrset describes one resholve invocation.
 
@@ -28,19 +31,19 @@ Each "solution" (k=v pair) in this attrset describes one resholve invocation.
 > - Packages with scripts that require conflicting directives can use multiple
 >   solutions to resolve the scripts separately, but produce a single package.
 
-The `resholveScript` and `resholveScriptBin` functions support a _single_
-`solution` attrset. This is basically the same as any single solution in `resholvePackage`, except that it doesn't need a `scripts` attr (it is automatically added).
+`resholve.writeScript` and `resholve.writeScriptBin` support a _single_
+`solution` attrset. This is basically the same as any single solution in `resholve.mkDerivation`, except that it doesn't need a `scripts` attr (it is automatically added). `resholve.phraseSolution` also only accepts a single solution--but it _does_ still require the `scripts` attr.
 
-## Basic `resholvePackage` Example
+## Basic `resholve.mkDerivation` Example
 
-Here's a simple example of how `resholvePackage` is already used in nixpkgs:
+Here's a simple example of how `resholve.mkDerivation` is already used in nixpkgs:
 
 <!-- TODO: figure out how to pull this externally? -->
 
 ```nix
 { lib
 , fetchFromGitHub
-, resholvePackage
+, resholve
 , substituteAll
 , bash
 , coreutils
@@ -48,7 +51,7 @@ Here's a simple example of how `resholvePackage` is already used in nixpkgs:
 , which
 }:
 
-resholvePackage rec {
+resholve.mkDerivation rec {
   pname = "dgoss";
   version = "0.3.16";
 
@@ -89,20 +92,20 @@ resholvePackage rec {
 ```
 
 
-## Basic `resholveScript` and `resholveScriptBin` examples
+## Basic `resholve.writeScript` and `resholve.writeScriptBin` examples
 
 Both of these functions have the same basic API. This example is a little
 trivial for now. If you have a real usage that you find helpful, please PR it.
 
 ```nix
-resholvedScript = resholveScript "name" {
+resholvedScript = resholve.writeScript "name" {
     inputs = [ file ];
     interpreter = "${bash}/bin/bash";
   } ''
     echo "Hello"
     file .
   '';
-resholvedScriptBin = resholveScriptBin "name" {
+resholvedScriptBin = resholve.writeScriptBin "name" {
     inputs = [ file ];
     interpreter = "${bash}/bin/bash";
   } ''
@@ -112,9 +115,38 @@ resholvedScriptBin = resholveScriptBin "name" {
 ```
 
 
+## Basic `resholve.phraseSolution` example
+
+This function has a similar API to `writeScript` and `writeScriptBin`, except it does require a `scripts` attr. It is intended to make resholve a little easier to mix into more types of build. This example is a little
+trivial for now. If you have a real usage that you find helpful, please PR it.
+
+```nix
+{ stdenv, resholve, module1 }:
+
+stdenv.mkDerivation {
+  # pname = "testmod3";
+  # version = "unreleased";
+  # src = ...;
+
+  installPhase = ''
+    mkdir -p $out/bin
+    install conjure.sh $out/bin/conjure.sh
+    ${resholve.phraseSolution "conjure" {
+      scripts = [ "bin/conjure.sh" ];
+      interpreter = "${bash}/bin/bash";
+      inputs = [ module1 ];
+      fake = {
+        external = [ "jq" "openssl" ];
+      };
+    }}
+  '';
+}
+```
+
+
 ## Options
 
-`resholvePackage` maps Nix types/idioms into the flags and environment variables
+`resholve.mkDerivation` maps Nix types/idioms into the flags and environment variables
 that the `resholve` CLI expects. Here's an overview:
 
 | Option | Type | Containing |

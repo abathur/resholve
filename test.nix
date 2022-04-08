@@ -2,9 +2,6 @@
 , stdenv
 , callPackage
 , resholve
-, resholvePackage
-, resholveScript
-, resholveScriptBin
 # , shunit2
 , ncurses
 , fetchFromGitHub
@@ -36,7 +33,7 @@ let
   parsed_packages = [ coreutils sqlite util-linux gnused gawk findutils rlwrap gnutar bc ];
 in
 rec {
-  shunit2 = resholvePackage rec {
+  shunit2 = resholve.mkDerivation rec {
     pname = "shunit2";
     version = "2.1.8";
 
@@ -115,7 +112,7 @@ rec {
       platforms = platforms.unix;
     };
   };
-  module1 = resholvePackage {
+  module1 = resholve.mkDerivation {
     pname = "testmod1";
     version = "unreleased";
 
@@ -139,7 +136,7 @@ rec {
 
     is_it_okay_with_arbitrary_envs = "shonuff";
   };
-  module2 = resholvePackage {
+  module2 = resholve.mkDerivation {
     pname = "testmod2";
     version = "unreleased";
 
@@ -179,7 +176,8 @@ rec {
       };
     };
   };
-  module3 = resholvePackage {
+  # demonstrate that we could use resholve in larger build
+  module3 = stdenv.mkDerivation {
     pname = "testmod3";
     version = "unreleased";
 
@@ -189,18 +187,15 @@ rec {
     installPhase = ''
       mkdir -p $out/bin
       install conjure.sh $out/bin/conjure.sh
-    '';
-
-    solutions = {
-      conjure = {
+      ${resholve.phraseSolution "conjure" {
         scripts = [ "bin/conjure.sh" ];
         interpreter = "${bash}/bin/bash";
         inputs = [ module1 ];
         fake = {
           external = [ "jq" "openssl" ];
         };
-      };
-    };
+      }}
+    '';
   };
 
   cli = stdenv.mkDerivation {
@@ -250,14 +245,14 @@ rec {
   };
 
   # Caution: ci.nix asserts the equality of both of these w/ diff
-  resholvedScript = resholveScript "resholved-script" {
+  resholvedScript = resholve.writeScript "resholved-script" {
     inputs = [ file ];
     interpreter = "${bash}/bin/bash";
   } ''
     echo "Hello"
     file .
   '';
-  resholvedScriptBin = resholveScriptBin "resholved-script-bin" {
+  resholvedScriptBin = resholve.writeScriptBin "resholved-script-bin" {
     inputs = [ file ];
     interpreter = "${bash}/bin/bash";
   } ''

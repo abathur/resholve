@@ -1,11 +1,11 @@
-resholvedScript = resholveScript "name" {
+resholvedScript = resholve.writeScript "name" {
     inputs = [ file ];
     interpreter = "${bash}/bin/bash";
   } ''
     echo "Hello"
     file .
   '';
-resholvedScriptBin = resholveScriptBin "name" {
+resholvedScriptBin = resholve.writeScriptBin "name" {
     inputs = [ file ];
     interpreter = "${bash}/bin/bash";
   } ''
