@@ -24,7 +24,7 @@ rec {
     else if true == val then name
     else if false == val then "" # omit!
     else if null == val then "" # omit!
-    else if builtins.isList val then "${name}:${semicolons val}"
+    else if builtins.isList val then "${name}:${semicolons (map lib.escapeShellArg val)}"
     else nope [ solution env name ] "unexpected type: ${builtins.typeOf val}";
 
   /* Build fake/fix/keep directives from Nix types */

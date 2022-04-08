@@ -4,7 +4,7 @@ from __future__ import print_function
 from _resholve import strings
 from _resholve.version import __version__
 
-DIRECTIVE_FORMAT = "2"
+DIRECTIVE_FORMAT = "3"
 
 import sys
 import os
@@ -4390,14 +4390,27 @@ class ResolvedScript(RecordCommandlike):
             new_directives = self.directives.difference(self.in_doc_directives)
             cursor.f.writelines(
                 [
-                    self.write_directive(directive)
+                    self.write_directive(map(self.spacequote, directive))
                     for directive in sorted(new_directives)
                 ]
                 + ["\n"]
             )
 
     @staticmethod
+    def spacequote(text):
+        """single-quote a string if it contains a space"""
+        if " " in text:
+            return repr(text)
+        else:
+            return text
+
+    @staticmethod
     def write_directive(directive):
+        """
+        Format a single directive for the file tail.
+
+        Assumes input directive is already spacequoted.
+        """
         if len(directive) == 3:
             return "# resholve: {:} {:}:{:}\n".format(*directive)
         elif len(directive) == 2:
