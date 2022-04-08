@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.8.0 (April 8 2022)
+This release ~completely reorganizes the Nix API and introduces a new function. The renames are:
+- `resholvePackage` -> `resholve.mkDerivation`
+- `resholveScript` -> `resholve.writeScript`
+- `resholveScriptBin` -> `resholve.writeScriptBin`
+
+The new function is `resholve.phraseSolution`. It's a
+little like `resholve.writeScript` in that it works on
+a single solution--but it only generates the invocation
+that you need to run resholve as part of a build. This
+makes it easier to bolt resholve on to other types of
+Nix builds.
+
 ## v0.7.0 (April 8 2022)
 This release sands down a few real-world shortcomings exposed by
 a mix of user reports and my own experience resholving some pkgs
