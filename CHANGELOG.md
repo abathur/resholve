@@ -1,13 +1,13 @@
 # Changelog
 
-## v0.7.0 (UNRELEASED)
+## v0.7.0 (April 8 2022)
 This release sands down a few real-world shortcomings exposed by
 a mix of user reports and my own experience resholving some pkgs
 in nixpkgs.
 
 ### Improved resolution
 - Resolve command arguments to `type` builtin
-- Nix API: Support intra-package inputs(#26)
+- Nix API: Support intra-package inputs (#26)
     - Update to binlore xxx
     - Split resholvePackage builds into 2 steps
         - an unresholved build of the package
