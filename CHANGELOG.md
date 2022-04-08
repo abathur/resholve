@@ -1,8 +1,22 @@
 # Changelog
 
 ## v0.7.0 (UNRELEASED)
+This release sands down a few real-world shortcomings exposed by
+a mix of user reports and my own experience resholving some pkgs
+in nixpkgs.
+
 ### Improved resolution
 - Resolve command arguments to `type` builtin
+- Nix API: Support intra-package inputs(#26)
+    - Update to binlore xxx
+    - Split resholvePackage builds into 2 steps
+        - an unresholved build of the package
+        - a 2nd "resholved" building atop the first
+
+### Improved interface
+- Fix directive quoting issue documented in #76
+    - Nix API: quote space-containing directives
+    - Output quoted directives in file footer
 
 ### Internal
 - First draft of documentation single-sourcing via wordswurst. There's still a lot left to do (I skimped on effort/principle in a large part of the Nixpkgs-README, for example).
