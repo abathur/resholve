@@ -55,7 +55,7 @@ resholve.1: docs/manpage.wwst docs/manpage.css docs/content.wwst
 	@echo Building manpage
 	@wordswurst $< > $@
 
-docs/README.nixpkgs.md: docs/markdown.wwst docs/markdown.css docs/content.wwst
+docs/README.nixpkgs.md: docs/markdown.wwst docs/markdown.css docs/content.wwst docs/examples/*.nix
 	@echo "Building Nixpkgs README (markdown)"
 	@wordswurst $< > $@
 
