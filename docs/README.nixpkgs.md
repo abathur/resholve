@@ -279,7 +279,7 @@ execer = [
 ];
 
 # --wrapper '${gnugrep}/bin/egrep:${gnugrep}/bin/grep'
-execer = [
+wrapper = [
   /*
     This is the same verdict binlore will
     come up with. It's a no-op just to demo
