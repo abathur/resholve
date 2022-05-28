@@ -1254,7 +1254,6 @@ if logger.isEnabledFor(logging.WARNING):
             # these self-print and don't block
             pass
 
-
 else:
 
     def observe(cls, *args, **kwargs):
@@ -1761,6 +1760,7 @@ class ExternalCommandParsers(object):
         generic.add_argument("-v", "--verbose", action="store_true")
         generic.add_argument("--preserve-status", action="store_true")
         generic.add_argument("--foreground", action="store_true")
+        generic.add_argument("duration")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
         )
