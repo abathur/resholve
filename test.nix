@@ -259,4 +259,11 @@ rec {
     echo "Hello"
     file .
   '';
+  resholvedScriptBinNone = resholve.writeScriptBin "resholved-script-bin" {
+    inputs = [ file ];
+    interpreter = "none";
+  } ''
+    echo "Hello"
+    file .
+  '';
 }
