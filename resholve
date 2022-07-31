@@ -1914,47 +1914,56 @@ class ExternalCommandParsers(object):
 
         """
         generic = CommandParser("awk")
-        # very unsure about this group part
-        script = generic.add_mutually_exclusive_group(required=True)
-        generic.add_argument("-D", "--debug", action="store_true")
-        generic.add_argument("-F", "--field-separator")
-        # actually assign should be append, but strip_varlikes will
+        assign_fallback = CommandParser("awk")
+
+        def base(parser):
+            # very unsure about this group part
+            script = parser.add_mutually_exclusive_group(required=True)
+            parser.add_argument("-D", "--debug", action="store_true")
+            parser.add_argument("-F", "--field-separator")
+            script.add_argument("-e", "--source", action="append")
+            script.add_argument("-f", "--file")
+
+            parser.add_argument("-b", "--characters-as-bytes", action="store_true")
+            parser.add_argument("-c", "--traditional", action="store_true")
+            parser.add_argument("-C", "--copyright", action="store_true")
+            # technically argless form of below, but see nargs note on rlwrap...
+            parser.add_argument("-d", "--dump-variables")
+            parser.add_argument("-E", "--exec")
+            parser.add_argument("-g", "--gen-pot", action="store_true")
+            parser.add_argument("-h", "--help", action="store_true")
+            parser.add_argument("-i", "--include")
+            parser.add_argument("-l", "--load")
+            # arg and argless forms of this; see note on rlwrap; guessing argless?
+            parser.add_argument("-L", "--lint", action="store_true")
+            # parser.add_argument("-L", "--lint", choices=["fatal", "invalid", "no-ext"])
+            parser.add_argument("-M", "--bignum", action="store_true")
+            parser.add_argument("-N", "--use-lc-numeric", action="store_true")
+            parser.add_argument("-n", "--non-decimal-data", action="store_true")
+            parser.add_argument("-o", "--pretty-print")
+            parser.add_argument("-O", "--optimize", action="store_true")
+            parser.add_argument("-p", "--profile")
+
+            parser.add_argument("-P", "--posix", action="store_true")
+            parser.add_argument("-r", "--re-interval", action="store_true")
+            parser.add_argument("-s", "--no-optimize", action="store_true")
+            parser.add_argument("-t", "--lint-old", action="store_true")
+
+            parser.add_argument("-S", "--sandbox", action="store_true")
+            parser.add_argument("-V", "--version", action="store_true")
+            script.add_argument("script", nargs="?")
+            parser.add_argument("input_file", nargs="*")
+
+        base(generic)
+        base(assign_fallback)
+
+        # assign should be append, but strip_varlikes will
         # pluck out the args it is looking for...
         generic.add_argument("-v", "--assign", action="count")
-        script.add_argument("-e", "--source", action="append")
-        script.add_argument("-f", "--file")
+        # but we need a fallback for the closed -vvarname=value form
+        assign_fallback.add_argument("-v", "--assign", action="append")
 
-        generic.add_argument("-b", "--characters-as-bytes", action="store_true")
-        generic.add_argument("-c", "--traditional", action="store_true")
-        generic.add_argument("-C", "--copyright", action="store_true")
-        # technically argless form of below, but see nargs note on rlwrap...
-        generic.add_argument("-d", "--dump-variables")
-        generic.add_argument("-E", "--exec")
-        generic.add_argument("-g", "--gen-pot", action="store_true")
-        generic.add_argument("-h", "--help", action="store_true")
-        generic.add_argument("-i", "--include")
-        generic.add_argument("-l", "--load")
-        # arg and argless forms of this; see note on rlwrap; guessing argless?
-        generic.add_argument("-L", "--lint", action="store_true")
-        # generic.add_argument("-L", "--lint", choices=["fatal", "invalid", "no-ext"])
-        generic.add_argument("-M", "--bignum", action="store_true")
-        generic.add_argument("-N", "--use-lc-numeric", action="store_true")
-        generic.add_argument("-n", "--non-decimal-data", action="store_true")
-        generic.add_argument("-o", "--pretty-print")
-        generic.add_argument("-O", "--optimize", action="store_true")
-        generic.add_argument("-p", "--profile")
-
-        generic.add_argument("-P", "--posix", action="store_true")
-        generic.add_argument("-r", "--re-interval", action="store_true")
-        generic.add_argument("-s", "--no-optimize", action="store_true")
-        generic.add_argument("-t", "--lint-old", action="store_true")
-
-        generic.add_argument("-S", "--sandbox", action="store_true")
-        generic.add_argument("-V", "--version", action="store_true")
-        script.add_argument("script", nargs="?")
-        generic.add_argument("input_file", nargs="*")
-
-        return (generic,)
+        return (generic, assign_fallback)
 
     _gawk = _awk
 
