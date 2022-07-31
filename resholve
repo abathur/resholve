@@ -1244,6 +1244,19 @@ class QuotedEval(Census):
     issue = 2
 
 
+class NoParserSucceeded(Forbid):
+    # this is somewhat related to PotentialExecer
+    # see issue 82 for backstory
+    problem = (
+        "'%s' executes its arguments in some circumstances, and "
+        "none of my command-specific rules for figuring out if this "
+        "specific invocation does or not succeeded. Look above "
+        "for warning messages with more context on what went wrong."
+    )
+    # ideas = "TODO: where should they go? Doc? Wiki? Issue?"
+    status = 15
+
+
 # emit census/feedback requests at warning+ verbosity
 if logger.isEnabledFor(logging.WARNING):
 
@@ -3969,6 +3982,13 @@ class RecordCommandlike(object):
                 )
                 if handler(parsed, invocation):
                     return
+
+            observe(
+                NoParserSucceeded,
+                invocation.firstword,
+                word=invocation.firstword.ast,
+                arena=self.arena,
+            )
 
         observe(
             PotentialExecer,
