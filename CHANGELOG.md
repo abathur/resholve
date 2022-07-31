@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.1 (Jul 31 2022)
+- Fix missing duration arg for `timeout` command parser
+- Fix nix `writeScript*` fns when interpreter is `none`
+- Improve message when command parsers fail (suggested in #82)
+- Fix `-vvarname value` handling in the `awk` command parser (#82)
+
 ## v0.8.0 (April 8 2022)
 This release ~completely reorganizes the Nix API and introduces a new function. The renames are:
 - `resholvePackage` -> `resholve.mkDerivation`
@@ -21,7 +27,7 @@ in nixpkgs.
 ### Improved resolution
 - Resolve command arguments to `type` builtin
 - Nix API: Support intra-package inputs (#26)
-    - Update to binlore xxx
+    - Update to binlore v0.2.0
     - Split resholvePackage builds into 2 steps
         - an unresholved build of the package
         - a 2nd "resholved" building atop the first
