@@ -40,7 +40,7 @@ Output:
 >>> [ stdinNone ]:3: Couldn't resolve command 'which'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 1 'which' needs to be in RESHOLVE_PATH in 309ms
+ok 1 'which' needs to be in RESHOLVE_PATH in 363ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < command_in_function.sh (exit: 3) ]
 
@@ -56,10 +56,10 @@ Output:
 >>>               ^~~~~
 >>> [ stdinNone ]:5: Couldn't resolve command 'which'
 >>> #!/nix/store/...-bash-5.1-p16/bin/bash
->>> source /private/tmp/nix-build-resholve-test.drv-0/resholved/tests/file_simple.sh
+>>> source /private/tmp/nix-build-resholve-test.drv-1/resholved/tests/file_simple.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH in 315ms
+ok 2 Even in a function, 'which' needs to be in RESHOLVE_PATH in 374ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < absolute_path.sh (exit: 5) ]
 
@@ -74,7 +74,7 @@ Output:
 >>> Next step: keep, fix, or pre-patch/substitute it.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 3 Absolute executable paths need exemptions in 303ms
+ok 3 Absolute executable paths need exemptions in 382ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < absolute_path_nested.sh (exit: 5) ]
 
@@ -91,7 +91,7 @@ Output:
 >>> /nix/store/...-findutils-4.9.0/bin/find
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 4 Even nested-executable paths need exemptions in 307ms
+ok 4 Even nested-executable paths need exemptions in 359ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < source_var_pwd.sh (exit: 6) ]
 
@@ -109,7 +109,7 @@ Output:
 >>> [ stdinNone ]:6: Can't resolve dynamic argument in 'source'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 5 Source, among others, needs an exemption for arguments containing variables in 306ms
+ok 5 Source, among others, needs an exemption for arguments containing variables in 413ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < file_simple.sh (exit: 0) ]
 
@@ -121,14 +121,14 @@ Diff:
 >>>  # resolves file from inputs
 >>> -file resholver
 >>> -"file" resholver
->>> +/nix/store/...-file-5.41/bin/file resholver
->>> +"/nix/store/...-file-5.41/bin/file" resholver
+>>> +/nix/store/...-file-5.42/bin/file resholver
+>>> +"/nix/store/...-file-5.42/bin/file" resholver
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 6 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 316ms
+ok 6 Resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 391ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < file_in_function.sh (exit: 0) ]
 
@@ -138,19 +138,19 @@ Diff:
 >>> @@ -1,5 +1,10 @@
 >>> -source which_simple.sh
 >>> +#!/nix/store/...-bash-5.1-p16/bin/bash
->>> +source /private/tmp/nix-build-resholve-test.drv-0/resholved/tests/which_simple.sh
+>>> +source /private/tmp/nix-build-resholve-test.drv-1/resholved/tests/which_simple.sh
 >>>  which() {
 >>>      # resolves file here too
 >>> -    file "$@"
->>> +    /nix/store/...-file-5.41/bin/file "$@"
+>>> +    /nix/store/...-file-5.42/bin/file "$@"
 >>>  }
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
->>> +# resholve: keep source:/private/tmp/nix-build-resholve-test.drv-0/resholved/tests/which_simple.sh
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
+>>> +# resholve: keep source:/private/tmp/nix-build-resholve-test.drv-1/resholved/tests/which_simple.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 7 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 319ms
+ok 7 Even in a function, resolves unqualified 'file' to absolute path from RESHOLVE_PATH in 384ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < file_home_source_pwd.sh (exit: 6) ]
 
@@ -167,7 +167,7 @@ Output:
 >>> [ stdinNone ]:6: Can't resolve dynamic argument in 'source'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 8 Only some commands ('source' but NOT 'file', here) are checked for variable arguments. in 310ms
+ok 8 Only some commands ('source' but NOT 'file', here) are checked for variable arguments. in 376ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash --keep 'source:$PWD' < file_home_source_pwd.sh (exit: 0) ]
 
@@ -179,16 +179,16 @@ Diff:
 >>>  # $HOME not blocking here; vars currently only checked in:
 >>>  #   alias command eval exec source|. sudo env
 >>> -file $HOME/file_simple.sh
->>> +/nix/store/...-file-5.41/bin/file $HOME/file_simple.sh
+>>> +/nix/store/...-file-5.42/bin/file $HOME/file_simple.sh
 >>>  # PWD needs exemption: --keep source:PWD or RESHOLVE_KEEP='source:PWD'
 >>>  source $PWD/file_simple.sh
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
 >>> +# resholve: keep source:$PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 9 Add an exemption with --keep <scope>:<name> in 321ms
+ok 9 Add an exemption with --keep <scope>:<name> in 369ms
 
 --[ RESHOLVE_KEEP='source:$PWD' resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < file_home_source_pwd.sh (exit: 0) ]
 
@@ -200,16 +200,16 @@ Diff:
 >>>  # $HOME not blocking here; vars currently only checked in:
 >>>  #   alias command eval exec source|. sudo env
 >>> -file $HOME/file_simple.sh
->>> +/nix/store/...-file-5.41/bin/file $HOME/file_simple.sh
+>>> +/nix/store/...-file-5.42/bin/file $HOME/file_simple.sh
 >>>  # PWD needs exemption: --keep source:PWD or RESHOLVE_KEEP='source:PWD'
 >>>  source $PWD/file_simple.sh
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
 >>> +# resholve: keep source:$PWD
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 10 Add an exemption with RESHOLVE_ALLOW=source:$PWD in 307ms
+ok 10 Add an exemption with RESHOLVE_ALLOW=source:$PWD in 378ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < source_missing_target.sh (exit: 4) ]
 
@@ -223,7 +223,7 @@ Output:
 >>> [ stdinNone ]:3: Unable to resolve source target 'doesnt_exist.sh' to a known file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 11 'source' targets also need to be in RESHOLVE_PATH in 294ms
+ok 11 'source' targets also need to be in RESHOLVE_PATH in 368ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < source_present_target.sh (exit: 0) ]
 
@@ -242,7 +242,7 @@ Diff:
 >>> +# resholve: keep source:/nix/store/...-gettext-0.21/bin/gettext.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 12 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH in 334ms
+ok 12 Resolves unqualified 'source' to absolute path from RESHOLVE_PATH in 409ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash --fix aliases < alias_riddle.sh (exit: 0) ]
 
@@ -264,7 +264,7 @@ Diff:
 >>>  file # I'm the alias
 >>>  \file # the function!
 >>> -command file # external
->>> +command /nix/store/...-file-5.41/bin/file # external
+>>> +command /nix/store/...-file-5.42/bin/file # external
 >>>  
 >>>  find # alias
 >>> -\find # external
@@ -274,11 +274,11 @@ Diff:
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
 >>> +# resholve: fix aliases
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
 >>> +# resholve: keep /nix/store/...-findutils-4.9.0/bin/find
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 13 Has (naive) context-specific resolution rules in 386ms
+ok 13 Has (naive) context-specific resolution rules in 460ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash < nested_execer.sh (exit: 0) ]
 
@@ -289,16 +289,16 @@ Diff:
 >>> +#!/nix/store/...-bash-5.1-p16/bin/bash
 >>>  fargs(){
 >>> -	echo "nice $(type -ap file) you got there"
->>> +	echo "nice $(type -ap /nix/store/...-file-5.41/bin/file) you got there"
+>>> +	echo "nice $(type -ap /nix/store/...-file-5.42/bin/file) you got there"
 >>>  }
 >>>  
 >>> -echo wert | find $(type -p file) -name file -exec file {} +  # resolve 1st/~last
->>> +echo wert | /nix/store/...-findutils-4.9.0/bin/find $(type -p /nix/store/...-file-5.41/bin/file) -name file -exec /nix/store/...-file-5.41/bin/file {} +  # resolve 1st/~last
+>>> +echo wert | /nix/store/...-findutils-4.9.0/bin/find $(type -p /nix/store/...-file-5.42/bin/file) -name file -exec /nix/store/...-file-5.42/bin/file {} +  # resolve 1st/~last
 >>>  echo wert | fargs file # resolve none
 >>> -echo wert | exec find file # resolve 2nd
 >>> -echo wert | xargs file # resolve both
 >>> +echo wert | exec /nix/store/...-findutils-4.9.0/bin/find file # resolve 2nd
->>> +echo wert | /nix/store/...-findutils-4.9.0/bin/xargs /nix/store/...-file-5.41/bin/file # resolve both
+>>> +echo wert | /nix/store/...-findutils-4.9.0/bin/xargs /nix/store/...-file-5.42/bin/file # resolve both
 >>>  
 >>> -builtin source gettext.sh # resolve last
 >>> -builtin command . gettext.sh # resolve last
@@ -317,8 +317,8 @@ Diff:
 >>>  	"bop" \
 >>> -	-c "command file" \
 >>> -	-c "bash -c file"
->>> +	-c "command /nix/store/...-file-5.41/bin/file" \
->>> +	-c "/nix/store/...-bash-5.1-p16/bin/bash -c /nix/store/...-file-5.41/bin/file"
+>>> +	-c "command /nix/store/...-file-5.42/bin/file" \
+>>> +	-c "/nix/store/...-bash-5.1-p16/bin/bash -c /nix/store/...-file-5.42/bin/file"
 >>>  
 >>> -if type -p find; then
 >>> +if type -p /nix/store/...-findutils-4.9.0/bin/find; then
@@ -328,14 +328,14 @@ Diff:
 >>>  fi
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
->>> +# resholve: keep /nix/store/...-bash-5.1-p16/bin/bash
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
 >>> +# resholve: keep /nix/store/...-findutils-4.9.0/bin/find
 >>> +# resholve: keep /nix/store/...-findutils-4.9.0/bin/xargs
+>>> +# resholve: keep /nix/store/...-bash-5.1-p16/bin/bash
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
 >>> +# resholve: keep source:/nix/store/...-gettext-0.21/bin/gettext.sh
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 14 Has (rudimentary) support for resolving executable arguments in 407ms
+ok 14 Has (rudimentary) support for resolving executable arguments in 550ms
 
 --[ resholve --interpreter /nix/store/...-bash-5.1-p16/bin/bash --fix '$FILE_CMD:file' < file_var.sh (exit: 0) ]
 
@@ -356,23 +356,23 @@ Diff:
 >>> -exec "$FILE_CMD"
 >>> -exec $FILE_CMD | exec $FILE_CMD
 >>> -exec "$FILE_CMD" | exec "$FILE_CMD"
->>> +/nix/store/...-file-5.41/bin/file resholver
->>> +"/nix/store/...-file-5.41/bin/file" resholver
->>> +/nix/store/...-file-5.41/bin/file resholver
->>> +"/nix/store/...-file-5.41/bin/file" resholver
->>> +/nix/store/...-file-5.41/bin/file resholver
->>> +"/nix/store/...-file-5.41/bin/file" resholver
->>> +exec /nix/store/...-file-5.41/bin/file
+>>> +/nix/store/...-file-5.42/bin/file resholver
+>>> +"/nix/store/...-file-5.42/bin/file" resholver
+>>> +/nix/store/...-file-5.42/bin/file resholver
+>>> +"/nix/store/...-file-5.42/bin/file" resholver
+>>> +/nix/store/...-file-5.42/bin/file resholver
+>>> +"/nix/store/...-file-5.42/bin/file" resholver
+>>> +exec /nix/store/...-file-5.42/bin/file
 >>> +exec "file"
 >>> +exec file | exec file
 >>> +exec "file" | exec "file"
 >>> +
 >>> +### resholve directives (auto-generated) ## format_version: 3
 >>> +# resholve: fix $FILE_CMD:file
->>> +# resholve: keep /nix/store/...-file-5.41/bin/file
+>>> +# resholve: keep /nix/store/...-file-5.42/bin/file
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ok 15 Can substitute a variable used as a command in 354ms
+ok 15 Can substitute a variable used as a command in 478ms
 ```
 
 ## Nix demo
@@ -410,20 +410,20 @@ nothing up my sleeve
 /nix/store/...-testmod3-unreleased/bin/conjure.sh: line 7: type: openssl: not found
 +++++ set +x
 test_openssl
-+++++ /nix/store/...-openssl-1.1.1o-bin/bin/openssl version
-OpenSSL 1.1.1o  3 May 2022
-+++++ /nix/store/...-resholved-testmod2-unreleased/libexec/invokeme
-OpenSSL 1.1.1o  3 May 2022
-+++++ /nix/store/...-resholved-testmod2-unreleased/libexec/invokeme
-OpenSSL 1.1.1o  3 May 2022
++++++ /nix/store/...-openssl-1.1.1q-bin/bin/openssl version
+OpenSSL 1.1.1q  5 Jul 2022
++++++ /nix/store/...-testmod2-unreleased/libexec/invokeme
+OpenSSL 1.1.1q  5 Jul 2022
++++++ /nix/store/...-testmod2-unreleased/libexec/invokeme
+OpenSSL 1.1.1q  5 Jul 2022
 +++++ set +x
 test_libressl
 +++++ /nix/store/...-jq-1.6-bin/bin/jq -n --arg greeting world '{"hello":$greeting}'
 {
   "hello": "world"
 }
-+++++ /nix/store/...-libressl-3.4.3-bin/bin/openssl version
-LibreSSL 3.4.3
++++++ /nix/store/...-libressl-3.5.3-bin/bin/openssl version
+LibreSSL 3.5.3
 +++++ set +x
 
 Ran 3 tests.
@@ -452,56 +452,56 @@ OK
   18   │     libressl_sh
   19   │ }
   20   │ 
-  21   │ source /nix/store/...-resholved-testmod1-unreleased/bin/libressl.sh
+  21   │ source /nix/store/...-testmod1-unreleased/bin/libressl.sh
   22   │ 
   23   │ ### resholve directives (auto-generated) ## format_version: 3
   24   │ # resholve: fake external:jq
   25   │ # resholve: fake external:openssl
-  26   │ # resholve: keep source:/nix/store/...-resholved-testmod1-unreleased/bin/libressl.sh
+  26   │ # resholve: keep source:/nix/store/...-testmod1-unreleased/bin/libressl.sh
   27   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/...-resholved-testmod2-unreleased/bin/openssl.sh
+       │ File: /nix/store/...-testmod2-unreleased/bin/openssl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
    1   │ openssl_sh() {
    2   │     set -x
-   3   │     /nix/store/...-openssl-1.1.1o-bin/bin/openssl version
-   4   │     /nix/store/...-resholved-testmod2-unreleased/libexec/invokeme
-   5   │     /nix/store/...-resholved-testmod2-unreleased/libexec/invokeme
+   3   │     /nix/store/...-openssl-1.1.1q-bin/bin/openssl version
+   4   │     /nix/store/...-testmod2-unreleased/libexec/invokeme
+   5   │     /nix/store/...-testmod2-unreleased/libexec/invokeme
    6   │     set +x
    7   │ }
-   8   │ alias blah=/nix/store/...-openssl-1.1.1o-bin/bin/openssl
+   8   │ alias blah=/nix/store/...-openssl-1.1.1q-bin/bin/openssl
    9   │ 
-  10   │ source /nix/store/...-resholved-shunit2-2.1.8/bin/shunit2
+  10   │ source /nix/store/...-shunit2-2.1.8/bin/shunit2
   11   │ 
   12   │ ### resholve directives (auto-generated) ## format_version: 3
   13   │ # resholve: fix aliases
-  14   │ # resholve: keep /nix/store/...-openssl-1.1.1o-bin/bin/openssl
-  15   │ # resholve: keep /nix/store/...-resholved-testmod2-unreleased/libexec/invokeme
-  16   │ # resholve: keep source:/nix/store/...-resholved-shunit2-2.1.8/bin/shunit2
+  14   │ # resholve: keep /nix/store/...-testmod2-unreleased/libexec/invokeme
+  15   │ # resholve: keep /nix/store/...-openssl-1.1.1q-bin/bin/openssl
+  16   │ # resholve: keep source:/nix/store/...-shunit2-2.1.8/bin/shunit2
   17   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ───────┬────────────────────────────────────────────────────────────────────────
-       │ File: /nix/store/...-resholved-testmod1-unreleased/bin/libressl.sh
+       │ File: /nix/store/...-testmod1-unreleased/bin/libressl.sh
 ───────┼────────────────────────────────────────────────────────────────────────
-   1   │ source /nix/store/...-resholved-testmod1-unreleased/submodule/helper.sh
+   1   │ source /nix/store/...-testmod1-unreleased/submodule/helper.sh
    2   │ 
    3   │ libressl_sh() {
    4   │     set -x
    5   │     /nix/store/...-jq-1.6-bin/bin/jq -n --arg greeting world '{"hello":$greeting}'
-   6   │     /nix/store/...-libressl-3.4.3-bin/bin/openssl version
+   6   │     /nix/store/...-libressl-3.5.3-bin/bin/openssl version
    7   │     set +x
    8   │ }
    9   │ 
   10   │ just_being_helpful
   11   │ 
-  12   │ source /nix/store/...-resholved-testmod2-unreleased/bin/openssl.sh
+  12   │ source /nix/store/...-testmod2-unreleased/bin/openssl.sh
   13   │ 
   14   │ ### resholve directives (auto-generated) ## format_version: 3
   15   │ # resholve: keep /nix/store/...-jq-1.6-bin/bin/jq
-  16   │ # resholve: keep /nix/store/...-libressl-3.4.3-bin/bin/openssl
-  17   │ # resholve: keep source:/nix/store/...-resholved-testmod1-unreleased/submodule/helper.sh
-  18   │ # resholve: keep source:/nix/store/...-resholved-testmod2-unreleased/bin/openssl.sh
+  16   │ # resholve: keep /nix/store/...-libressl-3.5.3-bin/bin/openssl
+  17   │ # resholve: keep source:/nix/store/...-testmod2-unreleased/bin/openssl.sh
+  18   │ # resholve: keep source:/nix/store/...-testmod1-unreleased/submodule/helper.sh
   19   │ 
 ───────┴────────────────────────────────────────────────────────────────────────
 ```

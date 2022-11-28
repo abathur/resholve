@@ -3,7 +3,7 @@
 }:
 
 rec {
-  version = "0.8.1";
+  version = "0.8.2";
   rSrc =
     # local build -> `make ci`; `make clean` to restore
     # return to remote source

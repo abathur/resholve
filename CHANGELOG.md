@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.8.2 (Nov 27 2022)
+- Add `--fix <command>` form to circumvent NAUGHTY_NIXERS.
+
 ## v0.8.1 (Jul 31 2022)
 - Fix missing duration arg for `timeout` command parser
 - Fix nix `writeScript*` fns when interpreter is `none`

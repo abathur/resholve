@@ -245,6 +245,26 @@ def directive_fake(value):
     return directives
 
 
+"""
+This is a set of commands that NixOS uses setuid wrappers for.
+I don't know if these are all literally the same case, but I
+know resholve can't safely use `bin/sudo` from a sudo package
+in a Nix build--because we'll bake in a reference to the un-
+wrapped and thus useless copy. Painting them all with the same
+brush unless/until someone informs me otherwise.
+"""
+NAUGHTY_NIXERS = (
+    "ping",  # macos: /sbin/ping, nix: iputils
+    "chsh",  # macos: /usr/bin/chsh, nix: shadow
+    "newgrp",  # macos: /usr/bin/newgrp, nix: shadow
+    "passwd",  # macos: /usr/bin/passwd, nix: shadow
+    "su",  # macos: /usr/bin/su, nix: shadow
+    "sudo",  # macos: /usr/bin/sudo, nix: sudo
+    "mount",  # macos: /sbin/mount, nix: util-linux
+    "umount",  # macos: /sbin/umount, nix: util-linux
+)
+
+
 def directive_fix(value):
     directives = parse_directive(value)
     logger.debug("validating fix directives %r", directives)
@@ -255,6 +275,8 @@ def directive_fix(value):
                 pass  # ok literal
             elif os.path.isabs(directive[0]):
                 pass  # ok absolute path
+            elif directive[0] in NAUGHTY_NIXERS:
+                pass  # ok force resolution of NAUGHTY_NIXER
             else:
                 raise ourparse.ArgumentTypeError(
                     "valid single-part fix directives: 'aliases', absolute path"
@@ -2751,27 +2773,12 @@ class OrderedCommandResolver(object):
         """
         return True if self.name in self.KNOWN_BUILTINS else False
 
-    """
-    This is a set of commands that NixOS uses setuid wrappers for.
-    I don't know if these are all literally the same case, but I
-    know resholve can't safely use `bin/sudo` from a sudo package
-    in a Nix build--because we'll bake in a reference to the un-
-    wrapped and thus useless copy. Painting them all with the same
-    brush unless/until someone informs me otherwise.
-    """
-    NAUGHTY_NIXERS = (
-        "ping",  # macos: /sbin/ping, nix: iputils
-        "chsh",  # macos: /usr/bin/chsh, nix: shadow
-        "newgrp",  # macos: /usr/bin/newgrp, nix: shadow
-        "passwd",  # macos: /usr/bin/passwd, nix: shadow
-        "su",  # macos: /usr/bin/su, nix: shadow
-        "sudo",  # macos: /usr/bin/sudo, nix: sudo
-        "mount",  # macos: /sbin/mount, nix: util-linux
-        "umount",  # macos: /sbin/umount, nix: util-linux
-    )
-
     def resolve_external(self):
-        if self.name in self.NAUGHTY_NIXERS and "NIX_BUILD_TOP" in os.environ:
+        if (
+            self.name in NAUGHTY_NIXERS
+            and "NIX_BUILD_TOP" in os.environ
+            and (self.name,) not in directives.fix
+        ):
             # --fake 'external:sudo' or w/e will let this fall back to
             # a run-time PATH lookup.
             observe(NixSetuidWrapper, self.name)
