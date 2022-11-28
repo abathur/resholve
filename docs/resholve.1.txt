@@ -67,7 +67,7 @@ CONTROLLING RESOLUTION
         Ex: --fake 'f:setUp;tearDown builtin:setopt source:/etc/bashrc'
 
      --fix 'directives' | RESHOLVE_FIX='directives'
-        Fix things we can't auto-fix/ignore. There are 4 directive forms:
+        Fix things we can't auto-fix/ignore. There are 5 directive forms:
 
         $variable:command (Note: $ may need escaping)
            replace parameter expansions of $variable with command
@@ -77,6 +77,9 @@ CONTROLLING RESOLUTION
 
         aliases
            resolve into alias definitions
+
+        command
+           (nix-only) ignore security-wrapper error for command
 
         Ex: --fix 'aliases $GIT:gix /bin/bash'
 
@@ -218,4 +221,4 @@ SEE ALSO
 AUTHORS
      Travis A. Everett <travis.a.everett@gmail.com>
 
-Nixpkgs                        February 13, 2022                       Nixpkgs
+Nixpkgs                        November 27, 2022                       Nixpkgs

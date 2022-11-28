@@ -59,6 +59,9 @@
       #form
         #part %literal_arg{aliases}
         #purpose resolve into alias definitions
+      #form
+        #part %arg{command}
+        #purpose (nix-only) ignore security-wrapper error for %arg{command}
       #example[flag=fix] aliases $GIT:gix /bin/bash
   #flag#keep.directives[type=directives]
     #value %arg{directives}
