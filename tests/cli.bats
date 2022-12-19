@@ -264,6 +264,12 @@ CASES
 resholve --interpreter $INTERP < alias_riddle.sh
 CASES
 
+prologue="$(mktemp)"
+epilogue="$(mktemp)"
+
+echo "declare BEFORE" > "$prologue"
+echo "declare AFTER" > "$epilogue"
+
 @test "inject before and after script" {
   require <({
     status 0
@@ -271,8 +277,22 @@ CASES
     line -1 equals '# end epilogue inserted by resholve'
   })
 } <<CASES
-resholve --interpreter $INTERP --prologue <(echo "declare BEFORE") --epilogue <(echo "declare AFTER") < find_beginning_and_end.sh
-resholve --interpreter $INTERP --prologue <(echo "declare BEFORE")  --epilogue <(echo "declare AFTER") < find_beginning_and_end2.sh
+resholve --interpreter $INTERP --prologue $prologue --epilogue $epilogue < find_beginning_and_end.sh
+resholve --interpreter $INTERP --prologue $prologue --epilogue $epilogue < find_beginning_and_end2.sh
+CASES
+
+@test "inject before/after in multiple scripts" {
+  require <({
+    status 0
+    line 1 ends "find_beginning_and_end.sh.resolved'"
+    line 2 ends "find_beginning_and_end2.sh.resolved'"
+  }) && \
+  grep BEFORE find_beginning_and_end.sh.resolved && \
+  grep BEFORE find_beginning_and_end2.sh.resolved && \
+  grep AFTER find_beginning_and_end.sh.resolved && \
+  grep AFTER find_beginning_and_end2.sh.resolved
+} <<CASES
+resholve --interpreter $INTERP --prologue $prologue --epilogue $epilogue find_beginning_and_end.sh find_beginning_and_end2.sh
 CASES
 
 @test "fail with bad lore argument" {

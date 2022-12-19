@@ -4484,6 +4484,8 @@ class ResolvedScript(RecordCommandlike):
             to.write(self.prologue.read())
             to.write("\n# end prologue inserted by resholve\n")
             cursor.PrintUntil(first_span)
+            # rewind in case we need to use again
+            self.prologue.seek(0)
 
         last = -1
 
@@ -4555,6 +4557,9 @@ class ResolvedScript(RecordCommandlike):
                 to.write("\n# begin epilogue inserted by resholve\n")
                 to.write(self.epilogue.read())
                 to.write("\n# end epilogue inserted by resholve\n")
+
+                # rewind in case we need to use again
+                self.epilogue.seek(0)
 
             self.write_directives(cursor)
 
