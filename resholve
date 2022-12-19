@@ -944,7 +944,7 @@ def punshow():
 
                 resolve_cmdlikes()
 
-        for script_path in to_write:
+        for script_path in sorted(to_write):
             write_resolved_script(
                 script_path, resolved_scripts[script_path], args.overwrite
             )
