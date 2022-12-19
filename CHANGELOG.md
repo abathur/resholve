@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.4 (Dec 19 2022)
+- Add prologue/epilogue to more than first script arg (#89)
+
+## v0.8.3 (Nov 27 2022)
+- Include missed manpage update for v0.8.2
+
 ## v0.8.2 (Nov 27 2022)
 - Add `--fix <command>` form to circumvent NAUGHTY_NIXERS.
 
