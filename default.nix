@@ -1,17 +1,20 @@
-{ pkgs ? import <nixpkgs> { } }:
+{ lib
+, pkgs
+, pkgsBuildHost
+, ...
+}:
 
-with pkgs; let
-    python27' = (pkgsBuildHost.python27.overrideAttrs (old:
-    {
-      # Overriding `meta.knownVulnerabilities` here, see #201859 for why it exists
-      # In resholve case this should not be a security issue,
-      # since it will only be used during build, not runtime
-      meta = (old.meta or { }) // { knownVulnerabilities = [ ]; };
-    }
-  )).override {
+let
+  removeKnownVulnerabilities = pkg: pkg.overrideAttrs (old: {
+    meta = (old.meta or { }) // { knownVulnerabilities = [ ]; };
+  });
+  # We are removing `meta.knownVulnerabilities` from `python27`,
+  # and setting it in `resholve` itself.
+  python27' = (removeKnownVulnerabilities pkgsBuildHost.python27).override {
     self = python27';
     pkgsBuildHost = pkgsBuildHost // { python27 = python27'; };
     # strip down that python version as much as possible
+    openssl = null;
     bzip2 = null;
     readline = null;
     ncurses = null;
@@ -23,80 +26,26 @@ with pkgs; let
     stripConfig = true;
     stripIdlelib = true;
     stripTests = true;
-    stripLibs = [
-      # directories
-      "bsddb*"
-      "curses"
-      "compiler"
-      "ensurepip"
-      "hotshot"
-      "lib-tk"
-      "sqlite3"
-      # files
-      "aifc*"
-      "antigravity*"
-      "async*"
-      "*audio*"
-      "BaseHTTPServer*"
-      "Bastion*"
-      "binhex*"
-      "bdb*"
-      "CGIHTTPServer*"
-      "cgitb*"
-      "chunk*"
-      "colorsys*"
-      "dbhash*"
-      "dircache*"
-      "*dbm*"
-      "ftplib*"
-      "*hdr*"
-      "imaplib*"
-      "imputil*"
-      "MimeWriter*"
-      "mailbox*"
-      "mhlib*"
-      "mimify*"
-      "multifile*"
-      "netrc*"
-      "nntplib*"
-      "os2emxpath*"
-      "pyclbr*"
-      "pydoc*"
-      "SimpleHTTPServer*"
-      "sgmllib*"
-      "smtp*"
-      "ssl*"
-      "sun*"
-      "tabnanny*"
-      "telnetlib*"
-      "this*"
-      "wave*"
-      "webbrowser*"
-      "whichdb*"
-      "wsgiref*"
-      "xdrlib*"
-      "*XMLRPC*"
-    ];
     enableOptimizations = false;
   };
   callPackage = lib.callPackageWith (pkgs // { python27 = python27'; });
   source = callPackage ./source.nix { };
   deps = callPackage ./deps.nix { };
-in
-with pkgs; rec
+in rec
 {
   # resholve itself
-  resholve = callPackage ./resholve.nix {
+  resholve = removeKnownVulnerabilities (callPackage ./resholve.nix {
     inherit (source) rSrc version;
     inherit (deps) binlore;
     inherit (deps.oil) oildev;
     inherit (deps) configargparse;
     inherit resholve-utils;
-  };
+  });
   # funcs to validate and phrase invocations of resholve
   # and use those invocations to build packages
   resholve-utils = callPackage ./resholve-utils.nix {
     inherit resholve;
     inherit (deps) binlore;
   };
+  python27 = python27';
 }
