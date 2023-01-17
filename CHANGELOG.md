@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.8.5 (Jan 17 2023)
+- Fix problem with identical invocations beyond the first going unresolved in some contexts. (#94)
+
 ## v0.8.4 (Dec 19 2022)
 - Add prologue/epilogue to more than first script arg (#89)
 

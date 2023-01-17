@@ -55,8 +55,10 @@ Here's how to get resholve to play with it. You should also review `man resholve
 ### CLI
 
 ```shell
-nix-shell -p resholve
+NIXPKGS_ALLOW_INSECURE=1 nix-shell -p resholve
 ```
+
+> **Note:** resholve uses python2 because the high-quality parser it's built on does. Setting the `NIXPKGS_ALLOW_INSECURE` env is necessary to try resholve out in a shell because `nixpkgs` has taken steps to root out run-time usage of python2. resholve *will* still work at build-time for use in Nix packages. To be safe, don't run resholve on untrusted input.
 
 ### Nix builder
 The best documentation on the Nix builder is currently in [nixpkgs](https://github.com/nixos/nixpkgs/blob/master/pkgs/development/misc/resholve/README.md).
