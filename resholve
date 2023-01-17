@@ -3036,8 +3036,10 @@ class CommandLike(object):
                     )
                 else:
                     solution.replace_name_with(cmdkind, self.path or self.name, test)
+
                 for source in self.order_to_source[distinct_cro]:
                     source.directives.keep.add((test,))
+
                 logger.debug("break because replacement")
                 break
 
@@ -3309,6 +3311,14 @@ class Invocation(PositionalObjectBase, tuple):
         self.first_spid = firstword.first_spid
         self.last_spid = self[-1].last_spid
         return self
+
+    def __hash__(self):
+        """
+        Factor positions into uniqueness calculations for set/dict. We can't put this up on the positional object base because
+        the Word object is used as a key to the cmdlikes dict
+        (where we don't want position-sensitive uniques).
+        """
+        return hash((self.firstword, self.first_spid, self.last_spid))
 
     @property
     def args(self):

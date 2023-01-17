@@ -133,6 +133,10 @@ CASES
     line 18 contains '-c "/nix/store/'
     line 18 contains '/bin/bash -c /nix/store/'
     line 18 ends '/bin/file"'
+    line 19 contains 'type -p /nix/store/'
+    line 20 contains 'type -p /nix/store/'
+    line 21 contains 'type -p /nix/store/'
+    line 22 contains 'type -p /nix/store/'
   })
 } <<CASES
 resholve --interpreter $INTERP < nested_execer.sh
