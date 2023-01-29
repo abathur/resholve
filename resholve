@@ -45,7 +45,7 @@ from oil.core import (
     main_loop,  # ParseWholeFile
     optview,  # Parse
     state,  # InitOpts
-    ui,  # PrettyPrintError
+    ui,  # ErrorFormatter.PrettyPrintError
 )
 
 from oil.osh import (
@@ -959,7 +959,9 @@ def punshow():
         if hasattr(e, "print_if_needed"):
             e.print_if_needed()
         elif hasattr(e, "arena"):
-            ui.PrettyPrintError(e, e.arena, getattr(e, "label", "error: "))
+            ui.ErrorFormatter(e.arena).PrettyPrintError(
+                e, getattr(e, "label", "error: ")
+            )
         else:
             print(
                 "This error has location context I couldn't "
@@ -1110,7 +1112,7 @@ class ResolutionException(ExceptionWithContext):
 
     def print_if_needed(self):
         if not self.printed:
-            ui.PrettyPrintError(self, self.arena)
+            ui.ErrorFormatter(self.arena).PrettyPrintError(self)
             self.printed = True
 
 

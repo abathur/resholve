@@ -9,9 +9,9 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 @test "verify warnings are thrown for quoted evals" {
   require <({
     status 0
-    line 3 contains "eval_quoted.sh:4: $quoted_eval"
-    line 7 contains "eval_quoted.sh:7: $quoted_eval"
-    line 11 contains "eval_quoted.sh:12: $quoted_eval"
+    line 3 contains "eval_quoted.sh':4: $quoted_eval"
+    line 7 contains "eval_quoted.sh':7: $quoted_eval"
+    line 11 contains "eval_quoted.sh':12: $quoted_eval"
   })
 } <<CASES
 resholve --interpreter $INTERP eval_quoted.sh
@@ -50,15 +50,25 @@ CASES
 resholve --interpreter $INTERP < coproc_simple.sh
 CASES
 
-@test "can't resolve a named coproc w/o upstream support :(" {
+@test "can't resolve a named braced coproc w/o upstream support :(" {
   require <({
     status 1
-    line 3 contains "error: Unexpected " # full errors noted below
+    line 3 contains "error: Unexpected right brace" # full errors noted below
     # paren error: "Unexpected word while parsing command line"
     # brace error: "Unexpected right brace"
   })
 } <<CASES
 resholve --interpreter $INTERP < coproc_named_brace.sh
+CASES
+
+@test "can't resolve a named paren coproc w/o upstream support :(" {
+  require <({
+    status 1
+    line 3 ends "error: Invalid word while parsing command line" # full errors noted below
+    # paren error: "Unexpected word while parsing command line"
+    # brace error: "Unexpected right brace"
+  })
+} <<CASES
 resholve --interpreter $INTERP < coproc_named_paren.sh
 CASES
 
@@ -236,8 +246,8 @@ builtin_overridden="FEEDBACK WANTED: Essential builtin overridden by"
 @test "verify warnings are thrown for overridden builtins" {
   require <({
     status 0
-    line 3 contains "builtin_overridden.sh:6: $builtin_overridden alias"
-    line 7 contains "builtin_overridden.sh:7: $builtin_overridden function"
+    line 3 contains "builtin_overridden.sh':6: $builtin_overridden alias"
+    line 7 contains "builtin_overridden.sh':7: $builtin_overridden function"
   })
 } <<CASES
 resholve --interpreter $INTERP builtin_overridden.sh

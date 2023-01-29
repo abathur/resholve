@@ -25,13 +25,17 @@ rec {
       hash = "sha256-bBJky7Km+mieHTqoMz3mda3KaKxr9ipYpfQqn/4w8J0=";
     })
     { };
-  # oil = callPackage ../oildev { };
+  # oil = callPackage ../oildev {
+  #     inherit python27;
+  #     inherit six;
+  #     inherit typing;
+  #   };
   oil = callPackage
     (fetchFromGitHub {
       owner = "abathur";
       repo = "nix-py-dev-oil";
-      rev = "v0.8.12.3";
-      hash = "sha256-ElrABlQG58kF6BV989dPxnfHuVq9UStDzE3Z713nYvk=";
+      rev = "v0.14.0.0";
+      hash = "sha256-U6uR8G6yB2xwuDE/fznco23mVFSVdCxPUNdCRYz4Mj8=";
     })
     {
       inherit python27;
