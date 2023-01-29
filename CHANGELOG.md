@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.0 (Jan 29 2023)
+Update oil/osh parser from 0.8.12 -> 0.14.0. In the process of updating the parser, I also cut out some extensions and dependencies that resholve shouldn't need to depend on.
+
+This release shouldn't include any substantive change in resholve itself, but I think it's prudent to signal the potential for regressions or new problems.
+
 ## v0.8.5 (Jan 17 2023)
 - Fix problem with identical invocations beyond the first going unresolved in some contexts. (#94)
 
