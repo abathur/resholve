@@ -17,4 +17,5 @@ jobs:
     - uses: cachix/install-nix-action@v22
       with:
         nix_path: nixpkgs=channel:nixos-unstable
+    - uses: DeterminateSystems/magic-nix-cache-action@v1
     - run: touch .local && nix-build ci.nix
