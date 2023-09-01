@@ -7,8 +7,8 @@ let
     (fetchFromGitHub {
       owner = "abathur";
       repo = "wordswurst";
-      rev = "d3e687a29751d3a087c21ff751746feeb9164711";
-      hash = "sha256-dUrEzcf7EahrazWvLu4Yemh4ZTxxQRhcCbmLy6Y/LVk=";
+      rev = "66763c5f46cda53d6244383b1322d2699affe167";
+      hash = "sha256-d3ieqsYPNghCsid8WcW3z4wqQbtEFOu6kb8j8mxPuc4=";
     })
     { };
 in
