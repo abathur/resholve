@@ -9,15 +9,7 @@ let
   deps = callPackage ./deps.nix { };
   resholve = (callPackage ./default.nix { }).resholve;
   resolveTimeDeps = [ coreutils file findutils gettext ];
-  #wordswurst = callPackage ../wordswurst { };
-  wordswurst = callPackage
-    (fetchFromGitHub {
-      owner = "abathur";
-      repo = "wordswurst";
-      rev = "d3e687a29751d3a087c21ff751746feeb9164711";
-      hash = "sha256-dUrEzcf7EahrazWvLu4Yemh4ZTxxQRhcCbmLy6Y/LVk=";
-    })
-    { };
+  wordswurst = import ./wordswurst.nix { };
 in
 pkgs.mkShell {
   buildInputs = [ resholve bats nixpkgs-fmt cloc wordswurst sassc scss-lint ];
