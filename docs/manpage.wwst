@@ -88,7 +88,7 @@
   .Nm
   to raise an error when it encounters a command with a can|might verdict unless it has rules for figuring out whether the invocation includes a nested command.
   .It Fl Fl wrapper Eo ' Ns Ar directives Ec Ns ' | Pf RESHOLVE_WRAPPER= Eo ' Ns Ar directives Ec Ns '
-  Each wrapper-lore directive indicates whether one executable is just an exec wrapper for another with a wrapper_abspath:wrapped_abspath pair. \
+  Each wrapper-lore directive indicates whether one executable is just an exec wrapper for another with a wrapper_abspath:wrapped_abspath pair.
   .Nm
   uses this information to substitute the wrapped executable's verdict whenever it encounters a wrapper. \
   (Executables are often wrapped in nixpkgs, but it's also common in packages. In gnugrep, for example, both egrep and fgrep are wrappers of grep.)
