@@ -17,6 +17,6 @@ jobs:
     - uses: cachix/install-nix-action@v22
       with:
         nix_path: nixpkgs=channel:nixos-unstable
-    - run: touch .local && nix-build ci.nix
     - name: ensure demo doesn't rot
       run: nix-shell --run "./demo"
+    - run: touch .local && nix-build ci.nix
