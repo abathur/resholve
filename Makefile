@@ -63,9 +63,10 @@ docs/%.css: docs/%.scss
 	@echo Sassing $@ from $<
 	@sassc --omit-map-comment $< $@
 
+# -dAD=l is left alignment per groff_man.7.gz
 docs/resholve.1.txt: resholve.1
 	@echo Building plain-text copy of manpage
-	@groff -m mdoc -T utf8 $< | col -bx > $@
+	@groff -m mdoc -dAD=l -T utf8 $< | ansifilter > $@
 
 _resholve/strings.py: docs/strings.wwst docs/strings.css docs/content.wwst
 	@echo Wursting $@ from $<
