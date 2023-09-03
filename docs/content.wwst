@@ -33,8 +33,9 @@
         #aliases You may also use aliases %option{inputs} or %envvar[fafter=.]{RESHOLVE_INPUTS}
     #api.nix
       #value %arg{packages}
+      #value %arg{paths}
       #purpose
-        Packages to resolve external dependencies from.
+        A list of packages and string paths to directories/files to resolve external dependencies from.
   #flag#fake.directives[type=directives]
     #value %arg{directives}
     #purpose pretend some commands exist
