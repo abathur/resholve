@@ -2,7 +2,7 @@
 #export PATH := $(shell nix-shell -p nix coreutils gnused groff util-linux --run 'echo $$PATH')
 export PATH := $(shell nix-shell make.nix --run 'echo $$PATH')
 
-.PHONY: apologeez ci clean update
+.PHONY: apologeez ci clean update # lint
 
 apologeez:
 	@echo Sorry--the Makefile is a lie. I just use this for dev tasks atm.
@@ -73,3 +73,11 @@ _resholve/strings.py: docs/strings.wwst docs/strings.css docs/content.wwst
 	@wordswurst $< > $@
 
 update: timings.md demos.md docs/resholve.1.txt docs/README.nixpkgs.md
+
+# lint: lint-sass # lint-nix
+
+# lint-nix:
+# 	nixpkgs-fmt
+
+# lint-sass: docs/*.scss
+# 	scss-lint $<

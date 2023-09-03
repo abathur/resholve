@@ -8,11 +8,10 @@ with pkgs;
 let
   deps = callPackage ./deps.nix { };
   resholve = (callPackage ./default.nix { }).resholve;
-  resolveTimeDeps = [ coreutils file findutils gettext ];
-  wordswurst = import ./wordswurst.nix { };
+  resolveTimeDeps = [ bash coreutils file findutils gettext ];
 in
 pkgs.mkShell {
-  buildInputs = [ resholve bats nixpkgs-fmt cloc wordswurst sassc scss-lint ];
+  buildInputs = [ resholve bats ];
   RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
   RESHOLVE_LORE = "${deps.binlore.collect { drvs = resolveTimeDeps; } }";
   INTERP = "${bash}/bin/bash";
