@@ -2,37 +2,23 @@
 
 ![Test](https://github.com/abathur/resholve/workflows/Test/badge.svg)
 
-resholve replaces references to a bash/shell script's external 
-dependencies (commands and sourced scripts) with absolute paths, ensuring
-they are declared, present, and don't shift if PATH changes.
+resholve ensures shell script dependencies are declared, present, and don't break or shift if PATH changes. It helps turn shell scripts and libraries into reliable, self-contained packages that you can use as building blocks.
+
+resholve treats external references to commands and sourced scripts as built-blocking errors until you declare them. Once they're all declared, it rewrites the references to absolute paths.
 
 Comparisons:
 - a linker for bash scripts
 - [patchelf](https://github.com/NixOS/patchelf) for shell scripts
 
-It treats references it can't resolve as build-blocking errors
-until you tell it how to handle them, and then rewrites the script.
-
-Convinced? Jump to the [Quickstart](#quickstart). Otherwise, read on.
-
-## Wait, what?
-
-Fair! It took me a while to figure out resholve should exist, myself. 
-If you aren't sure you need it, you *probably* don't. Still, you should
-read a *bit* further so you'll recognize the needs resholve meets if you
-encounter them someday :)
-
-(If you change your mind from here on, please open an issue to help me 
-understand how you're thinking about this and refine the intro.)
-
+Convinced? Jump to the [Quickstart](#quickstart). Otherwise:
 - If you want to understand what problems resholve addresses, read the next section.
 - If you want to see invocations and output, the [Demos](demos.md) document is a good place to start.
 
 ## What problem(s) does this solve?
 
-resholve is a generic tool, but I'm building it so [Nix](https://nixos.org/nix/)/[Nixpkgs](https://github.com/NixOS/nixpkgs) can have have great shell packaging.
+resholve is a generic tool, but I built it so [Nix](https://nixos.org/nix/)/[Nixpkgs](https://github.com/NixOS/nixpkgs) can have have great shell packaging.
 
-In the Nix ecosystem, resholve is already helping us:
+In the Nix ecosystem, resholve helps us:
 - discover and declare dependencies at package time instead of after runtime failures
     - keep unexpected versions of an executable or script from causing undefined behavior
 - avoid polluting PATH with all of a script's dependencies, which also means
@@ -45,47 +31,59 @@ In the Nix ecosystem, resholve is already helping us:
     - no fragile .patch files
     - no fragile sed/awk text substitutions that might over-match
 
-(Please open a PR/issue to document uses you discover!)
-
 ## Quickstart
-> *Note:* resholve *works for a living*, but it is young. For example, it is *only* packaged for the [Nix package manager](https://nixos.org/nix/). You may want to review the [limitations](#limitations) section for more.
 
-Here's how to get resholve to play with it. You should also review `man resholve` (or the [plaintext](docs/resholve.1.txt) copy).
+If you use Nix, you'll want to use resholve's Nix API/builders included in nixpkgs. Two good places to start:
+- API reference: [NixOS/nixpkgs: pkgs/development/misc/resholve/README.md](https://github.com/nixos/nixpkgs/blob/master/pkgs/development/misc/resholve/README.md).
+
+- [Examples via GitHub code search](https://github.com/search?q=language%3Anix+%2Fresholve%5C.%28mkDerivation%7CwriteScript%7CwriteScriptBin%7CphraseSolution%29%2F+-path%3A**%2Faliases.nix&type=code)
 
 ### CLI
 
+If you'd like to look at scripting resholve or integrating it with other toolchains, you can also use the resholve CLI directly. resholve is only packaged with Nix for now, so you'll need it installed for both approaches:
+
 ```shell
+# pull resholve from nixpkgs
 NIXPKGS_ALLOW_INSECURE=1 nix-shell -p resholve
-```
 
-> **Note:** resholve uses python2 because the high-quality parser it's built on does. Setting the `NIXPKGS_ALLOW_INSECURE` env is necessary to try resholve out in a shell because `nixpkgs` has taken steps to root out run-time usage of python2. resholve *will* still work at build-time for use in Nix packages. To be safe, don't run resholve on untrusted input.
-
-### Nix builder
-The best documentation on the Nix builder is currently in [nixpkgs](https://github.com/nixos/nixpkgs/blob/master/pkgs/development/misc/resholve/README.md).
-
-### DIY
-
-```shell
+# DIY
 git clone https://github.com/abathur/resholve.git
 cd resholve
 nix-shell
-# I recommend nix-shell for 'man resholve' support
+
+# In both cases, check `man resholve` for CLI usage
 ```
+
+> **Note:** resholve uses python2 because the high-quality shell parser it's built on does. Setting the `NIXPKGS_ALLOW_INSECURE` env is necessary to try resholve out in a shell because `nixpkgs` has taken steps to root out run-time usage of python2. resholve *will* still work at build-time for use in Nix packages. To be safe, don't run resholve on untrusted input.
+> 
+> (This isn't permanent. resholve should eventually be able to move to python3.)
+
+## Contributing
+If you're looking to improve resholve or the broader ecosystem (resholve + binlore), feel free to open issue or reach out to me on Matrix or by email. 
+
+There's much to do. Some of it is simple and straightforward. Some of it's creative and green-field. Some of it's difficult. I've focused on primary work at the expense of building an onramp for other contributors, but I'm happy to help you get started and use the opportunity to build the ramp as we go.
+
+If you do make code changes, you should be able to validate the codebase locally by running `make ci`. and update generated files by running `make update`.
+
+> Caution: from a dev perspective, `shell.nix` and `default.nix` are a lie. The former is just for users to try the CLI, and the latter is in the form required by callPackage for syncing with nixpkgs.
 
 ## Acknowledgements
 - resholve leverages the [Oil](https://github.com/oilshell/oil) shell's OSH parser) and wouldn't be feasible without Andy Chu's excellent work on that project.
 
+<details><summary>
+
 ## Limitations
-We can't all be perfect :)
+
+</summary>
+
 
 ### Documentation
 - The manpage is currently the canonical reference to resholve's options and behavior; the only online format is [plaintext](resholve.1.txt). See https://github.com/abathur/resholve/issues/19.
 
 ### Packaging
 - My short-term goal is to support packaging shell projects for the [Nix package manager](https://nixos.org/nix/). As such, the current build process depends on Nix. 
-    - The Nix API probably isn't granular enough, yet.
-- *If you're interested in using resholve without Nix, I'll appreciate contributions that fill in build support for other environments.*
-- For simplicity, resholve uses nixpkgs' python2 rather than Oil's fork of python2. This may cause subtle problems.
+
+    *If you're interested in using resholve without Nix, I'll appreciate contributions that fill in build support for other environments.*
 
 ### Known Gaps & Edge Cases in the utility itself
 
@@ -104,3 +102,5 @@ The main areas I'm currently aware of:
     - if I run `ls /tmp` and then `fc -s tmp=sbin`, it'll run `ls /sbin`; if I then run `fc -s ls=stat`, it runs `stat /sbin`
         - accounting for and triaging this will be very hard; there are no strict semantics here; we can substitute arbitrary text which could be executable names or arguments or even just parts of them; we'd have to be very explicitly parsing things out, or maybe extracting them into a mock test and running it, to know what to do
     - For now this is unaddressed. It probably makes the most sense to just raise a warning about not handling fc and link to a doc or issue about it, but I'm inclined to put this off until someone asks about it.
+
+</details>
