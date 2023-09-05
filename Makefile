@@ -18,20 +18,13 @@ uninstall: apologeez
 
 result-ci: .local
 	@echo Building ci.nix
-	@nix-build --out-link result-ci ci.nix
-	@touch result-ci result-ci/* || true # TODO: fails on MU
+	@nix-build --out-link nix-result-ci ci.nix
+	@cp -LR nix-result-ci result-ci
 
 ci: result-ci
 
-result-quick: .local
-	@echo Building quick.nix
-	@nix-build --out-link result-quick quick.nix
-	@touch result-quick result-quick/* || true # TODO: fails on MU
-
-quick: result-quick
-
 clean:
-	rm .local result-ci result-quick docs/README.nixpkgs.md
+	rm .local nix-result-ci result-ci docs/README.nixpkgs.md
 
 result-ci/test.txt result-ci/demo.txt result-ci/nix-demo.txt: result-ci
 
