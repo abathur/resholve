@@ -3837,6 +3837,9 @@ class RecordCommandlike(object):
         return True
 
     def handle_external_generic(self, parsed, invocation):
+        if not hasattr(parsed, "commands"):
+            return True
+
         # TODO: shimming shells in here may be a bigger crime than
         #       duplicating the logic in two functions would be?
         shell = invocation.firstword in INVOKABLE_SHELLS
