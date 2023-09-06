@@ -63,7 +63,9 @@ If you're looking to improve resholve or the broader ecosystem (resholve + binlo
 
 There's much to do. Some of it is simple and straightforward. Some of it's creative and green-field. Some of it's difficult. I've focused on primary work at the expense of building an onramp for other contributors, but I'm happy to help you get started and use the opportunity to build the ramp as we go.
 
-If you do make code changes, you should be able to validate the codebase locally by running `make ci` and update generated files by running `make update`.
+If you do make code changes, you should be able to validate the codebase locally by running `make ci`.
+
+Some documentation updates entail updating generated files that currently require an adjacent checkout of nixpkgs--it's easiest to just bug me to do this for now.
 
 > Caution: from a dev perspective, `shell.nix` and `default.nix` are a lie. The former is just for users to try the CLI, and the latter is in the form required by callPackage for syncing with nixpkgs.
 
