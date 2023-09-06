@@ -19,12 +19,13 @@ uninstall: apologeez
 result-ci: .local
 	@echo Building ci.nix
 	@nix-build --out-link nix-result-ci ci.nix
-	@cp -LR nix-result-ci result-ci
+	@mkdir -p result-ci
+	@install -m 644 nix-result-ci/* result-ci/
 
 ci: result-ci
 
 clean:
-	rm .local nix-result-ci result-ci docs/README.nixpkgs.md
+	rm .local nix-result-ci result-ci/* docs/README.nixpkgs.md
 
 result-ci/test.txt result-ci/demo.txt result-ci/nix-demo.txt: result-ci
 
