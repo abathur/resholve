@@ -69,6 +69,7 @@ from oil._devbuild.gen.syntax_asdl import (
     command,  # ShFunction, Simple
     simple_var_sub,
     braced_var_sub,
+    compound_word,
 )
 
 from oil.tools import osh2oil  # Cursor
@@ -1404,6 +1405,28 @@ class CommandParser(theirparse.ArgumentParser):
     def error(self, message):
         logger.warn("CommandParser %r passing instead of %r", self, message)
 
+    def _parse_optional(self, arg_string):
+        """
+        Argparse can, under some circumstances, kick back plain strings
+        with our Word() wrappers removed. I'm not sure this is the best
+        way to go about fixing it (maybe just reimplementing the funcs
+        and not doing what they do would be better?), but for now I'll
+        try this more minimal intervention.
+        """
+        ret = super(CommandParser, self)._parse_optional(arg_string)
+        if isinstance(ret, tuple):
+            action, option_string, explicit_arg = ret
+            if option_string and not isinstance(option_string, Word):
+                for part in arg_string.ast.parts:
+                    if getattr(part, "val", None) == option_string:
+                        option_string = Word(compound_word([part]))
+            if explicit_arg and not isinstance(explicit_arg, Word):
+                for i, part in enumerate(arg_string.ast.parts):
+                    if getattr(part, "val", None) == explicit_arg:
+                        explicit_arg = Word(compound_word(arg_string.ast.parts[i:]))
+            return action, option_string, explicit_arg
+        return ret
+
 
 class FindParser(CommandParser):
     """
@@ -1683,7 +1706,12 @@ class ExternalCommandParsers(object):
         coreutils src/install.c:execlp
         """
         generic = CommandParser("install")
-        generic.add_argument("--strip-program", dest="commands", action="invocations")
+        generic.add_argument(
+            "--strip-program",
+            dest="commands",
+            action="invocations",
+            nargs=1,
+        )
         return (generic,)
 
     @staticmethod
