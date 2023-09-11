@@ -1968,7 +1968,7 @@ class ExternalCommandParsers(object):
         generic = CommandParser("awk")
         assign_fallback = CommandParser("awk")
 
-        def base(parser):
+        for parser in (generic, assign_fallback):
             # very unsure about this group part
             script = parser.add_mutually_exclusive_group(required=True)
             parser.add_argument("-D", "--debug", action="store_true")
@@ -2005,9 +2005,6 @@ class ExternalCommandParsers(object):
             parser.add_argument("-V", "--version", action="store_true")
             script.add_argument("script", nargs="?")
             parser.add_argument("input_file", nargs="*")
-
-        base(generic)
-        base(assign_fallback)
 
         # assign should be append, but strip_varlikes will
         # pluck out the args it is looking for...
