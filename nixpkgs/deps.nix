@@ -2,6 +2,7 @@
 , callPackage
 , fetchFromGitHub
 , python27
+, fetchPypi
 , ...
 }:
 
@@ -9,39 +10,14 @@
   Notes on specific dependencies:
   - if/when python2.7 is removed from nixpkgs, this may need to figure
   out how to build oil's vendored python2
-  - I'm not sure if glibcLocales is worth the addition here. It's to fix
-  a libc test oil runs. My oil fork just disabled the libc tests, but
-  I haven't quite decided if that's the right long-term call, so I
-  didn't add a patch for it here yet.
 */
 
 rec {
-  # binlore = callPackage ../binlore { };
-  binlore = callPackage
-    (fetchFromGitHub {
-      owner = "abathur";
-      repo = "binlore";
-      rev = "v0.2.0";
-      hash = "sha256-bBJky7Km+mieHTqoMz3mda3KaKxr9ipYpfQqn/4w8J0=";
-    })
-    { };
-  # oil = callPackage ../oildev {
-  #     inherit python27;
-  #     inherit six;
-  #     inherit typing;
-  #   };
-  oil = callPackage
-    (fetchFromGitHub {
-      owner = "abathur";
-      repo = "nix-py-dev-oil";
-      rev = "v0.14.0.0";
-      hash = "sha256-U6uR8G6yB2xwuDE/fznco23mVFSVdCxPUNdCRYz4Mj8=";
-    })
-    {
-      inherit python27;
-      inherit six;
-      inherit typing;
-    };
+  oil = callPackage ./oildev.nix {
+    inherit python27;
+    inherit six;
+    inherit typing;
+  };
   configargparse = python27.pkgs.buildPythonPackage rec {
     pname = "configargparse";
     version = "1.5.3";
@@ -67,7 +43,7 @@ rec {
     pname = "six";
     version = "1.16.0";
 
-    src = python27.pkgs.fetchPypi {
+    src = fetchPypi {
       inherit pname version;
       sha256 = "1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926";
     };
@@ -84,7 +60,7 @@ rec {
     pname = "typing";
     version = "3.10.0.0";
 
-    src = python27.pkgs.fetchPypi {
+    src = fetchPypi {
       inherit pname version;
       sha256 = "13b4ad211f54ddbf93e5901a9967b1e07720c1d1b78d596ac6a439641aa1b130";
     };

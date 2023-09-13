@@ -1,0 +1,196 @@
+{
+  "nodes": {
+    "binlore": {
+      "inputs": {
+        "flake-compat": [
+          "flake-compat"
+        ],
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "yallback": "yallback"
+      },
+      "locked": {
+        "lastModified": 1694747787,
+        "narHash": "sha256-Y59hBsNeAUla9q72g6aoNuCPAWzmLOtBumRISavMRec=",
+        "owner": "abathur",
+        "repo": "binlore",
+        "rev": "8ddfdce12ece37b9652b01d405f20c20e802cce6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "abathur",
+        "ref": "flakify",
+        "repo": "binlore",
+        "type": "github"
+      }
+    },
+    "d-mark-python": {
+      "inputs": {
+        "flake-compat": [
+          "wwurst",
+          "flake-compat"
+        ],
+        "flake-utils": [
+          "wwurst",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "wwurst",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1694748087,
+        "narHash": "sha256-pRtcTN3DT0oN0UnfleqdsCExurCmkwMPB64CwHsmkkY=",
+        "owner": "abathur",
+        "repo": "d-mark-python",
+        "rev": "68f0014ce75d23170175f0973f63148d2302c10b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "abathur",
+        "ref": "flakify",
+        "repo": "d-mark-python",
+        "type": "github"
+      }
+    },
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1673956053,
+        "narHash": "sha256-4gtG9iQuiKITOjNQQeQIpoIB6b16fm+504Ch3sNKLd8=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "35bb57c0c8d8b62bbfd284272c928ceb64ddbde9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-utils": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1694529238,
+        "narHash": "sha256-zsNZZGTGnMOf9YpHKJqMSsa0dXbfmxeoJ7xHlrt+xmY=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "ff7b65b44d01cf9ba6a71320833626af21126384",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1694593561,
+        "narHash": "sha256-WSaIQZ5s9N9bDFkEMTw6P9eaZ9bv39ZhsiW12GtTNM0=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "1697b7d480449b01111e352021f46e5879e47643",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "binlore": "binlore",
+        "flake-compat": "flake-compat",
+        "flake-utils": "flake-utils",
+        "nixpkgs": "nixpkgs",
+        "wwurst": "wwurst"
+      }
+    },
+    "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
+    "wwurst": {
+      "inputs": {
+        "d-mark-python": "d-mark-python",
+        "flake-compat": [
+          "flake-compat"
+        ],
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1694751495,
+        "narHash": "sha256-Yn2POLQoZT8H/xd3NUm2Vcns8azZLFW2bD0yVF0OT6w=",
+        "owner": "abathur",
+        "repo": "wordswurst",
+        "rev": "cc616b4455cf7b99ad9d6927ac064cee5df1a344",
+        "type": "github"
+      },
+      "original": {
+        "owner": "abathur",
+        "ref": "flakify",
+        "repo": "wordswurst",
+        "type": "github"
+      }
+    },
+    "yallback": {
+      "inputs": {
+        "flake-compat": [
+          "binlore",
+          "flake-compat"
+        ],
+        "flake-utils": [
+          "binlore",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "binlore",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1694747771,
+        "narHash": "sha256-CtcKToQH2m7JfthahV+busdFjS6OxF7hwqBxpan60UQ=",
+        "owner": "abathur",
+        "repo": "yallback",
+        "rev": "38a1675a6d94ba94c941727bd7336cbafb597355",
+        "type": "github"
+      },
+      "original": {
+        "owner": "abathur",
+        "ref": "flakify",
+        "repo": "yallback",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

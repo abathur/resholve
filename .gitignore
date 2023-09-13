@@ -1,11 +1,14 @@
 # resholve specific
-.local.nix
 *.resolved
 *.todo
 flarf/
 
 # nix
 result
+result-ci
+nix-result-ci
+nixpkgs_source
+nixpkgs_source.touch
 
 # subl
 *.sublime-*

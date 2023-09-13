@@ -15,13 +15,21 @@ This demo runs a handful of commands on a set of test `.sh` scripts (you can see
 - A status > 0 indicates the script couldn't be resolved. The body of the case report quotes the original file, and any feedback the command gives about why it can't resolve the script.
 - A status == 0 indicates the script was resolved. The body of the case report shows a diff of the input script, and the resolved output.
 
-To run this demo yourself:
+To run this demo yourself, first open the demo shell:
 
 ```shell
-nix-shell --run "./demo"
+# without cloning, w/ experimental nix-command flakes
+nix develop github:abathur/resholve
+
+# with a clone
+# w/ experimental nix-command flakes
+nix develop
+
+# or traditional
+nix-shell
 ```
 
-The demo output is colored for easier reading, but I've included an example of the output below as well:
+Once the shell loads, run `demo` to begin. The demo output uses color for easier reading, but I've included a plaintext copy of the output below as well:
 
 ```shell
-$ nix-shell --run "./demo"
+$ demo
