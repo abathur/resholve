@@ -1,6 +1,5 @@
 #! /usr/bin/env make
-#export PATH := $(shell nix-shell -p nix coreutils gnused groff util-linux --run 'echo $$PATH')
-export PATH := $(shell nix-shell make.nix --run 'echo $$PATH')
+export PATH := $(shell nix develop .#make --command sh -c 'echo $$makeInputs')
 
 .PHONY: apologeez ci clean update # lint
 
@@ -12,20 +11,17 @@ all: apologeez
 install: apologeez
 uninstall: apologeez
 
-.local : *.nix setup.cfg setup.py test.sh demo tests/* resholve.1 resholve _resholve/*
-	touch .local
 
-
-result-ci: .local
-	@echo Building ci.nix
-	@nix-build --out-link nix-result-ci ci.nix
+result-ci: *.nix setup.cfg setup.py test.sh demo tests/* resholve.1 resholve _resholve/*
+	@echo Running Nix CI tests
+	@nix build .#ci --out-link nix-result-ci
 	@mkdir -p result-ci
 	@install -m 644 nix-result-ci/* result-ci/
 
 ci: result-ci
 
 clean:
-	rm .local nix-result-ci result-ci/* docs/README.nixpkgs.md
+	rm nix-result-ci result-ci/* docs/README.nixpkgs.md
 
 result-ci/test.txt result-ci/demo.txt result-ci/nix-demo.txt: result-ci
 
@@ -49,7 +45,11 @@ resholve.1: docs/manpage.wwst docs/manpage.css docs/content.wwst
 	@echo Building manpage
 	@wordswurst $< > $@
 
-docs/README.nixpkgs.md: docs/markdown.wwst docs/markdown.css docs/content.wwst docs/examples/*.nix
+nixpkgs_source: flake.lock
+	@echo linking nixpkgs source into $@
+	@nix build --out-link nixpkgs_source "$$(nix eval .#nixpkgs_source --raw)"
+
+nixpkgs/README.md: docs/markdown.wwst docs/markdown.css docs/content.wwst docs/examples/*.nix nixpkgs_source
 	@echo "Building Nixpkgs README (markdown)"
 	@wordswurst $< > $@
 
@@ -66,7 +66,7 @@ _resholve/strings.py: docs/strings.wwst docs/strings.css docs/content.wwst
 	@echo Wursting $@ from $<
 	@wordswurst $< > $@
 
-update: timings.md demos.md docs/resholve.1.txt docs/README.nixpkgs.md
+update: timings.md demos.md docs/resholve.1.txt nixpkgs/README.md
 
 # lint: lint-sass # lint-nix
 
