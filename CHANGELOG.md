@@ -1,5 +1,8 @@
 # Changelog
 
+## September 14, 2023
+Refactor Nix expressions and convert to flake.
+
 ## v0.9.0 (Jan 29 2023)
 Update oil/osh parser from 0.8.12 -> 0.14.0. In the process of updating the parser, I also cut out some extensions and dependencies that resholve shouldn't need to depend on.
 
