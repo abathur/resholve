@@ -33,6 +33,8 @@ In the Nix ecosystem, resholve helps us:
 
 ## Quickstart
 
+### Nix API
+
 If you use Nix, you'll want to use resholve's Nix API/builders included in nixpkgs. Two good places to start:
 - API reference: [NixOS/nixpkgs: pkgs/development/misc/resholve/README.md](https://github.com/nixos/nixpkgs/blob/master/pkgs/development/misc/resholve/README.md).
 
@@ -40,34 +42,51 @@ If you use Nix, you'll want to use resholve's Nix API/builders included in nixpk
 
 ### CLI
 
-If you'd like to look at scripting resholve or integrating it with other toolchains, you can also use the resholve CLI directly. resholve is only packaged with Nix for now, so you'll need it installed for both approaches:
+If you'd like to look at scripting resholve or integrating it with other toolchains, you can also use the resholve CLI directly. resholve is only packaged with Nix for now, so you'll need to have it installed.
+
+#### Latest stable version
+
+You can get the latest stable version of resholve from Nixpkgs:
 
 ```shell
-# pull resholve from nixpkgs
 NIXPKGS_ALLOW_INSECURE=1 nix-shell -p resholve
+```
 
-# DIY
+Or, you can get it from this Git repo:
+
+```shell
 git clone https://github.com/abathur/resholve.git
 cd resholve
 nix-shell
-
-# In both cases, check `man resholve` for CLI usage
 ```
+
+In both cases, check `man resholve` for CLI usage.
 
 > **Note:** resholve uses python2 because the high-quality shell parser it's built on does. Setting the `NIXPKGS_ALLOW_INSECURE` env is necessary to try resholve out in a shell because `nixpkgs` has taken steps to root out run-time usage of python2. resholve *will* still work at build-time for use in Nix packages. To be safe, don't run resholve on untrusted input.
 > 
 > (This isn't permanent. resholve should eventually be able to move to python3.)
+
+#### Latest unstable version
+
+```shell
+git clone https://github.com/abathur/resholve.git
+cd resholve
+mkdir .local
+nix-shell
+```
+
+`mkdir .local` makes `nix-shell` use whatever code is in the resholve folder. Without a folder named `.local`, `nix-shell` will download a copy of a stable version of resholve.
 
 ## Contributing
 If you're looking to improve resholve or the broader ecosystem (resholve + binlore), feel free to open issue or reach out to me on Matrix or by email. 
 
 There's much to do. Some of it is simple and straightforward. Some of it's creative and green-field. Some of it's difficult. I've focused on primary work at the expense of building an onramp for other contributors, but I'm happy to help you get started and use the opportunity to build the ramp as we go.
 
-If you do make code changes, you should be able to validate the codebase locally by running `make ci`.
+If you do make code changes, then you can test your changes by following [the instructions for installing an unstable version of resholve](#latest-unstable-version). You can also validate the codebase locally by running `make ci`.
 
 Some documentation updates entail updating generated files that currently require an adjacent checkout of nixpkgs--it's easiest to just bug me to do this for now.
 
-> Caution: from a dev perspective, `shell.nix` and `default.nix` are a lie. The former is just for users to try the CLI, and the latter is in the form required by callPackage for syncing with nixpkgs.
+> Caution: from a dev perspective, `default.nix` is a lie. It’s in the form required by callPackage for syncing with nixpkgs.
 
 ## Acknowledgements
 - resholve leverages the [Oil](https://github.com/oilshell/oil) shell's OSH parser) and wouldn't be feasible without Andy Chu's excellent work on that project.
