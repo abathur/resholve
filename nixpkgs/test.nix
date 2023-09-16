@@ -11,6 +11,7 @@
 , jq
 , bash
 , bats
+, bats-require
 , libressl
 , openssl
 , python27
@@ -127,7 +128,7 @@ rec {
     '';
     doCheck = true;
     buildInputs = [ resholve ];
-    nativeCheckInputs = [ coreutils bats ];
+    nativeCheckInputs = [ coreutils (bats.withLibraries (p: [ bats-require ])) ];
     # LOGLEVEL="DEBUG";
 
     # default path

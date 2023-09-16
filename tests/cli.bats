@@ -14,6 +14,7 @@
 # it is also covered here. But not the inverse--the demo doesn't need to cover the same
 # exact ground as thoroughly as this suite.
 
+bats_load_library bats-require
 load helpers
 
 @test "invoking resholve without --interpreter prints an error" {

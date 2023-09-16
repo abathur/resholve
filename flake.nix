@@ -79,7 +79,7 @@
             resolveTimeDeps = [ pkgs.bash pkgs.coreutils pkgs.file pkgs.findutils pkgs.gettext ];
           in {
             default = pkgs.mkShell {
-              buildInputs = [ pkgs.bash pkgs.resholve pkgs.bats ];
+              buildInputs = [ pkgs.bash pkgs.resholve (pkgs.bats.withLibraries (p: [ bats-require ])) ];
               RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
               RESHOLVE_LORE = "${pkgs.binlore.collect { drvs = resolveTimeDeps; } }";
               INTERP = "${pkgs.bash}/bin/bash";

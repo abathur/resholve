@@ -5,6 +5,7 @@
 # older version of resholve against this suite to learn how compatible it is
 # with newer versions of the format.
 
+bats_load_library bats-require
 load helpers
 
 @test "modern resholve versions reject v1 files" {

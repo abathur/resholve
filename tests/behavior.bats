@@ -2,6 +2,7 @@
 # that try to stake out/exercise specific behavior that demonstrate and
 # codify where the boundaries of what resholve knows how to handle are.
 
+bats_load_library bats-require
 load helpers
 
 # TODO: replace w/ real test once issue is sorted

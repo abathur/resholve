@@ -1,3 +1,4 @@
+bats_load_library bats-require
 load helpers
 
 _cols="${COLUMNS:-80}"
