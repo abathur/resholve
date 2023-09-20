@@ -1356,9 +1356,12 @@ Some general principles/notes:
 
 Some patterns coalescing:
 - generic handler uses the "command" dest to find subcommands
-- init parser with a name and variant, i.e. "sed" and "gnu" or "bsd"
-- use a "skip" target if there are options that are mutually-exclusive
-  with sub-execution
+- init parser (by calling make_command_parser) with a name and variant,
+  i.e. "sed" and "gnu" or "bsd"
+- use a "skip" dest if there are options that are mutually-exclusive
+  with sub-execution but we should keep trying alt parsers
+- mark entire subcommands as ~safe (having no no exec) with:
+  subparser.add_deadend_parser(name, **kwards)
 
 Reminder: You could reap a performance benefit by dropping all of the
 bool flags, but it breaks handling of combined -abcd args.
@@ -1374,6 +1377,13 @@ TODO:
 - I'd like to condense these expressions, but retain the flexibility
   of specifying whatever argparse supports (if the above fails?)
 """
+
+
+class CommandSubParser(theirparse._SubParsersAction):
+    def add_deadend_parser(self, name, **kwargs):
+        parser = super(CommandSubParser, self).add_parser(name, **kwargs)
+        parser.set_defaults(_deadend=True)
+        return parser
 
 
 class CommandParser(theirparse.ArgumentParser):
@@ -1395,11 +1405,10 @@ class CommandParser(theirparse.ArgumentParser):
       - version, variant, description of how they differ, platform
     """
 
-    def __init__(self, name, variant="generic"):
-        theirparse.ArgumentParser.__init__(
-            self, prog="{:} ({:})".format(name, variant), add_help=False
-        )
+    def __init__(self, **kwargs):
+        theirparse.ArgumentParser.__init__(self, **kwargs)
         self.register("action", "invocations", InvocationsAction)
+        self.register("action", "parsers", CommandSubParser)
         # self.register("action", "invocation", InvocationAction)
 
     def error(self, message):
@@ -1426,6 +1435,10 @@ class CommandParser(theirparse.ArgumentParser):
                         explicit_arg = Word(compound_word(arg_string.ast.parts[i:]))
             return action, option_string, explicit_arg
         return ret
+
+
+def make_command_parser(name, variant="generic", cls=CommandParser):
+    return cls(prog="{:} ({:})".format(name, variant), add_help=False)
 
 
 class FindParser(CommandParser):
@@ -1544,7 +1557,7 @@ TODO:
 class BuiltinCommandParsers(object):
     @staticmethod
     def _alias():
-        generic = CommandParser("alias", "builtin")
+        generic = make_command_parser("alias", "builtin")
         generic.add_argument("-p", action="store_true")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
@@ -1553,7 +1566,7 @@ class BuiltinCommandParsers(object):
 
     @staticmethod
     def _builtin():
-        generic = CommandParser("builtin", "builtin")
+        generic = make_command_parser("builtin", "builtin")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
         )
@@ -1561,7 +1574,7 @@ class BuiltinCommandParsers(object):
 
     @staticmethod
     def _coproc():
-        generic = CommandParser("coproc", "builtin")
+        generic = make_command_parser("coproc", "builtin")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
         )
@@ -1569,7 +1582,7 @@ class BuiltinCommandParsers(object):
 
     @staticmethod
     def _command():
-        generic = CommandParser("command", "builtin")
+        generic = make_command_parser("command", "builtin")
         generic.add_argument("-p", action="store_true")
         generic.add_argument("-v", action="store_true")
         generic.add_argument("-V", action="store_true")
@@ -1580,7 +1593,7 @@ class BuiltinCommandParsers(object):
 
     @staticmethod
     def _eval():
-        generic = CommandParser("eval", "builtin")
+        generic = make_command_parser("eval", "builtin")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
         )
@@ -1601,7 +1614,7 @@ class BuiltinCommandParsers(object):
           -c    execute COMMAND with an empty environment
           -l    place a dash in the zeroth argument to COMMAND
         """
-        generic = CommandParser("exec", "builtin")
+        generic = make_command_parser("exec", "builtin")
         generic.add_argument("-a")
         generic.add_argument("-c", action="store_true")
         generic.add_argument("-l", action="store_true")
@@ -1612,7 +1625,7 @@ class BuiltinCommandParsers(object):
 
     @staticmethod
     def _source():
-        generic = CommandParser("source", "builtin")
+        generic = make_command_parser("source", "builtin")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
         )
@@ -1620,7 +1633,7 @@ class BuiltinCommandParsers(object):
 
     @staticmethod
     def _type():
-        generic = CommandParser("type", "builtin")
+        generic = make_command_parser("type", "builtin")
         generic.add_argument("-p", action="store_true")
         generic.add_argument("-v", action="store_true")
         generic.add_argument("-V", action="store_true")
@@ -1646,7 +1659,7 @@ class ExternalCommandParsers(object):
              --help     display this help and exit
              --version  output version information and exit
         """
-        generic = CommandParser("chroot")
+        generic = make_command_parser("chroot")
         # bsd
         generic.add_argument("-g")
         generic.add_argument("-G")
@@ -1676,7 +1689,7 @@ class ExternalCommandParsers(object):
 
         assignment-alikes should be stripped out already
         """
-        generic = CommandParser("env")
+        generic = make_command_parser("env")
         generic.add_argument("-P")  # bsd altpath
         # gnu
         generic.add_argument(
@@ -1705,7 +1718,7 @@ class ExternalCommandParsers(object):
         """
         coreutils src/install.c:execlp
         """
-        generic = CommandParser("install")
+        generic = make_command_parser("install")
         generic.add_argument(
             "--strip-program",
             dest="commands",
@@ -1720,7 +1733,7 @@ class ExternalCommandParsers(object):
         coreutils src/nice.c:execvp
         Usage: %s [OPTION] [COMMAND [ARG]...]
         """
-        generic = CommandParser("nice")
+        generic = make_command_parser("nice")
         generic.add_argument("-n")
         generic.add_argument("--adjustment")
         generic.add_argument(
@@ -1734,7 +1747,7 @@ class ExternalCommandParsers(object):
         coreutils src/nohup.c:execvp
         Usage: %s [OPTION] [COMMAND [ARG]...]
         """
-        generic = CommandParser("nohup")
+        generic = make_command_parser("nohup")
         generic.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
         )
@@ -1749,7 +1762,7 @@ class ExternalCommandParsers(object):
         two mutually-exclusive forms; if opts are present, the command
         is the first arg--if not, there's a combined context first.
         """
-        opt_context = CommandParser("runcon", "opt context")
+        opt_context = make_command_parser("runcon", "opt context")
         context = opt_context.add_mutually_exclusive_group(required=True)
         context.add_argument("-c", "--compute", action="store_true")
         context.add_argument("-t", "--type")
@@ -1761,7 +1774,7 @@ class ExternalCommandParsers(object):
         )
 
         # these two forms are mutua
-        combined_context = CommandParser("runcon", "combined context")
+        combined_context = make_command_parser("runcon", "combined context")
         combined_context.add_argument("context")
         combined_context.add_argument(
             "commands", nargs=theirparse.REMAINDER, action="invocations"
@@ -1773,7 +1786,7 @@ class ExternalCommandParsers(object):
         """
         coreutils src/sort.c:execlp
         """
-        generic = CommandParser("sort")
+        generic = make_command_parser("sort")
         generic.add_argument(
             "--compress-program",
             dest="commands",
@@ -1788,7 +1801,7 @@ class ExternalCommandParsers(object):
         """
         coreutils src/split.c:execl
         """
-        generic = CommandParser("split")
+        generic = make_command_parser("split")
         generic.add_argument(
             "--filter",
             dest="commands",
@@ -1804,7 +1817,7 @@ class ExternalCommandParsers(object):
         coreutils src/stdbuf.c:?
         Usage: %s [OPTION] [COMMAND [ARG]...]
         """
-        generic = CommandParser("stdbuf")
+        generic = make_command_parser("stdbuf")
         generic.add_argument("-i", "--input")
         generic.add_argument("-o", "--output")
         generic.add_argument("-e", "--error")
@@ -1819,7 +1832,7 @@ class ExternalCommandParsers(object):
         coreutils src/timeout.c:execvp
         Usage: %s [OPTION] [COMMAND [ARG]...]
         """
-        generic = CommandParser("timeout")
+        generic = make_command_parser("timeout")
         generic.add_argument("-k", "--kill-after")
         generic.add_argument("-s", "--signal")
         generic.add_argument("-v", "--verbose", action="store_true")
@@ -1834,7 +1847,7 @@ class ExternalCommandParsers(object):
     @staticmethod
     def _sqlite3():
         """ """
-        generic = CommandParser("sqlite3")
+        generic = make_command_parser("sqlite3")
         generic.add_argument(
             "-cmd",
             dest="commands",
@@ -1846,7 +1859,7 @@ class ExternalCommandParsers(object):
 
     @staticmethod
     def _script():
-        linux = CommandParser("script", "linux")
+        linux = make_command_parser("script", "linux")
         linux.add_argument("-a", "--append", action="store_true")
         linux.add_argument("-E", "--echo")
         linux.add_argument("-e", "--return", action="store_true")
@@ -1871,7 +1884,7 @@ class ExternalCommandParsers(object):
         )
         linux.add_argument("file", nargs="?")
 
-        bsd = CommandParser("script", "bsd")
+        bsd = make_command_parser("script", "bsd")
         bsd.add_argument("-d", action="store_true")
         bsd.add_argument("-k", action="store_true")
         bsd.add_argument("-p", action="store_true")
@@ -1896,7 +1909,7 @@ class ExternalCommandParsers(object):
         requires the GnuSedParser hack-around, I'll
         split them to be a little clearer...
         """
-        gnu = GnuSedParser("sed")
+        gnu = make_command_parser("sed", cls=GnuSedParser)
         # very unsure about this group part
         gscript = gnu.add_mutually_exclusive_group()
         gnu.add_argument("-a", action="store_true")  # BSD-only
@@ -1918,7 +1931,7 @@ class ExternalCommandParsers(object):
         gnu.add_argument("--version", action="store_true")
         gnu.add_argument("input_files", nargs="*")
 
-        bsd = CommandParser("sed")
+        bsd = make_command_parser("sed")
         # very unsure about this group part
         bscript = bsd.add_mutually_exclusive_group()
         bsd.add_argument("-a", action="store_true")  # BSD-only
@@ -1965,8 +1978,8 @@ class ExternalCommandParsers(object):
             -V          --version
 
         """
-        generic = CommandParser("awk")
-        assign_fallback = CommandParser("awk")
+        generic = make_command_parser("awk")
+        assign_fallback = make_command_parser("awk")
 
         def base(parser):
             # very unsure about this group part
@@ -2029,7 +2042,7 @@ class ExternalCommandParsers(object):
         YES: sudo -l [-AknS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
         YES: sudo [-AbEHknPS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
         """
-        generic = CommandParser("sudo", "generic")
+        generic = make_command_parser("sudo", "generic")
         # 1. weed out sudo forms that don't need resolving
         # note: some of these long forms aren't known correct
         #       because sudo re-uses a lot of flags
@@ -2047,7 +2060,7 @@ class ExternalCommandParsers(object):
             "--validate",
             "-e",
             "--edit",
-            dest="skip",
+            dest="_skip",
             action="store_true",
         )
         # sudo -l form
@@ -2096,7 +2109,7 @@ class ExternalCommandParsers(object):
 
         if this doesn't work, we'll probably need N parsers...
         """
-        generic = CommandParser("xargs")
+        generic = make_command_parser("xargs")
         # gnu
         generic.add_argument("-0", "--null", action="store_true")
         generic.add_argument("-a", "--arg-file")
@@ -2145,7 +2158,7 @@ class ExternalCommandParsers(object):
 
         if this doesn't work, we'll probably need N parsers...
         """
-        generic = CommandParser("rlwrap")
+        generic = make_command_parser("rlwrap")
         generic.add_argument("-a", "--always-readline", nargs="?")
         generic.add_argument("-A", "--ansi-colour-aware", action="store_true")
         generic.add_argument("-b", "--break-chars")
@@ -2195,7 +2208,7 @@ class ExternalCommandParsers(object):
         -ok command ;
         -okdir command ;
         """
-        generic = FindParser("find")
+        generic = make_command_parser("find", cls=FindParser)
         generic.add_argument("start")
         # boolean predicates, not quite like normal flags...
         # just capturing to ~ignore
@@ -2226,7 +2239,7 @@ class ExternalCommandParsers(object):
 
     @staticmethod
     def _generic_shell():
-        generic = CommandParser("generic_shell")
+        generic = make_command_parser("generic_shell")
         generic.add_argument(
             "-c",
             # rest are nonstandard; leaving breadcrumbs;
@@ -2294,7 +2307,7 @@ class ExternalCommandParsers(object):
           -I, --use-compress-program=COMMAND
           Filter data through COMMAND.  It must accept the -d option, for decompression.  The argument can contain command line options.
         """
-        generic = CommandParser("generic tar")
+        generic = make_command_parser("generic tar")
         """
         TODO: I'm technically missing one here, but it is a
         bit harder than the rest.
@@ -2387,7 +2400,7 @@ class ExternalCommandParsers(object):
         """
         We need to sub-search expressions for ! commands
         """
-        generic = CommandParser("dc")
+        generic = make_command_parser("dc")
         generic.add_argument("-e", "--expression", action="append")
         generic.add_argument("-f", "--file")
         generic.add_argument("-V", "--version", action="store_true")
@@ -2400,11 +2413,12 @@ class ExternalCommandParsers(object):
         """
         Based on Flatpak v1.14.4.
         """
-        generic = CommandParser("flatpak")
+        generic = make_command_parser("flatpak")
 
         # flatpak --help
         generic.add_argument(
-            "-h", "--help",
+            "-h",
+            "--help",
             "--version",
             "--default-arch",
             "--supported-arches",
@@ -2412,48 +2426,14 @@ class ExternalCommandParsers(object):
             "--installations",
             "--print-updated-env",
             "--print-system-only",
-            "-v", "--verbose",
+            "-v",
+            "--verbose",
             "--ostree-verbose",
-            action="store_true"
+            action="store_true",
         )
         subparsers = generic.add_subparsers()
         # flatpak update --help
-        update = subparsers.add_parser("update")
-        update.add_argument(
-            "-h", "--help",
-            "-u", "--user",
-            "--system",
-            action="store_true"
-        )
-        update.add_argument(
-            "--installation",
-            "--arch",
-            "--commit",
-            nargs=1
-        )
-        update.add_argument(
-            "--force-remove",
-            "--no-pull",
-            "--no-deploy",
-            "--no-related",
-            "--no-deps",
-            "--no-static-deltas",
-            "--runtime",
-            "--app",
-            "--appstream",
-            action="store_true"
-        )
-        update.add_argument("--subpath", nargs=1)
-        update.add_argument(
-            "-y", "--assumeyes",
-            "--noninteractive",
-        )
-        update.add_argument("--sideload-repo", nargs=1)
-        update.add_argument(
-            "-v", "--verbose",
-            "--ostree-verbose",
-            action="store_true"
-        )
+        update = subparsers.add_deadend_parser("update", add_help=False)
 
         return (generic,)
 
@@ -3088,8 +3068,11 @@ class CommandLike(object):
                             else:
                                 parsed, _unparsed = parsed
                                 # see sudo parser for example
-                                if "skip" in parsed and parsed.skip:
+                                if "_skip" in parsed and parsed._skip:
                                     continue
+                                # see flatpak parser for example
+                                elif "_deadend" in parsed and parsed._deadend:
+                                    return
                             if handler(parsed, invocation):
                                 break
 
@@ -3666,8 +3649,11 @@ class RecordCommandlike(object):
                 else:
                     parsed, _unparsed = parsed
                     # see sudo parser for example
-                    if "skip" in parsed and parsed.skip:
+                    if "_skip" in parsed and parsed._skip:
                         continue
+                    # see flatpak parser for example
+                    elif "_deadend" in parsed and parsed._deadend:
+                        return
 
                 handler = getattr(self, "handle_builtin_{:}".format(name), None)
                 if not handler:
@@ -3899,8 +3885,8 @@ class RecordCommandlike(object):
         return True
 
     def handle_external_generic(self, parsed, invocation):
-        if not hasattr(parsed, "commands"):
-            return True
+        # if not hasattr(parsed, "commands"):
+        #     return True
 
         # TODO: shimming shells in here may be a bigger crime than
         #       duplicating the logic in two functions would be?
@@ -4084,8 +4070,10 @@ class RecordCommandlike(object):
                 else:
                     parsed, _unparsed = parsed
                     # see sudo parser for example
-                    if "skip" in parsed and parsed.skip:
+                    if "_skip" in parsed and parsed._skip:
                         continue
+                    elif "_deadend" in parsed and parsed._deadend:
+                        return
 
                 handler = getattr(
                     self,

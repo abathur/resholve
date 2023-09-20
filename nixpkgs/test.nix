@@ -25,11 +25,23 @@
 , rlwrap
 , gnutar
 , bc
+, flatpak
 }:
 
 let
   default_packages = [ bash file findutils gettext ];
-  parsed_packages = [ coreutils sqlite unixtools.script gnused gawk findutils rlwrap gnutar bc ];
+  parsed_packages = [
+    coreutils
+    sqlite
+    unixtools.script
+    gnused
+    gawk
+    findutils
+    rlwrap
+    gnutar
+    bc
+  ] ++ lib.optionals stdenv.hostPlatform.isLinux [ flatpak
+  ];
 in
 rec {
   module1 = resholve.mkDerivation {
