@@ -1380,6 +1380,10 @@ TODO:
 
 
 class CommandSubParser(theirparse._SubParsersAction):
+    # TODO/Caution: subparsers work differently in at least some python3 releases
+    #               behavior here needs to get double-checked if we still use
+    #               argparse whenever we're able to port up
+    #               see also note in CommandParser.error
     def add_deadend_parser(self, name, **kwargs):
         parser = super(CommandSubParser, self).add_parser(name, **kwargs)
         parser.set_defaults(_deadend=True)
@@ -1412,7 +1416,16 @@ class CommandParser(theirparse.ArgumentParser):
         # self.register("action", "invocation", InvocationAction)
 
     def error(self, message):
-        logger.warn("CommandParser %r passing instead of %r", self, message)
+        emitter = logger.warn
+        for action in self._actions:
+            if isinstance(action, CommandSubParser) and message == "too few arguments":
+                # Known problem: https://bugs.python.org/issue9253
+                # I guess we'll just lower the loglevel
+                # see also note on CommandSubParser
+                emitter = logger.debug
+                break
+
+        emitter("CommandParser %r passing instead of %r", self, message)
 
     def _parse_optional(self, arg_string):
         """
