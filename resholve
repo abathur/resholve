@@ -1358,6 +1358,10 @@ Some patterns coalescing:
 - generic handler uses the "command" dest to find subcommands
 - init parser (by calling make_command_parser) with a name and variant,
   i.e. "sed" and "gnu" or "bsd"
+
+  This will use the ~normal LocatedExecCommandParser by default. You can
+  explicitly pass either the UnlocatedExecCommandParser or a parser for
+  a specific command (such as GnuSedParser)
 - use a "skip" dest if there are options that are mutually-exclusive
   with sub-execution but we should keep trying alt parsers
 - mark entire subcommands as ~safe (having no no exec) with:
@@ -1389,9 +1393,8 @@ class CommandSubParser(theirparse._SubParsersAction):
 class CommandParser(theirparse.ArgumentParser):
     """
     Changes:
-    - don't raise errors; I don't *think* we want to halt here
-      (because then we're going to have to have a full model of all in-use
-      options, even across different programs...)
+    - Try to keep the parser from returning plain strings instead of
+      our Word() wrappers.
 
     TODO:
     - if this pattern sticks, AND resholve gains a test-suite focused on
@@ -1401,7 +1404,7 @@ class CommandParser(theirparse.ArgumentParser):
       - knock out features and safety checks
       - maybe just literally construct the end data structure
       - two for loops in parse_known_args could probably be done on init
-    - regardless, I need to be keeping better notes on the cmds
+    - regardless, we need to be keeping better notes on the cmds
       - version, variant, description of how they differ, platform
     """
 
@@ -1410,9 +1413,6 @@ class CommandParser(theirparse.ArgumentParser):
         self.register("action", "invocations", InvocationsAction)
         self.register("action", "parsers", CommandSubParser)
         # self.register("action", "invocation", InvocationAction)
-
-    def error(self, message):
-        logger.warn("CommandParser %r passing instead of %r", self, message)
 
     def _parse_optional(self, arg_string):
         """
@@ -1437,11 +1437,74 @@ class CommandParser(theirparse.ArgumentParser):
         return ret
 
 
-def make_command_parser(name, variant="generic", cls=CommandParser):
+class LocatedExecCommandParser(CommandParser):
+    """
+    Parser focused on locating arguments that exhibit ~exec behavior.
+
+    This parser is broadly intended to be permissive. It won't fail if
+    an invocation contains an argument that we don't have declared. It
+    just needs to be able to reliably locate the exec.
+
+    Changes:
+    - don't raise errors; I don't *think* we want to halt here
+      (because then we're going to have to have a full model of all in-use
+      options, even across different programs...)
+    """
+
+    parse_relevant_args = CommandParser.parse_known_args
+
+    def error(self, message):
+        logger.warn(
+            "%s %r is a permissive parser; passing instead of halting on %r",
+            self.__class__.__name__,
+            self,
+            message,
+        )
+
+
+class UnlocatedExecCommandParser(CommandParser):
+    """
+    Parser focused on carving out CLI syntax that lacks ~exec behavior.
+
+    This parser is broadly intended to be strict. Invocations with any
+    unknown arguments should fail.
+
+    It helps us take person-sized bites out of the argument-space of
+    complex commands and declare that they don't have any known exec
+    behavior. It enables us to make incremental progress on CLIs like
+    git that are dauntingly-big for a human to audit in one sitting.
+
+    This parser is only meant for use *before* we've audited all of a
+    command's syntax. If we audit all of the syntax and don't find any
+    exec behavior, we should update binlore (either to add a lore
+    override for this command, or to fix the scanning rules if it was
+    a complete false-positive).
+
+    Caution: We've yet to intentionally address the case where a CLI
+    is too big to readily audit, but we do know of at least one case
+    of exec behavior. We can probably handle it here, but we need to
+    identify one of these and get it under test to be confident.
+
+
+    Changes:
+    - since we're letting this raise errors, we'll shim in some extra
+      error context to make it more obvious what the problem is
+    """
+
+    parse_relevant_args = CommandParser.parse_args
+
+    def error(self, message):
+        message = "{} {} is a strict parser that lacks rules for parsing this invocation, causing this error: {}".format(
+            self.__class__.__name__, repr(self), repr(message)
+        )
+        return super(UnlocatedExecCommandParser, self).error(message)
+
+
+def make_command_parser(name, variant="generic", cls=LocatedExecCommandParser):
     return cls(prog="{:} ({:})".format(name, variant), add_help=False)
 
 
-class FindParser(CommandParser):
+class FindParser(LocatedExecCommandParser):
     """
     find's exec options (-exec -execdir -ok -okdir)
     are terminated in a way argparse can't really
@@ -1474,7 +1537,7 @@ class FindParser(CommandParser):
         return ns, rest
 
 
-class GnuSedParser(CommandParser):
+class GnuSedParser(LocatedExecCommandParser):
     """
     gnused's -i/--in-place options can be bare, or have the
     argument directly attached (it CANNOT be a separate
@@ -2413,7 +2476,7 @@ class ExternalCommandParsers(object):
         """
         Based on Flatpak v1.14.4.
         """
-        generic = make_command_parser("flatpak")
+        generic = make_command_parser("flatpak", cls=UnlocatedExecCommandParser)
 
         # flatpak --help
         generic.add_argument(
@@ -3942,18 +4005,10 @@ class RecordCommandlike(object):
         if len(invocation) >= 1:
             pos = invocation.first_spid
             subcmd = invocation.firstword
-            # TODO: handle_external_generic needed this; not certain
-            # this one _doesn't_, but I haven't been able to find a
-            # test case that breaks on it (yet). rm in 2022.
-            #     remember that you have to indent the rest under else?
-            # if not subcmd.ok:
-            #     self.allow_dynamic_executable_word(subcmd, invocation.firstword)
-            # else:
-
             cmdlike = cmdlikes[subcmd]
-
             solution = None
             solutions = self.solutions[pos]
+
             if pos in self.solutions:
                 for solution, word_ob in solutions:
                     if word_ob == subcmd:

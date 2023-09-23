@@ -169,6 +169,10 @@ require() {
     done
 }
 
+# TODO: this ~needs two concepts of xfail:
+# - resholve can't parse it
+# - resholve can parse it, but invoking is an error
+#   (can handle this with ! <invocation>)
 parsers() {
     cat parse_*.sh > parsed.sh
     case "$(uname -s)" in
