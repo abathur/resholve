@@ -2446,7 +2446,7 @@ class ExternalCommandParsers(object):
             "-v",
             "--verbose",
             "--ostree-verbose",
-            dest="_skip",
+            dest="_deadend",
             action="store_true",
         )
         subparsers = generic.add_subparsers()
