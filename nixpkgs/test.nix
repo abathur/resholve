@@ -40,7 +40,8 @@ let
     rlwrap
     gnutar
     bc
-  ] ++ lib.optionals stdenv.hostPlatform.isLinux [ flatpak
+  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
+    flatpak
   ];
 in
 rec {
