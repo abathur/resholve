@@ -1385,6 +1385,7 @@ class CommandSubParser(theirparse._SubParsersAction):
     #               argparse whenever we're able to port up
     #               see also note in CommandParser.error
     def add_deadend_parser(self, name, **kwargs):
+        kwargs["add_help"] = False
         parser = super(CommandSubParser, self).add_parser(name, **kwargs)
         parser.set_defaults(_deadend=True)
         return parser
@@ -2442,11 +2443,12 @@ class ExternalCommandParsers(object):
             "-v",
             "--verbose",
             "--ostree-verbose",
+            dest="_skip",
             action="store_true",
         )
         subparsers = generic.add_subparsers()
         # flatpak update --help
-        update = subparsers.add_deadend_parser("update", add_help=False)
+        update = subparsers.add_deadend_parser("update")
 
         return (generic,)
 
