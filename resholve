@@ -1355,13 +1355,16 @@ Some general principles/notes:
 - minimize the number of bespoke handlers
 
 Some patterns coalescing:
-- generic handler uses the "command" dest to find subcommands
+- generic handler uses the "command" dest to find arguments that are
+  themselves commands we may need to resolve
 - init parser (by calling make_command_parser) with a name and variant,
   i.e. "sed" and "gnu" or "bsd"
-- use a "skip" dest if there are options that are mutually-exclusive
+- use a "_skip" dest if there are options that are mutually-exclusive
   with sub-execution but we should keep trying alt parsers
 - mark entire subcommands as ~safe (having no no exec) with:
   subparser.add_deadend_parser(name, **kwards)
+
+  (This will *not* keep trying alt parsers.)
 
 Reminder: You could reap a performance benefit by dropping all of the
 bool flags, but it breaks handling of combined -abcd args.
@@ -2539,7 +2542,8 @@ CommandLike objects. Each CommandLike will "solve" for the distinct contexts
 it was found in, and add the appropriate resolution to the corresponding
 Solution object. This process records whether each Solution should be a no-op,
 raise an exception, or result in a replacement. It'll also trigger an eager
-recursive resolution of invocations that may have subcommands lurking in them.
+recursive resolution of invocations that may have other commands lurking in
+their arguments.
 
 Next, we render the resolved script by looping over each of these solutions.
 """
