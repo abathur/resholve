@@ -169,8 +169,23 @@ require() {
     done
 }
 
+# TODO: this ~needs two concepts of xfail:
+# - resholve can't parse it
+# - resholve can parse it, but invoking is an error
+#   (can handle this with ! <invocation>)
 parsers() {
     cat parse_*.sh > parsed.sh
-    resholve --interpreter none --path "${PKG_PARSED}:${PKG_COREUTILS}" < parsed.sh > resolved.sh
-    bash -xe resolved.sh
+    case "$(uname -s)" in
+        Linux)
+            cat linux_parse_*.sh >> parsed.sh
+            ;;
+        Darwin)
+            : pass for now
+            ;;
+        *)
+            : pass for now
+            ;;
+    esac
+    resholve --interpreter none --path "${PKG_PARSED}:${PKG_COREUTILS}" parsed.sh
+    bash -xe parsed.sh.resolved
 }
