@@ -152,9 +152,11 @@ CASES
     status 0
     line 2 begins "/nix/store/"
     line 2 ends "/bin/file"
+    line 3 begins "/nix/store/"
+    line 3 ends "/bin/printf"
   })
 } <<CASES
-resholve --interpreter $INTERP --fix '/usr/bin/file' < abspath_command.sh
+RESHOLVE_PATH="$RESHOLVE_PATH:$PKG_COREUTILS" resholve --interpreter $INTERP --fix '/usr/bin/file' --fix '/usr/bin/printf' < abspath_command.sh
 CASES
 
 
