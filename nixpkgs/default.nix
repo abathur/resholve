@@ -1,13 +1,8 @@
 { lib
 , pkgs
 , pkgsBuildHost
-, version ? "0.9.0"
-, rSrc ? pkgs.fetchFromGitHub {
-    owner = "abathur";
-    repo = "resholve";
-    rev = "v${version}";
-    hash = "sha256-FRdCeeC2c3bMEXekEyilgW0PwFfUWGstZ5mXdmRPM5w=";
-  }
+, version
+, rSrc
 }:
 
 let
@@ -42,9 +37,10 @@ rec {
   resholveBuildTimeOnly = removeKnownVulnerabilities resholve;
   # resholve itself
   resholve = removeKnownVulnerabilities (callPackage ./resholve.nix {
-    inherit rSrc version resholve-utils;
+    inherit rSrc version;
     inherit (deps.oil) oildev;
     inherit (deps) configargparse;
+    inherit resholve-utils;
     # used only in tests
     resholve = resholveBuildTimeOnly;
   });
