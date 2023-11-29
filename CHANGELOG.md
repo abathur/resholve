@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.9.1 (Nov 28 2023)
+- Fix problem with handling of abspaths that share a name with a builtin (#111)
+
 ## September 14, 2023
 Refactor Nix expressions and convert to flake.
 

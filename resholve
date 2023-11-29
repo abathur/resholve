@@ -2800,8 +2800,14 @@ class OrderedCommandResolver(object):
         NOTE: if you're using resholve for some other shell and have
         a builtin not in this list, you can add an exemption with
         --fake builtin:<name>
+
+        TODO: I don't love the ad-hoc way I'm carving out externals
+        that have been ~allowed via a fix directive by checking for
+        self.cmd.path here
         """
-        return True if self.name in self.KNOWN_BUILTINS else False
+        return (
+            True if (self.name in self.KNOWN_BUILTINS and not self.cmd.path) else False
+        )
 
     def resolve_external(self):
         if (
