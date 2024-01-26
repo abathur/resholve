@@ -1357,12 +1357,33 @@ Some general principles/notes:
 Some patterns coalescing:
 - generic handler uses the "command" dest to find arguments that are
   themselves commands we may need to resolve
-- init parser (by calling make_command_parser) with a name and variant,
-  i.e. "sed" and "gnu" or "bsd"
+- init parser (by calling make_command_parser) with a command name
+  (i.e., "sed") and variant (more on this below)
 
-  This will use the ~normal LocatedExecCommandParser by default. You can
-  explicitly pass either the UnlocatedExecCommandParser or a parser for
-  a specific command (such as GnuSedParser)
+  - This will use the ~normal LocatedExecCommandParser by default. You
+    can explicitly pass either the UnlocatedExecCommandParser or a
+    parser for a specific command (such as GnuSedParser)
+
+  - The variant is a label to differentiate parsers if we need more
+    than one. Why would we need more than one? There may be divergent
+    implementations of the command. For example, there's a GNU time, a
+    BSD time, and most shells have a time builtin as well.
+
+    We don't always split these out. If the syntaxes are compatible,
+    we can handle trivial differences with one parser. In very rare
+    cases, we may need more than one parser for one implementation of
+    a command. This usually means there's context-dependent behavior
+    in the command that argparse isn't smart (or degenerate?) enough
+    to model in the same parser.
+
+    This label is mostly just a debugging affordance. With verbose
+    logging on, we can readily tell which parser variant is matching
+    an invocation or emitting an error.
+
+    The default variant is "generic". Other examples are "builtin",
+    "gnu", "bsd". `runcon` is an example of two parsers needed for a
+    single implementation.
+
 - use a "skip" dest if there are options that are mutually-exclusive
   with sub-execution but we should keep trying alt parsers
 - mark entire subcommands as ~safe (having no no exec) with:
