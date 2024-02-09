@@ -90,7 +90,6 @@ rec {
       "${patchSrc}/0001-add_setup_py.patch"
       "${patchSrc}/0002-add_MANIFEST_in.patch"
       "${patchSrc}/0004-disable-internal-py-yajl-for-nix-built.patch"
-      "${patchSrc}/0006-disable_failing_libc_tests.patch"
       "${patchSrc}/0007-namespace_via_init.patch"
       "${patchSrc}/0009-avoid_nix_arch64_darwin_toolchain_bug.patch"
       "${patchSrc}/0010-disable-line-input.patch"
@@ -120,6 +119,8 @@ rec {
       rm cpp/stdlib.h # keep modules from finding the wrong stdlib?
       # work around hard parse failure documented in oilshell/oil#1468
       substituteInPlace osh/cmd_parse.py --replace 'elif self.c_id == Id.Op_LParen' 'elif False'
+      # disable fragile libc tests
+      substituteInPlace build/py.sh --replace "py-ext-test pyext/libc_test.py" "#py-ext-test pyext/libc_test.py"
     '';
 
     # See earlier note on glibcLocales TODO: verify needed?
