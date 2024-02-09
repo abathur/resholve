@@ -81,14 +81,13 @@ CASES
 resholve --interpreter $INTERP < absolute_source.sh
 CASES
 
-echo "source $PWD/tests/source_present_target.sh" > $PWD/tests/temp_source_test.sh
 @test "allows exempted absolute source paths" {
   require <({
     status 0
-    line -1 ends "/tests/source_present_target.sh"
+    line -1 ends "/source_present_target.sh"
   })
 } <<CASES
-resholve --interpreter $INTERP --keep source:$PWD/tests/source_present_target.sh < $PWD/tests/temp_source_test.sh && rm $PWD/tests/temp_source_test.sh
+{ echo "source $PWD/source_present_target.sh" > $PWD/temp_source_test.sh; } && resholve --interpreter $INTERP --keep source:$PWD/source_present_target.sh < $PWD/temp_source_test.sh && rm $PWD/temp_source_test.sh
 CASES
 
 @test "allow (but do not parse) --fake 'source:path'" {
@@ -116,7 +115,7 @@ CASES
     line -1 equals "[ stdinNone ]:2: Can't resolve dynamic command"
   })
 } <<CASES
-resholve --interpreter $INTERP < $PWD/tests/tilde_dynamic_pipeline.sh
+resholve --interpreter $INTERP < tilde_dynamic_pipeline.sh
 CASES
 
 @test "allows exempted tilde executable paths" {
@@ -125,7 +124,7 @@ CASES
     line -1 equals "# resholve: keep ~/.bashrc"
   })
 } <<CASES
-resholve --interpreter $INTERP --keep '~/.bashrc' < $PWD/tests/tilde_dynamic_pipeline.sh
+resholve --interpreter $INTERP --keep '~/.bashrc' < tilde_dynamic_pipeline.sh
 CASES
 
 @test "allows --fake executable" {
