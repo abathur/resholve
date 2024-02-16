@@ -171,6 +171,6 @@ require() {
 
 parsers() {
     cat parse_*.sh > parsed.sh
-    resholve --interpreter none --path "${PKG_PARSED}:${PKG_COREUTILS}" < parsed.sh > resolved.sh
+    resholve --interpreter none --path "${PKG_PARSED}:${PKG_COREUTILS}" --fix sudo < parsed.sh > resolved.sh
     bash -xe resolved.sh
 }

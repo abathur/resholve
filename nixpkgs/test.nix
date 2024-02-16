@@ -25,11 +25,21 @@
 , rlwrap
 , gnutar
 , bc
+, writeScriptBin
 }:
 
 let
+  /*
+  We want to be able to pretend sudo exists to test our syntax
+  parser for it, but pkgs.sudo doesn't "work" anyways, so let's
+  just fake a sudo executable without adding any deps
+  */
+  fake_sudo = writeScriptBin "sudo" ''
+    #!${bash}/bin/bash
+    true
+  '';
   default_packages = [ bash file findutils gettext ];
-  parsed_packages = [ coreutils sqlite unixtools.script gnused gawk findutils rlwrap gnutar bc ];
+  parsed_packages = [ coreutils sqlite unixtools.script gnused gawk findutils rlwrap gnutar bc fake_sudo ];
 in
 rec {
   module1 = resholve.mkDerivation {

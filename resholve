@@ -932,7 +932,6 @@ def punshow():
 
                 resolve_cmdlikes()
         else:
-
             with sourcePATH(script_map):
                 for script in checked_scripts:
                     resolve_script(
@@ -2030,7 +2029,18 @@ class ExternalCommandParsers(object):
         YES: sudo [-AbEHknPS] [-C num] [-g group] [-h host] [-p prompt] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
         """
         generic = CommandParser("sudo", "generic")
-        # 1. weed out sudo forms that don't need resolving
+
+        # TODO: initially I tried to model some flags associated with
+        #       forms that don't need resolving with a skip flag, but
+        #       that wasn't right--a skip flag is just how we bail out
+        #       of one parser ~early so that a later parser can match
+        #       the form correctly. I'm dropping dest="skip" now, but
+        #       this also means that grouping these args is vestigial.
+        #
+        #       leaving as-is for now to minimize unnecessary change
+        #       and because I feel like it helps ~document a key edge
+        #       case that we'd want to be able to handle if we roll
+        #       our own syntax parser.
         # note: some of these long forms aren't known correct
         #       because sudo re-uses a lot of flags
         generic.add_argument(
@@ -2047,9 +2057,9 @@ class ExternalCommandParsers(object):
             "--validate",
             "-e",
             "--edit",
-            dest="skip",
             action="store_true",
         )
+
         # sudo -l form
         generic.add_argument("-l", "--list", action="count")
         generic.add_argument("-A", "--askpass", action="store_true")
@@ -2073,7 +2083,9 @@ class ExternalCommandParsers(object):
         generic.add_argument("-s", "--shell", action="store_true")
         # not listed in the synopsis; probably valid in most
         generic.add_argument("-B", "--bell", action="store_true")
-        generic.add_argument("commands")
+        generic.add_argument(
+            "commands", nargs=theirparse.REMAINDER, action="invocations"
+        )
         return (generic,)
 
     @staticmethod
@@ -3473,7 +3485,6 @@ class RecordCommandlike(object):
             )
 
             for subcmd in parsed.commands:
-
                 if subcmd.firstword.ok:
                     if not self.handle_first_pass_essentials(subcmd):
                         recorder(subcmd)
@@ -3527,7 +3538,10 @@ class RecordCommandlike(object):
                 # user said keep this abspath
                 self.record_external_source(firstword)
                 target = False
-            elif ("source", firstword,) in self.directives.fix or (
+            elif (
+                "source",
+                firstword,
+            ) in self.directives.fix or (
                 ".",
                 firstword,
             ) in self.directives.fix:
