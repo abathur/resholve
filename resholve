@@ -4162,7 +4162,11 @@ class RecordCommandlike(object):
                     )
                     continue
                 else:
-                    parsed, _unparsed = parsed
+                    try:
+                        parsed, _unparsed = parsed
+                    except TypeError:
+                        pass
+
                     # see sudo parser for example
                     if "_skip" in parsed and parsed._skip:
                         continue
