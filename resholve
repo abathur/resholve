@@ -1518,7 +1518,10 @@ class PartialSurveyCommandParserForPossibleExec(CommandParser):
       error context to make it more obvious what the problem is
     """
 
-    parse_relevant_args = CommandParser.parse_args
+    def parse_relevant_args(self, args=None, namespace=None):
+        parsed = CommandParser.parse_args(self, args, namespace)
+        parsed.commands = []
+        return parsed, None
 
     def error(self, message):
         message = "{} {} is a strict parser that lacks rules for parsing this invocation, causing this error: {}".format(
@@ -4162,10 +4165,7 @@ class RecordCommandlike(object):
                     )
                     continue
                 else:
-                    try:
-                        parsed, _unparsed = parsed
-                    except TypeError:
-                        pass
+                    parsed, _unparsed = parsed
 
                     # see sudo parser for example
                     if "_skip" in parsed and parsed._skip:
