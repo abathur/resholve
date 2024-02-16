@@ -932,7 +932,6 @@ def punshow():
 
                 resolve_cmdlikes()
         else:
-
             with sourcePATH(script_map):
                 for script in checked_scripts:
                     resolve_script(
@@ -1360,9 +1359,10 @@ Some patterns coalescing:
 - init parser (by calling make_command_parser) with a command name
   (i.e., "sed") and variant (more on this below)
 
-  - This will use the ~normal LocatedExecCommandParser by default. You
-    can explicitly pass either the UnlocatedExecCommandParser or a
-    parser for a specific command (such as GnuSedParser)
+  - This will use the ~normal FullSurveyCommandParserForKnownExec
+    by default. You can explicitly pass some other parser class like:
+    - PartialSurveyCommandParserForPossibleExec
+    - one for a specific command (such as GnuSedParser)
 
   - The variant is a label to differentiate parsers if we need more
     than one. Why would we need more than one? There may be divergent
@@ -1460,13 +1460,15 @@ class CommandParser(theirparse.ArgumentParser):
         return ret
 
 
-class LocatedExecCommandParser(CommandParser):
+class FullSurveyCommandParserForKnownExec(CommandParser):
     """
     Parser focused on locating arguments that exhibit ~exec behavior.
 
     This parser is broadly intended to be permissive. It won't fail if
     an invocation contains an argument that we don't have declared. It
-    just needs to be able to reliably locate the exec.
+    just needs to be able to reliably locate the exec. This is mostly
+    safe _if we are confident that we've surveyed well enough to catch
+    whatever exec is in the command_.
 
     Changes:
     - don't raise errors; I don't *think* we want to halt here
@@ -1488,7 +1490,7 @@ class LocatedExecCommandParser(CommandParser):
         )
 
 
-class UnlocatedExecCommandParser(CommandParser):
+class PartialSurveyCommandParserForPossibleExec(CommandParser):
     """
     Parser focused on carving out CLI syntax that lacks ~exec behavior.
 
@@ -1511,7 +1513,6 @@ class UnlocatedExecCommandParser(CommandParser):
     of exec behavior. We can probably handle it here, but we need to
     identify one of these and get it under test to be confident.
 
-
     Changes:
     - since we're letting this raise errors, we'll shim in some extra
       error context to make it more obvious what the problem is
@@ -1523,14 +1524,16 @@ class UnlocatedExecCommandParser(CommandParser):
         message = "{} {} is a strict parser that lacks rules for parsing this invocation, causing this error: {}".format(
             self.__class__.__name__, repr(self), repr(message)
         )
-        return super(UnlocatedExecCommandParser, self).error(message)
+        return super(PartialSurveyCommandParserForPossibleExec, self).error(message)
 
 
-def make_command_parser(name, variant="generic", cls=LocatedExecCommandParser):
+def make_command_parser(
+    name, variant="generic", cls=FullSurveyCommandParserForKnownExec
+):
     return cls(prog="{:} ({:})".format(name, variant), add_help=False)
 
 
-class FindParser(LocatedExecCommandParser):
+class FindParser(FullSurveyCommandParserForKnownExec):
     """
     find's exec options (-exec -execdir -ok -okdir)
     are terminated in a way argparse can't really
@@ -1563,7 +1566,7 @@ class FindParser(LocatedExecCommandParser):
         return ns, rest
 
 
-class GnuSedParser(LocatedExecCommandParser):
+class GnuSedParser(FullSurveyCommandParserForKnownExec):
     """
     gnused's -i/--in-place options can be bare, or have the
     argument directly attached (it CANNOT be a separate
@@ -2502,7 +2505,9 @@ class ExternalCommandParsers(object):
         """
         Based on Flatpak v1.14.4.
         """
-        generic = make_command_parser("flatpak", cls=UnlocatedExecCommandParser)
+        generic = make_command_parser(
+            "flatpak", cls=PartialSurveyCommandParserForPossibleExec
+        )
 
         # flatpak --help
         generic.add_argument(
@@ -3600,7 +3605,6 @@ class RecordCommandlike(object):
             )
 
             for subcmd in parsed.commands:
-
                 if subcmd.firstword.ok:
                     if not self.handle_first_pass_essentials(subcmd):
                         recorder(subcmd)
@@ -3654,7 +3658,10 @@ class RecordCommandlike(object):
                 # user said keep this abspath
                 self.record_external_source(firstword)
                 target = False
-            elif ("source", firstword,) in self.directives.fix or (
+            elif (
+                "source",
+                firstword,
+            ) in self.directives.fix or (
                 ".",
                 firstword,
             ) in self.directives.fix:
