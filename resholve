@@ -3160,7 +3160,7 @@ class CommandLike(object):
                     if handler and builtins[name]:
                         for parser in builtins[name]:
                             parsed = _unparsed = None
-                            parsed = parser.parse_known_args(invocation.args)
+                            parsed = parser.parse_relevant_args(invocation.args)
                             if not parsed:
                                 logger.debug(
                                     "parse failed (parser=%r, args=%r)",
@@ -3745,7 +3745,7 @@ class RecordCommandlike(object):
         if builtins[name]:
             for parser in builtins[name]:
                 parsed = _unparsed = None
-                parsed = parser.parse_known_args(invocation.args)
+                parsed = parser.parse_relevant_args(invocation.args)
                 if not parsed:
                     logger.debug(
                         "parse failed (parser=%r, invocation=%r)", parser, invocation
@@ -4155,7 +4155,7 @@ class RecordCommandlike(object):
         if externals[subcmd]:
             for parser in externals[subcmd]:
                 parsed = _unparsed = None
-                parsed = parser.parse_known_args(invocation.args)
+                parsed = parser.parse_relevant_args(invocation.args)
                 if not parsed:
                     logger.debug(
                         "parse failed (parser=%r, args=%r)", parser, invocation
