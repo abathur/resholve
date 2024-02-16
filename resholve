@@ -2539,8 +2539,8 @@ class ExternalCommandParsers(object):
         update = subparsers.add_deadend_parser("update")
 
         return (
-            no_positionals,
             generic,
+            no_positionals,
         )
 
 
