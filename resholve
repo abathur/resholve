@@ -2509,26 +2509,36 @@ class ExternalCommandParsers(object):
             "flatpak", cls=PartialSurveyCommandParserForPossibleExec
         )
 
-        # flatpak --help
-        generic.add_argument(
-            "-h",
-            "--help",
-            "--version",
-            "--default-arch",
-            "--supported-arches",
-            "--gl-drivers",
-            "--installations",
-            "--print-updated-env",
-            "--print-system-only",
-            "-v",
-            "--verbose",
-            "--ostree-verbose",
-            action="store_true",
+        no_positionals = make_command_parser(
+            "flatpak",
+            variant="no positional args",
+            cls=PartialSurveyCommandParserForPossibleExec,
         )
+
+        for parser in (no_positionals, generic):
+            # flatpak --help
+            parser.add_argument(
+                "-h",
+                "--help",
+                "--version",
+                "--default-arch",
+                "--supported-arches",
+                "--gl-drivers",
+                "--installations",
+                "--print-updated-env",
+                "--print-system-only",
+                "-v",
+                "--verbose",
+                "--ostree-verbose",
+                action="store_true",
+            )
         subparsers = generic.add_subparsers()
         update = subparsers.add_deadend_parser("update")
 
-        return (generic,)
+        return (
+            no_positionals,
+            generic,
+        )
 
 
 def generate_builtin_command_parser(cmdname):
