@@ -4307,7 +4307,7 @@ class ResolvedScript(RecordCommandlike):
             arena=arena,
             parse_opts=optview.Parse(state.InitOpts(), NO_OPTIONS_OVERLAY),
             aliases={},  # dummy
-            oil_grammar=None,
+            ysh_grammar=None,
             one_pass_parse=True,
         )
 

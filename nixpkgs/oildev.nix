@@ -62,8 +62,8 @@ rec {
     src = fetchFromGitHub {
       owner = "oilshell";
       repo = "oil";
-      # rev == present HEAD of release/0.18.0
-      rev = "bd7ba38a2c04459cf21352b4ba60da3c334c40b1";
+      # rev == present HEAD of release/0.19.0
+      rev = "4d56470f97da2f55f33ad9e4d89d103c3b9436ee";
       hash = "sha256-TODO-via-fixup";
 
       /*
@@ -110,11 +110,11 @@ rec {
     doCheck = true;
 
     preBuild = ''
-      build/dev.sh all
+      build/py.sh all
     '';
 
     postPatch = ''
-      patchShebangs asdl build core doctools frontend pyext oil_lang
+      patchShebangs asdl build core doctools frontend pyext oil_lang ysh
       substituteInPlace pyext/fastlex.c --replace '_gen/frontend' '../_gen/frontend'
       substituteInPlace core/main_loop.py --replace 'import fanos' '# import fanos'
       rm cpp/stdlib.h # keep modules from finding the wrong stdlib?
