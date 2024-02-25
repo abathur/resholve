@@ -52,7 +52,7 @@ CASES
 
 @test "can't resolve a named braced coproc w/o upstream support :(" {
   require <({
-    status 1
+    status 2
     line 3 contains "error: Unexpected right brace" # full errors noted below
     # paren error: "Unexpected word while parsing command line"
     # brace error: "Unexpected right brace"
@@ -63,7 +63,7 @@ CASES
 
 @test "can't resolve a named paren coproc w/o upstream support :(" {
   require <({
-    status 1
+    status 2
     line 3 ends "error: Invalid word while parsing command line" # full errors noted below
     # paren error: "Unexpected word while parsing command line"
     # brace error: "Unexpected right brace"
@@ -113,7 +113,7 @@ CASES
 @test "objects to unexempted tilde executable paths" {
   require <({
     status 7
-    line -1 equals "[ stdinNone ]:2: Can't resolve dynamic command"
+    line -1 equals "[ stdin ]:2: Can't resolve dynamic command"
   })
 } <<CASES
 resholve --interpreter $INTERP < $PWD/tests/tilde_dynamic_pipeline.sh

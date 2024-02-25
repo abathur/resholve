@@ -67,9 +67,10 @@ from oil._devbuild.gen.id_kind_asdl import (
 from oil._devbuild.gen.syntax_asdl import (
     source,  # MainFile, Stdin
     command,  # ShFunction, Simple
-    simple_var_sub,
-    braced_var_sub,
-    compound_word,
+    SimpleVarSub,
+    BracedVarSub,
+    CompoundWord,
+    loc,
 )
 
 from oil.tools import osh2oil  # Cursor
@@ -86,7 +87,7 @@ def consume_members(cls):
     yield members
 
 
-PEEPS = (simple_var_sub, braced_var_sub, command.Simple, command.ShFunction)
+PEEPS = (SimpleVarSub, BracedVarSub, command.Simple, command.ShFunction)
 for peep in PEEPS:
     peep.members = list()
     peep._old_init = peep.__init__
@@ -932,7 +933,6 @@ def punshow():
 
                 resolve_cmdlikes()
         else:
-
             with sourcePATH(script_map):
                 for script in checked_scripts:
                     resolve_script(
@@ -994,6 +994,10 @@ def find_earliest_spid(node):
     least one case with command.AndOr nodes where the leftmost spid in
     this array is actually for the && or || token.
 
+    In addition to above, the update from oil 0.14 to 0.15 also requires
+    doing something with the "left" attr to avoid inserting inside braced
+    sections.
+
     We really do want the earliest spid, because we want to be able to
     inject a prologue at that point. So, we'll try to descend the ~edge
     of the AST, keeping the lowest spid we find.
@@ -1006,7 +1010,9 @@ def find_earliest_spid(node):
     elif hasattr(node, "token"):
         node_spid = node.token.span_id
 
-    if hasattr(node, "children"):
+    if hasattr(node, "left"):
+        sub_spid = find_earliest_spid(node.left)
+    elif hasattr(node, "children"):
         sub_spid = find_earliest_spid(node.children[0])
     elif hasattr(node, "words"):
         sub_spid = find_earliest_spid(node.words[0])
@@ -1020,8 +1026,8 @@ def find_earliest_spid(node):
 def get_original_text(arena, location, positions):
     text = list()
     for loc in range(location, location + positions):
-        span = arena.GetLineSpan(loc)
-        line = arena.GetLine(span.line_id)
+        span = arena.GetToken(loc)
+        line = span.line.content
         text.append(line[span.col : span.col + span.length])
         logger.debug(
             "identified span=%r, line=%r, text=%r",
@@ -1047,7 +1053,7 @@ class ExceptionWithContext(error._ErrorWithLocation):
 
 
 # label? code? issue? feedback? url?
-class ResolutionException(ExceptionWithContext):
+class ResolutionException(ExceptionWithContext, error.FatalRuntime):
     """
     mostly same code for all 3 resolution exceptions
     """
@@ -1107,9 +1113,14 @@ class ResolutionException(ExceptionWithContext):
     def __init__(self, *args, **kwargs):
         self.arena = kwargs.pop("arena", None)
         self.template = self.build_template()
-        ExceptionWithContext.__init__(
-            self, self.description, *args, status=self.status, **kwargs
-        )
+        if self.status:
+            error.FatalRuntime.__init__(
+                self, self.status, self.description % args, kwargs.get("location", None)
+            )
+        else:
+            ExceptionWithContext.__init__(
+                self, self.description % args, kwargs.get("location", None)
+            )
 
     def print_if_needed(self):
         if not self.printed:
@@ -1418,12 +1429,12 @@ class CommandParser(theirparse.ArgumentParser):
             action, option_string, explicit_arg = ret
             if option_string and not isinstance(option_string, Word):
                 for part in arg_string.ast.parts:
-                    if getattr(part, "val", None) == option_string:
-                        option_string = Word(compound_word([part]))
+                    if getattr(part, "tval", None) == option_string:
+                        option_string = Word(CompoundWord([part]))
             if explicit_arg and not isinstance(explicit_arg, Word):
                 for i, part in enumerate(arg_string.ast.parts):
-                    if getattr(part, "val", None) == explicit_arg:
-                        explicit_arg = Word(compound_word(arg_string.ast.parts[i:]))
+                    if getattr(part, "tval", None) == explicit_arg:
+                        explicit_arg = Word(CompoundWord(arg_string.ast.parts[i:]))
             return action, option_string, explicit_arg
         return ret
 
@@ -3159,6 +3170,14 @@ ALLOWABLE_DYNAMIC_TOKENS = {
 
 
 def flatten_node(ast, kwargs=None):
+    """
+    TODO: document the lower-level token/left/ast fiddling here. In
+    the process you should also validate the details. This needed a
+    meaningful addition to get the 0.14->0.15 update working, but it's
+    harder to know that the inverse isn't true, too (i.e., is this
+    now trying to match vestigial AST patterns that we'll no longer
+    encounter and don't need to maintain?)
+    """
     if kwargs is None:
         kwargs = dict(
             first_spid=float("inf"),
@@ -3173,9 +3192,6 @@ def flatten_node(ast, kwargs=None):
 
     if hasattr(ast, "token"):
         out.append(flatten_node(ast.token, kwargs)[0])
-        # TODO: this did directly append, but I'm
-        # trying out recursing on it... drop if here in 2022
-        # out.append(ast.token.val)
 
     """
     Caution / TODO:
@@ -3187,19 +3203,34 @@ def flatten_node(ast, kwargs=None):
     If a clear need for this doesn't crop up by 2022, cut comment
     # if hasattr(ast, "left"):
     #     # AFAIK this will be a quote, so we'll repeat it
-    #     out.append(ast.left.val)
+    #     out.append(ast.left.tval)
 
     # ... (before return)
 
     # if hasattr(ast, "left"):
     #     # close earlier quote
-    #     out.append(ast.left.val)
+    #     out.append(ast.left.tval)
 
     """
+    # Caution: a little unsure about this exact formulation. Got tests
+    # running on the 0.14->0.15 update but I didn't document concerns
+    # and pressures here, so I feel like I'm just cargo-culting.
+    if hasattr(ast, "left"):
+        if ast.left.id in ALLOWABLE_DYNAMIC_TOKENS:
+            val = ALLOWABLE_DYNAMIC_TOKENS[ast.left.id].format(ast.left.tval)
+            out.append(val)
+            kwargs["allow"] = val
+        elif ast.left.id in KEEPABLE_DYNAMIC_TOKENS:
+            val = KEEPABLE_DYNAMIC_TOKENS[ast.left.id].format(ast.left.tval.strip("$"))
+            out.append(val)
+            kwargs["keep"] = val
+
     if hasattr(ast, "left_token"):
         # I think this is just backtick and $(
         if ast.left_token.id in ALLOWABLE_DYNAMIC_TOKENS:
-            val = ALLOWABLE_DYNAMIC_TOKENS[ast.left_token.id].format(ast.left_token.val)
+            val = ALLOWABLE_DYNAMIC_TOKENS[ast.left_token.id].format(
+                ast.left_token.tval
+            )
             out.append(val)
             kwargs["allow"] = val
 
@@ -3210,19 +3241,19 @@ def flatten_node(ast, kwargs=None):
     if hasattr(ast, "id"):
         # should be all Token AFAIK
         if ast.id in ALLOWABLE_DYNAMIC_TOKENS:
-            val = ALLOWABLE_DYNAMIC_TOKENS[ast.id].format(ast.val.strip("$"))
+            val = ALLOWABLE_DYNAMIC_TOKENS[ast.id].format(ast.tval.strip("$"))
             out.append(val)
             kwargs["allow"] = val
         elif ast.id in KEEPABLE_DYNAMIC_TOKENS:
-            val = KEEPABLE_DYNAMIC_TOKENS[ast.id].format(ast.val.strip("$"))
+            val = KEEPABLE_DYNAMIC_TOKENS[ast.id].format(ast.tval.strip("$"))
             out.append(val)
             kwargs["keep"] = val
         elif ast.id == Id.Lit_VarLike:
-            kwargs["varlike"] = ast.val.strip("=")
-            out.append(ast.val)
+            kwargs["varlike"] = ast.tval.strip("=")
+            out.append(ast.tval)
         else:
-            out.append(ast.val)
-    elif hasattr(ast, "val"):
+            out.append(ast.tval)
+    elif hasattr(ast, "tval"):
         # TODO: can probably throw this out a window if it doesn't
         # squeak by 2022
         raise Exception(
@@ -3290,12 +3321,10 @@ class Word(PositionalObjectBase, str):
     def __new__(cls, ast, text=None):
         _text, kwargs = flatten_node(ast)
         self = str.__new__(cls, text or _text)
-        """
-        TODO: mostly put AST here for debug w/ intent to drop/disable
-        but now it's earning a living as the way I pass the word to Oil's
-        exception printer... Probably just give up if there's no clear
-        path to writing it back out by early 2022.
-        """
+        # would like to pull all reliance on the AST behind stronger
+        # abstraction boundaries, but it does currently leak out in a
+        # small number of places. The majority are to pass location to
+        # oil's exception classes
         self.ast = ast
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -3327,7 +3356,7 @@ class Invocation(PositionalObjectBase, tuple):
                         span_id:0
                         val:'<')
                       loc: (redir_loc.Fd fd:0)
-                      arg: (compound_word
+                      arg: (CompoundWord
                         parts:[(Token
                           id:Id.Lit_Chars
                           span_id:1
@@ -3473,7 +3502,6 @@ class RecordCommandlike(object):
             )
 
             for subcmd in parsed.commands:
-
                 if subcmd.firstword.ok:
                     if not self.handle_first_pass_essentials(subcmd):
                         recorder(subcmd)
@@ -3527,7 +3555,10 @@ class RecordCommandlike(object):
                 # user said keep this abspath
                 self.record_external_source(firstword)
                 target = False
-            elif ("source", firstword,) in self.directives.fix or (
+            elif (
+                "source",
+                firstword,
+            ) in self.directives.fix or (
                 ".",
                 firstword,
             ) in self.directives.fix:
@@ -3544,7 +3575,7 @@ class RecordCommandlike(object):
                 observe(
                     UnexpectedAbsolutePath,
                     "source",
-                    word=firstword.ast,
+                    location=loc.Word(firstword.ast),
                     arena=self.arena,
                 )
         else:
@@ -3562,7 +3593,7 @@ class RecordCommandlike(object):
             observe(
                 UnresolvedSource,
                 firstword,
-                word=firstword.ast,
+                location=loc.Word(firstword.ast),
                 arena=self.arena,
             )
 
@@ -3571,6 +3602,10 @@ class RecordCommandlike(object):
             "handle builtin eval %r",
             invocation,
         )
+        """
+        invocation.firstword == eval
+        firstword == the firstword of what we'll eval
+        """
         firstword = parsed.commands[0].firstword
         if not firstword.ok:
             try:
@@ -3582,7 +3617,7 @@ class RecordCommandlike(object):
             observe(
                 QuotedEval,
                 invocation.firstword,
-                word=firstword.ast,
+                location=loc.Word(firstword.ast),
                 arena=self.arena,
             )
             return
@@ -3705,8 +3740,7 @@ class RecordCommandlike(object):
                 if self._find_sed_e_cmd(expression):
                     observe(
                         SedECommand,
-                        word=expression.ast,
-                        span_id=expression.first_spid,
+                        location=expression.ast,
                         arena=self.arena,
                     )
             return True
@@ -3716,8 +3750,7 @@ class RecordCommandlike(object):
             if self._find_sed_e_cmd(first):
                 observe(
                     SedECommand,
-                    word=first.ast,
-                    span_id=first.first_spid,
+                    location=first.ast,
                     arena=self.arena,
                 )
             return True
@@ -3804,8 +3837,7 @@ class RecordCommandlike(object):
                 if self._find_awk_sub_cmd(expression):
                     observe(
                         AwkSubCommand,
-                        word=expression.ast,
-                        span_id=expression.first_spid,
+                        location=expression.ast,
                         arena=self.arena,
                     )
             return True
@@ -3814,8 +3846,7 @@ class RecordCommandlike(object):
             if self._find_awk_sub_cmd(parsed.script):
                 observe(
                     AwkSubCommand,
-                    word=parsed.script.ast,
-                    span_id=parsed.script.first_spid,
+                    location=parsed.script.ast,
                     arena=self.arena,
                 )
             return True
@@ -3835,8 +3866,7 @@ class RecordCommandlike(object):
                     if expression[bangpos + 1] not in ("<", "=", ">"):
                         observe(
                             DcBangCommand,
-                            word=expression.ast,
-                            span_id=expression.first_spid,
+                            location=expression.ast,
                             arena=self.arena,
                         )
             return True
@@ -3957,12 +3987,18 @@ class RecordCommandlike(object):
             # refactor (aug 24 2021)
             if assay["command"] == " ".join(invocation):
                 if wordnum >= len(invocation):
+                    # Caution: before oil 0.14 -> 0.15, location was
+                    # word=invocation[-1].ast; I'm unsure about the parts[0]
+                    # tests pass, but this interface isn't documented or used
+                    # extensively so it wouldn't shock me if there are edge
+                    # cases. Not going to spend energy reasoning through since
+                    # this is probably going to get rooted out at some point.
                     observe(
                         InvalidAssay,
                         "the wordnum index(%d) is too large to zero-index args(%d)"
                         % (wordnum, len(invocation)),
                         assay,
-                        word=invocation[-1].ast,
+                        location=invocation[-1].ast.parts[0],
                         arena=self.arena,
                     )
                 pos = invocation[wordnum].first_spid
@@ -4048,14 +4084,14 @@ class RecordCommandlike(object):
             observe(
                 NoParserSucceeded,
                 invocation.firstword,
-                word=invocation.firstword.ast,
+                location=loc.Word(invocation.firstword.ast),
                 arena=self.arena,
             )
 
         observe(
             PotentialExecer,
             invocation.firstword,
-            word=invocation.firstword.ast,
+            location=loc.Word(invocation.firstword.ast),
             arena=self.arena,
         )
 
@@ -4266,15 +4302,15 @@ class ResolvedScript(RecordCommandlike):
             parse_opts=optview.Parse(state.InitOpts(), NO_OPTIONS_OVERLAY),
             aliases={},  # dummy
             oil_grammar=None,
+            one_pass_parse=True,
         )
-        parse_ctx.Init_OnePassParse(True)
 
         if script_path:
             # TODO: is there a real difference between using mainfile and
             # sourcedfile? (this gets re-used for sourced scripts)
             arena.PushSource(source.MainFile(script_path))
         else:
-            arena.PushSource(source.Stdin())
+            arena.PushSource(source.Stdin(""))
 
         mem = state.Mem("", list(), arena, list())
         parse_opts, exec_opts, mutable_opts = state.MakeOpts(mem, None)
@@ -4298,7 +4334,7 @@ class ResolvedScript(RecordCommandlike):
             mem, exec_opts, mutable_opts, splitter, errfmt
         )
         evaluator.arith_ev = sh_expr_eval.ArithEvaluator(
-            mem, exec_opts, parse_ctx, errfmt
+            mem, exec_opts, mutable_opts, parse_ctx, errfmt
         )
         evaluator.arith_ev.word_ev = evaluator
 
@@ -4316,7 +4352,7 @@ class ResolvedScript(RecordCommandlike):
     def substitute_vars(self):
         """
         This ties together a few parts, so here's the big picture:
-        1. monkey-patch oil's simple_var_sub and braced_var_sub to
+        1. monkey-patch oil's SimpleVarSub and BracedVarSub to
            get oil to compile a set of these for us so we don't have
            to walk the node tree to find them.
         2. iterate over these and create custom Solution objects for
@@ -4353,11 +4389,12 @@ class ResolvedScript(RecordCommandlike):
         # just-in-case to make sure we don't
         with self.consume_solutions() as solutions:
             replace_varsubs = self.directives.varsubs
-            with braced_var_sub.consume_members() as brace_subs:
+            with BracedVarSub.consume_members() as brace_subs:
                 for sub in brace_subs:
-                    location = sub.spids[0]
-                    positions = 1 + sub.spids[-1] - sub.spids[0]
-                    token = sub.token.val
+                    location = sub.left.span_id
+                    positions = 1 + sub.right.span_id - sub.left.span_id
+                    # Caution: less confident about this one than the SimpleVarSub copies coming up
+                    token = sub.token.tval
 
                     # if there's an explicit replacement, we'll use it
                     if token in replace_varsubs:
@@ -4369,12 +4406,12 @@ class ResolvedScript(RecordCommandlike):
                         )
                         self.solutions[location].append((sol, Word(sub)))
 
-            with simple_var_sub.consume_members() as simple_subs:
+            with SimpleVarSub.consume_members() as simple_subs:
                 # just do simple/braced separate; their structures differ
                 for sub in simple_subs:
-                    location = sub.token.span_id
+                    location = sub.left.span_id
                     positions = 1
-                    token = sub.token.val.lstrip("$")  # normalize simple w/ braced
+                    token = sub.left.tval.lstrip("$")  # normalize simple w/ braced
 
                     # if there's an explicit replacement, we'll use it
                     if token in replace_varsubs:
@@ -4559,11 +4596,9 @@ class ResolvedScript(RecordCommandlike):
 
                 e = solution.exception
                 if e:
-                    # TODO: unsure about this; perhaps I *meant* to replace
-                    # these if they were already set... drop if no bites by
-                    # 2022
-                    e.word = e.word or word_object.ast
-                    e.span_id = e.span_id or location
+                    # In some cases we need to raise an error from somewhere
+                    # we lack access to location context
+                    e.location = e.word if hasattr(e, "word") else word_object.ast
                     e.arena = e.arena or self.arena
                     raise e
                 elif solution.replacement:
@@ -4659,7 +4694,7 @@ class ResolvedScript(RecordCommandlike):
                 observe(
                     DynamicArgument,
                     outer,
-                    word=word.ast,
+                    location=loc.Word(word.ast),
                     arena=self.arena,
                 )
             else:
@@ -4678,7 +4713,7 @@ class ResolvedScript(RecordCommandlike):
 
                 observe(
                     DynamicCommand,
-                    word=word.ast,
+                    location=loc.Word(word.ast),
                     arena=self.arena,
                 )
 
@@ -4725,7 +4760,7 @@ class ResolvedScript(RecordCommandlike):
                     OverriddenEssentialBuiltin,
                     "function" if cmdlike.function else "alias",
                     invocation.firstword,
-                    word=invocation.firstword.ast,
+                    location=loc.Word(invocation.firstword.ast),
                     arena=self.arena,
                 )
 

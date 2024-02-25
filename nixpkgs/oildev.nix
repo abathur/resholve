@@ -62,9 +62,9 @@ rec {
     src = fetchFromGitHub {
       owner = "oilshell";
       repo = "oil";
-      # rev == present HEAD of release/0.14.0
-      rev = "3d0427e222f7e42ae7be90c706d7fde555efca2e";
-      hash = "sha256-XMoNkBEEmD6AwNSu1uSh3OcWLfy4/ADtRckn/Pj2cP4=";
+      # rev == present HEAD of release/0.15.0
+      rev = "4cd5fd8fe5f4e00606557aea3a42988b9b6dff13";
+      hash = "sha256-EG+8yGN7MMqeterKI03k1UXm49kS2CDm+C8d1Dd0O80=";
 
       /*
         It's not critical to drop most of these; the primary target is
@@ -75,7 +75,7 @@ rec {
         hash on rev updates. Command will fail w/o and not print hash.
       */
       postFetch = ''
-        rm -rf $out/{Python-2.7.13,metrics,py-yajl,rfc,gold,web,testdata,services,demo,devtools}
+        rm -rf $out/{Python-2.7.13,metrics,py-yajl,rfc,gold,web,testdata,services,demo}
       '';
     };
 
