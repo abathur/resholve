@@ -62,9 +62,9 @@ rec {
     src = fetchFromGitHub {
       owner = "oilshell";
       repo = "oil";
-      # rev == present HEAD of release/0.15.0
-      rev = "4cd5fd8fe5f4e00606557aea3a42988b9b6dff13";
-      hash = "sha256-EG+8yGN7MMqeterKI03k1UXm49kS2CDm+C8d1Dd0O80=";
+      # rev == present HEAD of release/0.16.0
+      rev = "643a4be18ca145af18cc8eade2c1cca8019dc0fb";
+      hash = "sha256-TODO-via-fixup";
 
       /*
         It's not critical to drop most of these; the primary target is

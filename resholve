@@ -960,9 +960,11 @@ def punshow():
         if hasattr(e, "print_if_needed"):
             e.print_if_needed()
         elif hasattr(e, "arena"):
-            ui.ErrorFormatter(e.arena).PrettyPrintError(
-                e, getattr(e, "label", "error: ")
-            )
+            # TODO: w/ the 0.16 update I suspect we can stop attaching e.arena
+            # _but_ it's our only signpost for printing these oil errors atm
+            # so it's not something I can just yank out without refactoring.
+            # deferring since it isn't essential.
+            ui.ErrorFormatter().PrettyPrintError(e, getattr(e, "label", "error: "))
         else:
             print(
                 "This error has location context I couldn't "
@@ -994,9 +996,11 @@ def find_earliest_spid(node):
     least one case with command.AndOr nodes where the leftmost spid in
     this array is actually for the && or || token.
 
-    In addition to above, the update from oil 0.14 to 0.15 also requires
-    doing something with the "left" attr to avoid inserting inside braced
-    sections.
+    In addition to above:
+    - the update from oil 0.14 to 0.15 also requires doing something
+      with the "left" attr to avoid inserting inside braced sections.
+    - the update from oil 0.15 to 0.16 required doing something with
+      the "keyword" attr to avoid missing on, say, a for loop.
 
     We really do want the earliest spid, because we want to be able to
     inject a prologue at that point. So, we'll try to descend the ~edge
@@ -1009,6 +1013,8 @@ def find_earliest_spid(node):
         node_spid = node.span_id
     elif hasattr(node, "token"):
         node_spid = node.token.span_id
+    elif hasattr(node, "keyword"):
+        node_spid = node.keyword.span_id
 
     if hasattr(node, "left"):
         sub_spid = find_earliest_spid(node.left)
@@ -1124,7 +1130,7 @@ class ResolutionException(ExceptionWithContext, error.FatalRuntime):
 
     def print_if_needed(self):
         if not self.printed:
-            ui.ErrorFormatter(self.arena).PrettyPrintError(self)
+            ui.ErrorFormatter().PrettyPrintError(self)
             self.printed = True
 
 
@@ -4295,7 +4301,7 @@ class ResolvedScript(RecordCommandlike):
 
     def parse_script(self, script, script_path):
         global evaluator
-        self.arena = arena = alloc.Arena()
+        self.arena = arena = alloc.Arena(save_tokens=True)
 
         parse_ctx = parse_lib.ParseContext(
             arena=arena,
@@ -4328,10 +4334,11 @@ class ResolvedScript(RecordCommandlike):
         state._InitVarsFromEnv(mem, dict())
 
         splitter = split.SplitContext(mem)
-        errfmt = ui.ErrorFormatter(arena)
+        errfmt = ui.ErrorFormatter()
+        tilde_ev = word_eval.TildeEvaluator(mem, exec_opts)
         # TODO: ask andy about these as well
         evaluator = word_eval.CompletionWordEvaluator(
-            mem, exec_opts, mutable_opts, splitter, errfmt
+            mem, exec_opts, mutable_opts, tilde_ev, splitter, errfmt
         )
         evaluator.arith_ev = sh_expr_eval.ArithEvaluator(
             mem, exec_opts, mutable_opts, parse_ctx, errfmt
@@ -4562,11 +4569,11 @@ class ResolvedScript(RecordCommandlike):
         # actual code span, so that we can inject before it.
         if full and self.prologue:
             first_span = find_earliest_spid(self.root)
-            cursor.PrintUntil(first_span)
+            cursor.PrintUntilSpid(first_span)
             to.write("\n# begin prologue inserted by resholve\n")
             to.write(self.prologue.read())
             to.write("\n# end prologue inserted by resholve\n")
-            cursor.PrintUntil(first_span)
+            cursor.PrintUntilSpid(first_span)
             # rewind in case we need to use again
             self.prologue.seek(0)
 
@@ -4604,7 +4611,14 @@ class ResolvedScript(RecordCommandlike):
                 elif solution.replacement:
                     logger.debug("pre-replacement %r", location)
                     if not current:
-                        cursor.PrintUntil(location)
+                        """
+                        TODO: oil e2f1598c40d1755885f1aacbe808a00bab89884d
+                        refactors PrintUntil to use tokens and renamed the old
+                        behavior to PrintUntilSpid. I'll use that for expedience
+                        for now, but it's worth thinking through whether using
+                        tokens would simplify any here.
+                        """
+                        cursor.PrintUntilSpid(location)
                         logger.debug("printed up to %r", location)
                         positions = max(solution.positions, word_object.spid_len)
                         current = get_original_text(self.arena, location, positions)
@@ -4629,9 +4643,9 @@ class ResolvedScript(RecordCommandlike):
                 )
 
                 # we already wrote this one; leapfrog
-                cursor.SkipUntil(last)
+                cursor.SkipUntilSpid(last)
 
-        cursor.PrintUntil(self.arena.LastSpanId())
+        cursor.PrintUntilSpid(self.arena.LastSpanId())
 
         if full:
             if self.epilogue:
