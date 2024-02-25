@@ -73,7 +73,7 @@ from oil._devbuild.gen.syntax_asdl import (
     loc,
 )
 
-from oil.tools import osh2oil  # Cursor
+from oil.tools import ysh_ify  # Cursor
 
 
 def jeepers_peepers(self, *args, **kwargs):
@@ -4557,7 +4557,7 @@ class ResolvedScript(RecordCommandlike):
     # look for an excuse to refactor render/write responsibilities.
     # Probably a 2022 thing.
     def render(self, to=sys.stdout, full=True):
-        cursor = osh2oil.Cursor(self.arena, to)
+        cursor = ysh_ify.Cursor(self.arena, to)
 
         replacements = sorted(self.solutions.keys())
         if len(replacements):

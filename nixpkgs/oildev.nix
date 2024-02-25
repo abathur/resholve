@@ -62,8 +62,8 @@ rec {
     src = fetchFromGitHub {
       owner = "oilshell";
       repo = "oil";
-      # rev == present HEAD of release/0.17.0
-      rev = "df59768253d98bb8551e1a25caaa2c39326c0e31";
+      # rev == present HEAD of release/0.18.0
+      rev = "bd7ba38a2c04459cf21352b4ba60da3c334c40b1";
       hash = "sha256-TODO-via-fixup";
 
       /*
@@ -94,7 +94,8 @@ rec {
       "${patchSrc}/0009-avoid_nix_arch64_darwin_toolchain_bug.patch"
       "${patchSrc}/0010-disable-line-input.patch"
       "${patchSrc}/0011-disable-fanos.patch"
-      "${patchSrc}/0012-disable-doc-cmark.patch"
+      # "${patchSrc}/0012-disable-doc-cmark.patch"
+      # DOING: this patch needs to get fixed, but for now I'm just adding a sub
       "${patchSrc}/0013-fix-pyverify.patch"
     ];
 
@@ -120,7 +121,9 @@ rec {
       # work around hard parse failure documented in oilshell/oil#1468
       substituteInPlace osh/cmd_parse.py --replace 'elif self.c_id == Id.Op_LParen' 'elif False'
       # disable fragile libc tests
-      substituteInPlace build/py.sh --replace "py-ext-test pyext/libc_test.py" "#py-ext-test pyext/libc_test.py"
+      substituteInPlace build/py.sh \
+        --replace "py-ext-test pyext/libc_test.py" "#py-ext-test pyext/libc_test.py" \
+        --replace "build/doc.sh all-help" "#build/doc.sh all-help"
     '';
 
     # See earlier note on glibcLocales TODO: verify needed?
@@ -135,7 +138,7 @@ rec {
       "oil._devbuild"
       "oil._devbuild.gen.id_kind_asdl"
       "oil._devbuild.gen.syntax_asdl"
-      "oil.tools.osh2oil"
+      "oil.tools.ysh_ify"
     ];
 
     meta = {
