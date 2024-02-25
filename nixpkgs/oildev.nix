@@ -62,8 +62,8 @@ rec {
     src = fetchFromGitHub {
       owner = "oilshell";
       repo = "oil";
-      # rev == present HEAD of release/0.16.0
-      rev = "643a4be18ca145af18cc8eade2c1cca8019dc0fb";
+      # rev == present HEAD of release/0.17.0
+      rev = "df59768253d98bb8551e1a25caaa2c39326c0e31";
       hash = "sha256-TODO-via-fixup";
 
       /*
