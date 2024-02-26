@@ -21,7 +21,7 @@ result-ci: *.nix flake.lock nixpkgs/*.nix setup.cfg setup.py test.sh demo tests/
 ci: result-ci
 
 clean:
-	rm nix-result-ci result-ci/* nixpkgs/README.md
+	rm -rf nix-result-ci result-ci nixpkgs/README.md
 
 result-ci/test.txt result-ci/demo.txt result-ci/nix-demo.txt: result-ci
 

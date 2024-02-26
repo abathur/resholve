@@ -9,9 +9,9 @@ quoted_eval="FEEDBACK WANTED: Letting quoted 'eval' through"
 @test "verify warnings are thrown for quoted evals" {
   require <({
     status 0
-    line 3 contains "eval_quoted.sh':4: $quoted_eval"
-    line 7 contains "eval_quoted.sh':7: $quoted_eval"
-    line 11 contains "eval_quoted.sh':12: $quoted_eval"
+    line 3 contains "eval_quoted.sh:4: $quoted_eval"
+    line 7 contains "eval_quoted.sh:7: $quoted_eval"
+    line 11 contains "eval_quoted.sh:12: $quoted_eval"
   })
 } <<CASES
 resholve --interpreter $INTERP eval_quoted.sh
@@ -248,8 +248,8 @@ builtin_overridden="FEEDBACK WANTED: Essential builtin overridden by"
 @test "verify warnings are thrown for overridden builtins" {
   require <({
     status 0
-    line 3 contains "builtin_overridden.sh':6: $builtin_overridden alias"
-    line 7 contains "builtin_overridden.sh':7: $builtin_overridden function"
+    line 3 contains "builtin_overridden.sh:6: $builtin_overridden alias"
+    line 7 contains "builtin_overridden.sh:7: $builtin_overridden function"
   })
 } <<CASES
 resholve --interpreter $INTERP builtin_overridden.sh
