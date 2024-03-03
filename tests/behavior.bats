@@ -274,3 +274,12 @@ CASES
 } <<CASES
 resholve --interpreter $INTERP < redirects.sh
 CASES
+
+@test "loads grammar and emits rewrite suggestion" {
+  require <({
+    status 2
+    line 3 equals '[ stdin ]:12: error: In expressions, remove $ and use `D1`, or sometimes "$D1"'
+  })
+} <<CASES
+resholve --interpreter $INTERP < simplified_lbd_syntax_edgecase.sh
+CASES

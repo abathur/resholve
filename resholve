@@ -37,6 +37,8 @@ on what is used from each Oil module. Oil is still young.
 It's easier to track upstream reorg w/ succinct notes.
 """
 
+import oil  # oil.__path__[0] for grammar loading
+
 from oil.asdl import pybase  # CompoundObj
 
 from oil.core import (
@@ -44,6 +46,7 @@ from oil.core import (
     error,  # Parse, _ErrorWithLocation
     main_loop,  # ParseWholeFile
     optview,  # Parse
+    pyutil,  # LoadYshGrammar, _FileResourceLoader
     state,  # InitOpts
     ui,  # ErrorFormatter.PrettyPrintError
 )
@@ -4307,7 +4310,9 @@ class ResolvedScript(RecordCommandlike):
             arena=arena,
             parse_opts=optview.Parse(state.InitOpts(), NO_OPTIONS_OVERLAY),
             aliases={},  # dummy
-            ysh_grammar=None,
+            ysh_grammar=pyutil.LoadYshGrammar(
+                pyutil._FileResourceLoader(oil.__path__[0])
+            ),
             one_pass_parse=True,
         )
 
