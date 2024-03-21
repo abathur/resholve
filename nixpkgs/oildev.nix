@@ -4,8 +4,7 @@
 , callPackage
 , fetchFromGitHub
 , makeWrapper
-, # re2c deps
-  autoreconfHook
+, re2c
 , # oil deps
   file
 , pkgsBuildBuild
@@ -14,22 +13,6 @@
 }:
 
 rec {
-  re2c = stdenv.mkDerivation rec {
-    pname = "re2c";
-    version = "1.0.3";
-    sourceRoot = "${src.name}/re2c";
-    src = fetchFromGitHub {
-      owner = "skvadrik";
-      repo = "re2c";
-      rev = version;
-      sha256 = "0grx7nl9fwcn880v5ssjljhcb9c5p2a6xpwil7zxpmv0rwnr3yqi";
-    };
-    nativeBuildInputs = [ autoreconfHook ];
-    preCheck = ''
-      patchShebangs run_tests.sh
-    '';
-  };
-
   /*
     Upstream isn't interested in packaging this as a library
     (or accepting all of the patches we need to do so).
