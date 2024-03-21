@@ -25,6 +25,8 @@ import logging
 
 from collections import defaultdict, Iterable
 
+import sedparse
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", logging.WARNING))
@@ -3683,42 +3685,29 @@ class RecordCommandlike(object):
 
         -e 'e echo'
         'sed: -e expression #1, char 1: e/r/w commands disabled in sandbox mode\n'
+
+        {
+            "cmd": "e",
+            "line": 68,
+            "x": {
+                "cmd_txt": {
+                    "text": [
+                        "d",
+                        "a",
+                        "t",
+                        "e",
+                        "\n"
+                    ]
+                }
+            }
+        },
         """
-        sed = lookup("sed")
-        if not sed:
-            raise Exception(
-                "Somehow I ended up trying to look for a sed `e` command in %r when sed isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
-                expr,
-            )
-        p = Popen(
-            [sed, "--sandbox", expr],
-            shell=False,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-            close_fds=True,
-        )
-        stdout, stderr = p.communicate(input="something cute")
-        #
-        if p.returncode == 1 and "commands disabled in sandbox mode" in stderr:
-            # gnused e/r/w command present
-            # ['sed', '', '-e', 'expression', '#1,', 'char', '1', '', 'e/r/w', 'commands', 'disabled', 'in', 'sandbox', 'mode', '']
-            badchar = int(re.split(r"\s|:", stderr)[6])
-            badchar -= 1  # adjust 1 -> 0 index
-
-            # trying to work around an issue
-            # demo: https://gist.github.com/abathur/ca0c6ca342da292f4361acd826740691
-            # report: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=48725
-            # my best-guess is that the error, for s cmds, can't trigger until
-            # the s-cmd ends? And since s supports internal spaces,
-            # that isn't until a brace or a semicolon or the end of the arg?
-            # in any case; walk back
-            while expr[badchar] in (";", " "):
-                badchar -= 1
-
-            if expr[badchar] == "e":
+        parsed = []
+        sedparse.compile_string(parsed, expr)
+        # TODO: if we can figure out how (or contribute upstream to support) to print this back out losslessly, we might actually be able to use sedparse to just edit and re-print the AST. That said, when I naively try the bundled `print_program` function for 'sed -e "e echo"' I send up with something like 'e\\\necho', which probably can't just be yeeted in
+        for cmd in parsed:
+            if cmd.cmd == "e":
                 return True
-                # TODO: maybe later we can do something smarter
 
         return False
 

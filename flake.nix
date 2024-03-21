@@ -75,6 +75,10 @@
           checks = pkgs.callPackages nixpkgs/test.nix {
             inherit (pkgs) resholve;
             rSrc = pkgs.lib.cleanSource self;
+          } // {
+            aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
           };
           devShells = let
             resolveTimeDeps = [ pkgs.bash pkgs.coreutils pkgs.file pkgs.findutils pkgs.gettext ];
