@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.1 (Mar 20 2024)
+- Track fixes upstream in nixpkgs.
+- Disable oildev libc tests. (These already caused trouble on macOS, but they also cause trouble with musl.)
+- Update oil/OSH from v0.14 to v0.20 (a decent amount of refactoring to track, especially around exceptions).
+- Fix ~parse errors caused by skipping grammar setup (#114).
+- A number of cross oriented fixes exposed by xdg-utils getting resholved:
+    - Use nixpgks version of re2c with oil instead of oil's specific version.
+    - Swap out use of `sed` executable for `sedparse`.
+    - Use pkgsBuildBuild (not sure this is ideal, but it's okay to iterate and review should shake this loose).
+
 ## v0.9.1 (Nov 28 2023)
 - Fix problem with handling of abspaths that share a name with a builtin (#111)
 
