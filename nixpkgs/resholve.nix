@@ -8,7 +8,7 @@
 , version
 , oildev
 , configargparse
-, pkgsBuildBuild
+, gawk
 , binlore
 , resholve
 , resholve-utils
@@ -39,7 +39,7 @@ in python27.pkgs.buildPythonApplication {
     sedparse
   ];
 
-  makeWrapperArgs = with pkgsBuildBuild; [
+  makeWrapperArgs = [
     "--prefix PATH : ${lib.makeBinPath [ gawk ]}"
   ];
 

@@ -1,6 +1,9 @@
 # Changelog
 
-## v0.10.1 (Mar 20 2024)
+## v0.10.1 (Mar 22 2024)
+- Refactor to minimize cross changes. (Trying to land this in nixpkgs made me a little more confident about the best approach.)
+
+## v0.10.0 (Mar 20 2024)
 - Track fixes upstream in nixpkgs.
 - Disable oildev libc tests. (These already caused trouble on macOS, but they also cause trouble with musl.)
 - Update oil/OSH from v0.14 to v0.20 (a decent amount of refactoring to track, especially around exceptions).

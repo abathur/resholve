@@ -14,11 +14,11 @@
         "yallback": "yallback"
       },
       "locked": {
-        "lastModified": 1710996582,
-        "narHash": "sha256-4Fs6HThfDhKRskuDJx2+hucl8crMRm10K6949JdIwPY=",
+        "lastModified": 1711149136,
+        "narHash": "sha256-CQOGpmH8eG8GLxC8xfUcdYvVcAwmpIkxohw4dCWwTc4=",
         "owner": "abathur",
         "repo": "binlore",
-        "rev": "76a6aad38892f21649e7cd44c92ce1bac1149b99",
+        "rev": "a425d4a1d06ab8d952f49d61fea292ede53dd25c",
         "type": "github"
       },
       "original": {
