@@ -25,7 +25,6 @@
 , rlwrap
 , gnutar
 , bc
-, pkgsBuildBuild
 }:
 
 let
@@ -172,14 +171,14 @@ rec {
   # Caution: ci.nix asserts the equality of both of these w/ diff
   resholvedScript = resholve.writeScript "resholved-script" {
     inputs = [ file ];
-    interpreter = "${pkgsBuildBuild.bash}/bin/bash";
+    interpreter = "${bash}/bin/bash";
   } ''
     echo "Hello"
     file .
   '';
   resholvedScriptBin = resholve.writeScriptBin "resholved-script-bin" {
     inputs = [ file ];
-    interpreter = "${pkgsBuildBuild.bash}/bin/bash";
+    interpreter = "${bash}/bin/bash";
   } ''
     echo "Hello"
     file .

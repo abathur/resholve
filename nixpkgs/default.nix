@@ -29,7 +29,7 @@ let
     stripTests = true;
     enableOptimizations = false;
   };
-  callPackage = lib.callPackageWith (pkgs // { python27 = python27'; });
+  callPackage = lib.callPackageWith (pkgsBuildHost // { python27 = python27'; });
   deps = callPackage ./deps.nix { };
 in
 rec {
