@@ -34,4 +34,5 @@ jobs:
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
     # DOING: figure out how to run the equivalent of this with the development resholve we're using here
+    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix flake check --print-build-logs
