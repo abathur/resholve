@@ -1,6 +1,8 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/staging";
+    # nixpkgs.url = "github:nixos/nixpkgs/staging";
+    nixpkgs.url = "github:abathur/nixpkgs/e7891ac2106700c183659882c3f5799bd1aa1c91";
+
     flake-utils.url = "github:numtide/flake-utils";
     flake-compat = {
       url = "github:edolstra/flake-compat";
