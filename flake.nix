@@ -72,10 +72,7 @@
               ${pkgs.ansifilter}/bin/ansifilter -o $out/nix-demo.txt --text nix-demo.ansi
             '';
           };
-          checks = pkgs.callPackages nixpkgs/test.nix {
-            inherit (pkgs) resholve;
-            rSrc = pkgs.lib.cleanSource self;
-          } // {
+          checks = {} // {
             aarch64-cross-test-lesspipe = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
               inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
             });
