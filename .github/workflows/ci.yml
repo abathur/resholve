@@ -23,9 +23,6 @@ jobs:
     - name: validate new CLI demo
       run: nix develop --command ./demo
   cross-test:
-    env:
-      ACTIONS_STEP_DEBUG: true
-      RUST_LOG: debug
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -40,4 +37,4 @@ jobs:
     - uses: DeterminateSystems/magic-nix-cache-action@main
       with:
         source-revision: 1a898bd613535711756fc960e4dd1dfefd4e1636
-    - run: nix flake check --print-build-logs -vvv
+    - run: nix flake check --print-build-logs
