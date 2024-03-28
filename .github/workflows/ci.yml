@@ -25,6 +25,7 @@ jobs:
   cross-test:
     env:
       ACTIONS_STEP_DEBUG: true
+      RUST_LOG: debug
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
