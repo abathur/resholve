@@ -36,5 +36,5 @@ jobs:
     # DOING: figure out how to run the equivalent of this with the development resholve we're using here
     - uses: DeterminateSystems/magic-nix-cache-action@main
       with:
-        use-gha-cache: false
+        source-revision: 1a898bd613535711756fc960e4dd1dfefd4e1636
     - run: nix flake check --print-build-logs
