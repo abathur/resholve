@@ -1271,10 +1271,18 @@ class NixSetuidWrapper(Detain):
     issue = 29
 
 
-class AwkSubCommand(Detain):
-    problem = "I don't know how to handle awk sub commands yet--sorry :("
+class AwkSubCommand(Census):
+    """
+    Caution: note that this was formerly an error, but I'm backing it off
+    to a simple warning for now since I'm having to convert to a method
+    that we can't trust to accurately identify the problem cases.
+    """
+
+    problem = (
+        "I don't know how to find and replace sub commands in awk scripts yet--sorry :("
+    )
     ideas = ("- See the feedback issue for a workaround",)
-    status = 13
+    # status = 13
     issue = 31
 
 
@@ -3764,6 +3772,11 @@ class RecordCommandlike(object):
 
     def _find_awk_sub_cmd(self, expr):
         """
+        Note: the first draft of this behavior leveraged awk's --sandbox flag
+        to figure out when this behavior was present. This is good, but for
+        reasons I haven't yet understood the calls out were hanging during
+        cross builds (instead of producing binary format errors...):
+
         $ awk --sandbox 'BEGIN { system("date"); close("date")}'
         awk: cmd. line:1: fatal: 'system' function not allowed in sandbox mode
 
@@ -3775,50 +3788,25 @@ class RecordCommandlike(object):
             close(cmd);
         }'
         awk: cmd. line:3: fatal: redirection not allowed in sandbox mode
+
+        Since we're having cross trouble and I haven't had much luck finding
+        a Python parser for the Awk language, we'll do the dumbest-plausible
+        thing here but then just warn about this for now.
         """
-        awk = lookup("awk")
 
-        if not awk:
-            raise Exception(
-                "Somehow I ended up trying to look for an awk sub command in %r when awk isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
-                expr,
+        if "system(" in expr:
+            logger.warning(
+                "awk expression may contain system command (exec): '%s'", expr
             )
+            return True
 
-        # TODO: abstract this pattern
-        # close dupe in sed
-        p = Popen(
-            [awk, "--sandbox", expr],
-            shell=False,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-            close_fds=True,
-        )
+        if " | " in expr:
+            logger.warning("awk expression may contain pipe (exec): '%s'", expr)
+            return True
 
-        try:
-            timer = Timer(2, p.kill)
-            timer.start()
-            stdout, stderr = p.communicate(input="something cute")
-        finally:
-            if timer.is_alive():
-                timer.cancel()
-            else:
-                logger.warning(
-                    "timeout after 1s waiting for awk expression test: \n%s\ncontinuing but I'm not certain it doesn't contain external commands.",
-                    expr,
-                )
-
-        if p.returncode == 2:
-            if "fatal: 'system' function not allowed in sandbox mode" in stderr:
-                return True
-            # test for | since normal > redirects also trigger
-            elif (
-                "fatal: redirection not allowed in sandbox mode" in stderr
-                and "|" in expr
-            ):
-                return True
-            logger.debug("unhandled awk error: %r", stderr)
-            # TODO: maybe later we can do something smarter
+        if " |& " in expr:
+            logger.warning("awk expression may contain pipe (exec): '%s'", expr)
+            return True
 
         return False
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.10.2 (Mar 22 2024)
+- Fix some cases where resholve could fail to find a node's first span_id.
+- Ongoing cross oriented fixes exposed by xdg-utils getting resholved:
+    - Swap out use of `awk` executable for dumb string searches and convert from an error to a warning.
+
 ## v0.10.1 (Mar 22 2024)
 - Refactor to minimize cross changes. (Trying to land this in nixpkgs made me a little more confident about the best approach.)
 
