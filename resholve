@@ -1271,10 +1271,10 @@ class NixSetuidWrapper(Detain):
     issue = 29
 
 
-class AwkSubCommand(Detain):
+class AwkSubCommand(Census):
     problem = "I don't know how to handle awk sub commands yet--sorry :("
     ideas = ("- See the feedback issue for a workaround",)
-    status = 13
+    # status = 13
     issue = 31
 
 
@@ -3776,49 +3776,18 @@ class RecordCommandlike(object):
         }'
         awk: cmd. line:3: fatal: redirection not allowed in sandbox mode
         """
-        awk = lookup("awk")
 
-        if not awk:
-            raise Exception(
-                "Somehow I ended up trying to look for an awk sub command in %r when awk isn't even present. Oops! Please report this @ https://github.com/abathur/resholve",
-                expr,
-            )
+        if "system(" in expr:
+            logger.warning("awk expression may contain system command (exec)", expr)
+            return True
 
-        # TODO: abstract this pattern
-        # close dupe in sed
-        p = Popen(
-            [awk, "--sandbox", expr],
-            shell=False,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-            close_fds=True,
-        )
+        if " | " in expr:
+            logger.warning("awk expression may contain pipe (exec)", expr)
+            return True
 
-        try:
-            timer = Timer(2, p.kill)
-            timer.start()
-            stdout, stderr = p.communicate(input="something cute")
-        finally:
-            if timer.is_alive():
-                timer.cancel()
-            else:
-                logger.warning(
-                    "timeout after 1s waiting for awk expression test: \n%s\ncontinuing but I'm not certain it doesn't contain external commands.",
-                    expr,
-                )
-
-        if p.returncode == 2:
-            if "fatal: 'system' function not allowed in sandbox mode" in stderr:
-                return True
-            # test for | since normal > redirects also trigger
-            elif (
-                "fatal: redirection not allowed in sandbox mode" in stderr
-                and "|" in expr
-            ):
-                return True
-            logger.debug("unhandled awk error: %r", stderr)
-            # TODO: maybe later we can do something smarter
+        if " |& " in expr:
+            logger.warning("awk expression may contain pipe (exec)", expr)
+            return True
 
         return False
 
