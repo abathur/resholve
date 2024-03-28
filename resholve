@@ -1014,12 +1014,14 @@ def find_earliest_spid(node):
     node_spid = sub_spid = None
     if hasattr(node, "spids") and node.spids and len(node.spids):
         node_spid = node.spids[0]
-    elif hasattr(node, "span_id"):
+    elif hasattr(node, "span_id") and node.span_id:
         node_spid = node.span_id
-    elif hasattr(node, "token"):
+    elif hasattr(node, "token") and node.token:
         node_spid = node.token.span_id
-    elif hasattr(node, "keyword"):
+    elif hasattr(node, "keyword") and node.keyword:
         node_spid = node.keyword.span_id
+    elif hasattr(node, "name_tok") and node.name_tok:
+        node_spid = node.name_tok.span_id
 
     if hasattr(node, "left"):
         sub_spid = find_earliest_spid(node.left)
@@ -1030,8 +1032,17 @@ def find_earliest_spid(node):
     elif hasattr(node, "parts"):
         sub_spid = find_earliest_spid(node.parts[0])
 
-    # min will return a None, so fail down the list just in case
-    return min(node_spid, sub_spid) or node_spid or sub_spid
+    # min() will return a None, so I'll be really explicit
+    if node_spid is None and sub_spid is None:
+        raise Exception(
+            "No approach found an integer span id; please report this", node
+        )
+    elif node_spid is None:
+        return sub_spid
+    elif sub_spid is None:
+        return node_spid
+    else:
+        return min(node_spid, sub_spid)
 
 
 def get_original_text(arena, location, positions):
