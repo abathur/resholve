@@ -81,14 +81,16 @@ CASES
 resholve --interpreter $INTERP < absolute_source.sh
 CASES
 
-echo "source $PWD/tests/source_present_target.sh" > $PWD/tests/temp_source_test.sh
+# TODO: TEST_TMP and BATS_TEST_TMPDIR can all be PWD later;
+# for now it's prudent to support bats 1.10 and 1.11
 @test "allows exempted absolute source paths" {
+  echo "source $TEST_TMP/source_present_target.sh" > "$TEST_TMP/temp_source_test.sh"
   require <({
     status 0
-    line -1 ends "/tests/source_present_target.sh"
+    line -1 ends "/source_present_target.sh"
   })
 } <<CASES
-resholve --interpreter $INTERP --keep source:$PWD/tests/source_present_target.sh < $PWD/tests/temp_source_test.sh && rm $PWD/tests/temp_source_test.sh
+resholve --interpreter $INTERP --keep source:$BATS_TEST_TMPDIR/source_present_target.sh < temp_source_test.sh
 CASES
 
 @test "allow (but do not parse) --fake 'source:path'" {
