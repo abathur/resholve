@@ -116,7 +116,7 @@ CASES
     line -1 equals "[ stdin ]:2: Can't resolve dynamic command"
   })
 } <<CASES
-resholve --interpreter $INTERP < $PWD/tests/tilde_dynamic_pipeline.sh
+resholve --interpreter $INTERP < tilde_dynamic_pipeline.sh
 CASES
 
 @test "allows exempted tilde executable paths" {
@@ -125,7 +125,7 @@ CASES
     line -1 equals "# resholve: keep ~/.bashrc"
   })
 } <<CASES
-resholve --interpreter $INTERP --keep '~/.bashrc' < $PWD/tests/tilde_dynamic_pipeline.sh
+resholve --interpreter $INTERP --keep '~/.bashrc' < tilde_dynamic_pipeline.sh
 CASES
 
 @test "allows --fake executable" {
