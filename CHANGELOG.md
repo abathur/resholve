@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.10.3 (Apr 13 2024)
+Work around some test breaks coming in bats 1.11 while remaining compatible with 1.10. (No behavior changes in resholve itself.)
+
 ## v0.10.2 (Mar 22 2024)
 - Fix some cases where resholve could fail to find a node's first span_id.
 - Ongoing cross oriented fixes exposed by xdg-utils getting resholved:

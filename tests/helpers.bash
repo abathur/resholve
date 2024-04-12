@@ -1,6 +1,8 @@
 setup() {
     {
-        TEST_TMP="$(mktemp -d)"
+        # TODO: exporting this for now to cut a release supporting
+        # bats 1.10 and 1.11; test references can change to PWD later
+        export TEST_TMP="$BATS_TEST_TMPDIR"
         cp tests/*.{bats,bash,sh} "$TEST_TMP"/ > /dev/null
         pushd "$TEST_TMP"
     } > /dev/null
