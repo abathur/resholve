@@ -75,7 +75,7 @@
           checks = pkgs.callPackages nixpkgs/test.nix {
             inherit (pkgs) resholve;
             rSrc = pkgs.lib.cleanSource self;
-          } // {
+          } // pkgs.lib.optionalAttrs (!(builtins.elem system [ "aarch64-darwin" "x86_64-darwin" ])) {
             aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
               inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
             });
