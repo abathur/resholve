@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.10.5 (Apr 21 2024)
+- Warn instead of block on parse errors from sedparse.
+- Track nix README changes made in nixpkgs.
+- Expand passthru tests (all resholve-using packages in nixpkgs)
+
 ## v0.10.4 (Apr 13 2024)
 Work around some test breaks coming in bats 1.11 while remaining compatible with 1.10. (No behavior changes in resholve itself.)
 
