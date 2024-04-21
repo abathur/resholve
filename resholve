@@ -1166,6 +1166,10 @@ class Census(ResolutionException):
         self.print_if_needed()
 
 
+class Caution(Census):
+    label = "CAUTION: "
+
+
 """
 TODO: I'm waffling a bit on messaging.
 
@@ -1258,6 +1262,15 @@ class SedECommand(Detain):
     problem = "I don't know how to handle sed `e` commands yet--sorry :("
     ideas = ("- See the feedback issue for a workaround",)
     status = 11
+    issue = 28
+
+
+class SedECommandParseError(Caution):
+    problem = "My sed parser couldn't handle this expression. "
+    ideas = (
+        "- Manually check it for exec (e commands) and patch any you find.",
+        "- Report your case in the issue to help us understand these cases",
+    )
     issue = 28
 
 
@@ -3721,12 +3734,20 @@ class RecordCommandlike(object):
             }
         },
         """
+
         parsed = []
-        sedparse.compile_string(parsed, expr)
-        # TODO: if we can figure out how (or contribute upstream to support) to print this back out losslessly, we might actually be able to use sedparse to just edit and re-print the AST. That said, when I naively try the bundled `print_program` function for 'sed -e "e echo"' I send up with something like 'e\\\necho', which probably can't just be yeeted in
-        for cmd in parsed:
-            if cmd.cmd == "e":
-                return True
+        try:
+            sedparse.compile_string(parsed, expr)
+            # TODO: if we can figure out how (or contribute upstream to support) to print this back out losslessly, we might actually be able to use sedparse to just edit and re-print the AST. That said, when I naively try the bundled `print_program` function for 'sed -e "e echo"' I send up with something like 'e\\\necho', which probably can't just be yeeted in
+            for cmd in parsed:
+                if cmd.cmd == "e":
+                    return True
+        except sedparse.ParseError as e:
+            observe(
+                SedECommandParseError,
+                location=expr.ast,
+                arena=self.arena,
+            )
 
         return False
 
