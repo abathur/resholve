@@ -2446,6 +2446,68 @@ class ExternalCommandParsers(object):
 
         return (generic,)
 
+    @staticmethod
+    def _flatpak():
+        """
+        Based on Flatpak v1.14.4.
+        """
+        generic = CommandParser("flatpak")
+
+        # flatpak --help
+        generic.add_argument(
+            "-h", "--help",
+            "--version",
+            "--default-arch",
+            "--supported-arches",
+            "--gl-drivers",
+            "--installations",
+            "--print-updated-env",
+            "--print-system-only",
+            "-v", "--verbose",
+            "--ostree-verbose",
+            action="store_true"
+        )
+        subparsers = generic.add_subparsers()
+        # flatpak update --help
+        update = subparsers.add_parser("update")
+        update.add_argument(
+            "-h", "--help",
+            "-u", "--user",
+            "--system",
+            action="store_true"
+        )
+        update.add_argument(
+            "--installation",
+            "--arch",
+            "--commit",
+            nargs=1
+        )
+        update.add_argument(
+            "--force-remove",
+            "--no-pull",
+            "--no-deploy",
+            "--no-related",
+            "--no-deps",
+            "--no-static-deltas",
+            "--runtime",
+            "--app",
+            "--appstream",
+            action="store_true"
+        )
+        update.add_argument("--subpath", nargs=1)
+        update.add_argument(
+            "-y", "--assumeyes",
+            "--noninteractive",
+        )
+        update.add_argument("--sideload-repo", nargs=1)
+        update.add_argument(
+            "-v", "--verbose",
+            "--ostree-verbose",
+            action="store_true"
+        )
+
+        return (generic,)
+
 
 def generate_builtin_command_parser(cmdname):
     cmdname = "_" + cmdname
@@ -3888,6 +3950,9 @@ class RecordCommandlike(object):
         return True
 
     def handle_external_generic(self, parsed, invocation):
+        if not hasattr(parsed, "commands"):
+            return True
+
         # TODO: shimming shells in here may be a bigger crime than
         #       duplicating the logic in two functions would be?
         shell = invocation.firstword in INVOKABLE_SHELLS
