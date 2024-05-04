@@ -50,7 +50,6 @@
 , nix-direnv
 , pdf2odt
 , pdfmm
-, rancid
 , s0ix-selftest-tool
 , unix-privesc-check
 , wgnord
@@ -283,7 +282,6 @@ rec {
 } // lib.optionalAttrs stdenv.isLinux {
   inherit arch-install-scripts;
   inherit dgoss;
-  inherit rancid;
   inherit unix-privesc-check;
   inherit wgnord;
   inherit wsl-vpnkit;

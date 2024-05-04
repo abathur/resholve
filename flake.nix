@@ -55,9 +55,41 @@
         };
       in
         {
+          # only ~exporting these for resholve-with-packages shenanigans
+          _pkgs = pkgs;
           packages = {
             inherit (pkgs) resholve;
             default = pkgs.resholve;
+            # support quick DIY resholving of a script from a set of nixpkgs
+            # nix run .#resholve-with-packages -- <script-file> [<package>...]
+            resholve-with-packages = (pkgs.writeScriptBin "resholve-with-packages" ''
+              #!${pkgs.bash}/bin/bash
+
+              if [ "$#" -lt 2 ]; then
+                echo "usage: resholve-with-packages <script-file> [package…]" 1>&2
+                exit 64
+              fi
+
+              readonly script="$1"
+              shift
+
+              dep_lore(){
+                ${pkgs.nix}/bin/nix build --impure --print-out-paths -f -
+              } <<EOF
+              with (builtins.getFlake "${self}")._pkgs."${system}"; (binlore.collect { drvs = [ $@ ]; })
+              EOF
+
+              dep_path(){
+                ${pkgs.nix}/bin/nix eval --impure --raw -f -
+              } <<EOF
+              with (builtins.getFlake "${self}")._pkgs."${system}"; (lib.makeBinPath [ $@ ])
+              EOF
+
+              export RESHOLVE_LORE="$(dep_lore "$@")"
+              export RESHOLVE_PATH="$(dep_path "$@")"
+
+              ${pkgs.resholve}/bin/resholve --interpreter ${pkgs.bash}/bin/bash < "$script"
+            '');
             ci = let
               inherit (pkgs.resholve.tests.override(prev: { runDemo = true; })) module1 module2 module3 cli resholvedScript resholvedScriptBin resholvedScriptBinNone;
             in pkgs.runCommand "resholve-ci" { } ''
@@ -79,6 +111,33 @@
             aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
               inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
             });
+            aarch64-cross-test_arch-install-scripts = pkgs.pkgsCross.aarch64-multiplatform.arch-install-scripts.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
+            aarch64-cross-test_dgoss = pkgs.pkgsCross.aarch64-multiplatform.dgoss.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
+            aarch64-cross-test_unix-privesc-check = pkgs.pkgsCross.aarch64-multiplatform.unix-privesc-check.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
+            aarch64-cross-test_wgnord = pkgs.pkgsCross.aarch64-multiplatform.wgnord.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
+            aarch64-cross-test_wsl-vpnkit = pkgs.pkgsCross.aarch64-multiplatform.wsl-vpnkit.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
+            aarch64-cross-test_zxfer = pkgs.pkgsCross.aarch64-multiplatform.zxfer.override (old: {
+              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+            });
+            aarch64-cross-test_writeScriptBin =
+              pkgs.pkgsCross.aarch64-multiplatform.resholve.writeScriptBin "resholved-script-bin"
+                {
+                  inputs = [ ];
+                  interpreter = "${pkgs.pkgsCross.aarch64-multiplatform.bash}/bin/bash";
+                }
+                ''
+                  echo "Hello"
+                '';
           };
           devShells = let
             resolveTimeDeps = [ pkgs.bash pkgs.coreutils pkgs.file pkgs.findutils pkgs.gettext ];

@@ -129,8 +129,6 @@ rec {
              )
            )
          )}
-      '' + lib.optionalString (partialSolution.interpreter != "none") ''
-        ${partialSolution.interpreter} -n $out
       '';
     };
   writeScriptBin = name: partialSolution: text:
@@ -147,8 +145,6 @@ rec {
             )
           )
         }
-      '' + lib.optionalString (partialSolution.interpreter != "none") ''
-        ${partialSolution.interpreter} -n $out/bin/${name}
       '';
     };
   mkDerivation = { pname
