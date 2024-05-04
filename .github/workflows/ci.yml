@@ -22,6 +22,8 @@ jobs:
       run: nix-shell --run ./demo
     - name: validate new CLI demo
       run: nix develop --command ./demo
+    - name: validate quick-and-dirty flake CLI
+      run: nix run .#resholve-with-packages -- tests/parse_sed.sh gnused
   cross-test:
     runs-on: ${{ matrix.os }}
     strategy:

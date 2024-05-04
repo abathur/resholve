@@ -55,9 +55,41 @@
         };
       in
         {
+          # only ~exporting these for resholve-with-packages shenanigans
+          _pkgs = pkgs;
           packages = {
             inherit (pkgs) resholve;
             default = pkgs.resholve;
+            # support quick DIY resholving of a script from a set of nixpkgs
+            # nix run .#resholve-with-packages -- <script-file> [<package>...]
+            resholve-with-packages = (pkgs.writeScriptBin "resholve-with-packages" ''
+              #!${pkgs.bash}/bin/bash
+
+              if [ "$#" -lt 2 ]; then
+                echo "usage: resholve-with-packages <script-file> [package…]" 1>&2
+                exit 64
+              fi
+
+              readonly script="$1"
+              shift
+
+              dep_lore(){
+                ${pkgs.nix}/bin/nix build --impure --print-out-paths -f -
+              } <<EOF
+              with (builtins.getFlake "${self}")._pkgs."${system}"; (binlore.collect { drvs = [ $@ ]; })
+              EOF
+
+              dep_path(){
+                ${pkgs.nix}/bin/nix eval --impure --raw -f -
+              } <<EOF
+              with (builtins.getFlake "${self}")._pkgs."${system}"; (lib.makeBinPath [ $@ ])
+              EOF
+
+              export RESHOLVE_LORE="$(dep_lore "$@")"
+              export RESHOLVE_PATH="$(dep_path "$@")"
+
+              ${pkgs.resholve}/bin/resholve --interpreter ${pkgs.bash}/bin/bash < "$script"
+            '');
             ci = let
               inherit (pkgs.resholve.tests.override(prev: { runDemo = true; })) module1 module2 module3 cli resholvedScript resholvedScriptBin resholvedScriptBinNone;
             in pkgs.runCommand "resholve-ci" { } ''
