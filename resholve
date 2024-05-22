@@ -2446,6 +2446,139 @@ class ExternalCommandParsers(object):
 
         return (generic,)
 
+    @staticmethod
+    def _msmtp():
+        """
+        This was based on running "msmtp --help" with msmtp v1.8.24.
+        """
+        generic = CommandParser("msmtp")
+
+        # General options
+        generic.add_argument(
+            "--version",
+            "--help",
+            "-P", "--pretend",
+            "-v", "-d", "--debug",
+            action="store_true"
+        )
+
+        # Changing the mode of operation
+        generic.add_argument("--configure", nargs=1)
+        generic.add_argument("-S", "--serverinfo", action="store_true")
+        generic.add_argument("--rmqs", nargs=1)
+
+        # Configuration options
+        generic.add_argument("-C", "--file", nargs=1)
+        # For msmtp, "-a" is nargs=1.
+        # For msmtpq, "--q-mgmt -a" is nargs=0.
+        generic.add_argument("-a", nargs="?")
+        generic.add_argument(
+            "--account",
+            "--host",
+            "--port",
+            nargs=1
+        )
+        generic.add_argument(
+            "--source-ip",
+            "--proxy-host",
+            "--proxy-port",
+            "--socket",
+            "--timeout",
+            "--protocol",
+            "--domain",
+            "--auth",
+            "--user",
+            nargs="?"
+        )
+        generic.add_argument(
+            "--passwordeval",
+            dest="commands",
+            action="invocations",
+            nargs=1
+        )
+        generic.add_argument(
+            "--tls",
+            "--tls-starttls",
+            "--tls-trust-file",
+            "--tls-crl-file",
+            "--tls-fingerprint",
+            "--tls-certcheck",
+            "--tls-key-file",
+            "--tls-cert-file",
+            "--tls-priorities",
+            "--tls-host-override",
+            "--tls-min-dh-prime-bits",
+            nargs="?"
+        )
+
+        # Options specific to sendmail mode
+        generic.add_argument(
+            "--auto-from",
+            "-f", "--from=address",
+            "--maildomain",
+            "-N", "--dsn-notify",
+            "-R", "--dsn-return",
+            "-X", "--logfile",
+            "--logfile-time-format",
+            "--syslog",
+            nargs="?"
+        )
+        generic.add_argument(
+            "-t", "--read-recipients",
+            "--read-envelope-from",
+            action="store_true"
+        )
+        generic.add_argument(
+            "--aliases",
+            "--set-from-header",
+            "--set-date-header",
+            "--set-msgid-header",
+            "--remove-bcc-headers",
+            "--undisclosed-recipients",
+            nargs="?"
+        )
+        # Accepted but ignored:
+        generic.add_argument("-A", action="store_true")
+        generic.add_argument("-B", nargs=1)
+        generic.add_argument("-bm", action="store_true")
+        generic.add_argument("-F", nargs=1)
+        generic.add_argument("-G", action="store_true")
+        # For msmtp, "-h" is nargs=1.
+        # For msmtpq "--q-mgmt -h" is nargs=0.
+        generic.add_argument("-h", nargs="?")
+        generic.add_argument("-i", action="store_true")
+        generic.add_argument("-L", nargs=1)
+        generic.add_argument(
+            "-m",
+            "-n",
+            action="store_true"
+        )
+        generic.add_argument(
+            "-O",
+            # See <https://github.com/abathur/resholve/pull/103#issuecomment-1710979420>
+            action="count"
+        )
+        generic.add_argument("-o", nargs=1)
+
+        return (generic,)
+
+    @classmethod
+    def _msmtpq(cls):
+        """
+        This was based on running "msmtpq --q-mgmt -h" with msmtp v1.8.24.
+        """
+        generic = cls._msmtp()[0]
+
+        # -R, -d, -a and -h are already handled by the msmtp parser.
+        generic.add_argument(
+            "--q-mgmt",
+            "-r",
+            "-p",
+            action="store_true"
+        )
+
+        return (generic,)
+
 
 def generate_builtin_command_parser(cmdname):
     cmdname = "_" + cmdname
