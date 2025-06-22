@@ -37,7 +37,7 @@
 
   <!-- TODO: figure out how to pull this externally? -->
 
-  #insert[language=nix] ../nixpkgs_source/pkgs/tools/misc/dgoss/default.nix
+  #insert[language=nix] ../nixpkgs_source/pkgs/by-name/dg/dgoss/package.nix
 
   ## Basic `resholve.writeScript` and `resholve.writeScriptBin` examples
 

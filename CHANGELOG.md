@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.10.6 (Jun 21 2025)
+- nix: update flake
+- nix: remove test for obsolete nixpkgs consumer
+- nix: configure formatting (and apply formatting to non-nixpkgs nix source)
+- Track several no-op upstream changes in nixpkgs (treewide cleanup, reformat, etc.)
+- Add msmtp and msmtpq parsers (#103)
+- Add flake output to support quick resolution testing, like: `nix run .#resholve-with-packages -- tests/parse_sed.sh gnused`
+
 ## v0.10.5 (Apr 21 2024)
 - Warn instead of block on parse errors from sedparse.
 - Track nix README changes made in nixpkgs.
