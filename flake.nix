@@ -26,23 +26,44 @@
       inputs.flake-utils.follows = "flake-utils";
       inputs.flake-compat.follows = "flake-compat";
     };
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   description = "Resolve external shell-script dependencies";
 
-  outputs = { self, nixpkgs, flake-utils, flake-compat, /*bats-require,*/ wwurst, binlore }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      flake-compat,
+      # bats-require,
+      wwurst,
+      binlore,
+      treefmt-nix,
+    }:
     {
       # TODO:
       # - document if I need nixpkgs.lib.composeExtensions wwurst.overlays.default or not. TL;DR: make sure you aren't holding this wrong or cargo culting
       # - update other flakes based on this?
-      overlays.default = (final: prev: {
-        inherit (prev.callPackage ./nixpkgs {
-          version = prev.resholve.version + "-" + (self.shortRev or "dirty");
-          rSrc = final.lib.cleanSource self;
-        }) resholve;
-      });
+      overlays.default = (
+        final: prev: {
+          inherit
+            (prev.callPackage ./nixpkgs {
+              version = prev.resholve.version + "-" + (self.shortRev or "dirty");
+              rSrc = final.lib.cleanSource self;
+            })
+            resholve
+            ;
+        }
+      );
       nixpkgs_source = nixpkgs.outPath;
-    } // flake-utils.lib.eachDefaultSystem (system:
+    }
+    // flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -53,16 +74,19 @@
             self.overlays.default
           ];
         };
+
+        treefmtEval = (treefmt-nix.lib.evalModule pkgs ./treefmt.nix);
       in
-        {
-          # only ~exporting these for resholve-with-packages shenanigans
-          _pkgs = pkgs;
-          packages = {
-            inherit (pkgs) resholve;
-            default = pkgs.resholve;
-            # support quick DIY resholving of a script from a set of nixpkgs
-            # nix run .#resholve-with-packages -- <script-file> [<package>...]
-            resholve-with-packages = (pkgs.writeScriptBin "resholve-with-packages" ''
+      {
+        # only ~exporting these for resholve-with-packages shenanigans
+        _pkgs = pkgs;
+        packages = {
+          inherit (pkgs) resholve;
+          default = pkgs.resholve;
+          # support quick DIY resholving of a script from a set of nixpkgs
+          # nix run .#resholve-with-packages -- <script-file> [<package>...]
+          resholve-with-packages = (
+            pkgs.writeScriptBin "resholve-with-packages" ''
               #!${pkgs.bash}/bin/bash
 
               if [ "$#" -lt 2 ]; then
@@ -89,10 +113,24 @@
               export RESHOLVE_PATH="$(dep_path "$@")"
 
               ${pkgs.resholve}/bin/resholve --interpreter ${pkgs.bash}/bin/bash < "$script"
-            '');
-            ci = let
-              inherit (pkgs.resholve.tests.override(prev: { runDemo = true; })) module1 module2 module3 cli resholvedScript resholvedScriptBin resholvedScriptBinNone;
-            in pkgs.runCommand "resholve-ci" { } ''
+            ''
+          );
+          ci =
+            let
+              inherit
+                (pkgs.resholve.tests.override (prev: {
+                  runDemo = true;
+                }))
+                module1
+                module2
+                module3
+                cli
+                resholvedScript
+                resholvedScriptBin
+                resholvedScriptBinNone
+                ;
+            in
+            pkgs.runCommand "resholve-ci" { } ''
               diff ${resholvedScript} ${resholvedScriptBin}/bin/resholved-script-bin
               bash ${resholvedScriptBinNone}/bin/resholved-script-bin
               mkdir $out
@@ -103,22 +141,48 @@
               ${pkgs.ansifilter}/bin/ansifilter -o $out/demo.txt --text ${cli}/demo.ansi
               ${pkgs.ansifilter}/bin/ansifilter -o $out/nix-demo.txt --text nix-demo.ansi
             '';
-          };
-          checks = pkgs.callPackages nixpkgs/test.nix {
+        };
+        checks =
+          pkgs.callPackages nixpkgs/test.nix {
             inherit (pkgs) resholve;
             rSrc = pkgs.lib.cleanSource self;
-          } // pkgs.lib.optionalAttrs (!(builtins.elem system [ "aarch64-darwin" "x86_64-darwin" ])) {
-            aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
-              inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-            });
-          };
-          devShells = let
-            resolveTimeDeps = [ pkgs.bash pkgs.coreutils pkgs.file pkgs.findutils pkgs.gettext ];
-          in {
+          }
+          // {
+            formatting = treefmtEval.config.build.check self;
+          }
+          //
+            pkgs.lib.optionalAttrs
+              (
+                !(builtins.elem system [
+                  "aarch64-darwin"
+                  "x86_64-darwin"
+                ])
+              )
+              {
+                aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
+                  inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                });
+              };
+        devShells =
+          let
+            resolveTimeDeps = [
+              pkgs.bash
+              pkgs.coreutils
+              pkgs.file
+              pkgs.findutils
+              pkgs.gettext
+            ];
+          in
+          {
             default = pkgs.mkShell {
-              buildInputs = [ pkgs.bash pkgs.resholve pkgs.bats pkgs.man ];
+              buildInputs = [
+                pkgs.bash
+                pkgs.resholve
+                pkgs.bats
+                pkgs.man
+              ];
               RESHOLVE_PATH = "${pkgs.lib.makeBinPath resolveTimeDeps}";
-              RESHOLVE_LORE = "${pkgs.binlore.collect { drvs = resolveTimeDeps; } }";
+              RESHOLVE_LORE = "${pkgs.binlore.collect { drvs = resolveTimeDeps; }}";
               INTERP = "${pkgs.bash}/bin/bash";
               shellHook = ''
                 demo()(
@@ -153,22 +217,34 @@
               '';
             };
             make = pkgs.mkShell {
-              makeInputs = with pkgs; lib.makeBinPath [
-                git
-                bash
-                nix
-                coreutils
-                gnused
-                groff
-                ansifilter
-                wordswurst
-                sassc
-                # TODO: lint/format stuff? or do you want this in a dev shell once you convert to flake?
-                # nixpkgs-fmt
-                # scss-lint
-              ];
+              makeInputs =
+                with pkgs;
+                lib.makeBinPath [
+                  git
+                  bash
+                  nix
+                  coreutils
+                  gnused
+                  groff
+                  ansifilter
+                  wordswurst
+                  sassc
+                  # TODO: lint/format stuff? or do you want this in a dev shell once you convert to flake?
+                  # nixpkgs-fmt
+                  # scss-lint
+                ];
             };
           };
-        }
+        formatter = treefmtEval.config.build.wrapper;
+        formatterx = (
+          pkgs.treefmt.withConfig {
+            runtimeInputs = [ pkgs.nixfmt-rfc-style ];
+            settings.formatter.nixfmt = {
+              command = "nixfmt";
+              includes = [ "*.nix" ];
+            };
+          }
+        );
+      }
     );
 }

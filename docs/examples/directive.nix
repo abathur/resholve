@@ -3,7 +3,10 @@
   fake = {
     # fake accepts the initial of valid identifier types as a CLI convenience.
     # Use full names in the Nix API.
-    function = [ "setUp" "tearDown" ];
+    function = [
+      "setUp"
+      "tearDown"
+    ];
     builtin = [ "setopt" ];
     source = [ "/etc/bashrc" ];
   };

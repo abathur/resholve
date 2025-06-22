@@ -1,4 +1,8 @@
-{ stdenv, resholve, module1 }:
+{
+  stdenv,
+  resholve,
+  module1,
+}:
 
 stdenv.mkDerivation {
   # pname = "testmod3";
@@ -13,7 +17,10 @@ stdenv.mkDerivation {
       interpreter = "${bash}/bin/bash";
       inputs = [ module1 ];
       fake = {
-        external = [ "jq" "openssl" ];
+        external = [
+          "jq"
+          "openssl"
+        ];
       };
     }}
   '';
