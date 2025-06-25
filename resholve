@@ -2579,6 +2579,57 @@ class ExternalCommandParsers(object):
 
         return (generic,)
 
+    @staticmethod
+    def _run0():
+        """
+        This was based on running "run0 --help" with systemd v257.6.
+
+        This was also based on some manual testing because the "--" argument
+        wasn't documented [1].
+
+        [1]: <https://github.com/systemd/systemd/issues/37961>
+        """
+        generic = CommandParser("run0")
+        generic.add_argument(
+            "-h",
+            "--help",
+            "-V",
+            "--version",
+            "--no-ask-password",
+            action="store_true"
+        )
+        generic.add_argument(
+            "--machine",
+            "--unit",
+            "--property",
+            "--description",
+            "--slice",
+            nargs=1
+        )
+        generic.add_argument("--slice-inherit", action="store_true")
+        generic.add_argument(
+            "-u",
+            "--user",
+            "-g",
+            "--group",
+            "--nice",
+            "-D",
+            "--chdir",
+            "--setenv",
+            "--background",
+            nargs=1
+        )
+        generic.add_argument(
+            "--pty",
+            "--pipe",
+            action="store_true"
+        )
+        generic.add_argument("--shell-prompt-prefix", nargs=1)
+        generic.add_argument(
+            "commands", nargs="*", action="invocations"
+        )
+        return (generic,)
+
 
 def generate_builtin_command_parser(cmdname):
     cmdname = "_" + cmdname
