@@ -1,6 +1,7 @@
 {
   lib,
   pkgsBuildHost,
+  resholve,
   version,
   rSrc,
 }:
@@ -37,10 +38,10 @@ let
   };
   callPackage = lib.callPackageWith (pkgsBuildHost // { python27 = python27'; });
   deps = callPackage ./deps.nix { };
-in
-rec {
   # not exposed in all-packages
   resholveBuildTimeOnly = removeKnownVulnerabilities resholve;
+in
+rec {
   # resholve itself
   resholve = removeKnownVulnerabilities (
     callPackage ./resholve.nix {
