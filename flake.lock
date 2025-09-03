@@ -165,11 +165,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1750551417,
-        "narHash": "sha256-1nVEgbkvUfdRNp+yC276TcIas+vdALxA8qaNmay1F3w=",
+        "lastModified": 1756861849,
+        "narHash": "sha256-ZXE+INKjue2dSXcfuB9o54V+uto8JHnfuac6VFyqg9U=",
         "owner": "abathur",
         "repo": "wordswurst",
-        "rev": "58da84a3003ce82f59d5a180eb64473801b4f575",
+        "rev": "d98174b41eb3a6792aa12830a4e8b74df96927e4",
         "type": "github"
       },
       "original": {
