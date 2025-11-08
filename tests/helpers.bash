@@ -171,8 +171,16 @@ require() {
     done
 }
 
+# stub functions to temporarily ~disable specific commands if they aren't working
+norun(){
+    for skip in "$@"; do
+        echo "$skip(){ true; }"
+    done
+}
+
 parsers() {
-    cat parse_*.sh > parsed.sh
+    norun msmtp msmtpq > parsed.sh
+    cat parse_*.sh >> parsed.sh
     resholve --interpreter none --path "${PKG_PARSED}:${PKG_COREUTILS}" < parsed.sh > resolved.sh
     bash -xe resolved.sh
 }
