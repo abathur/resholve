@@ -159,9 +159,40 @@
                 ])
               )
               {
-                aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
+                # aarch64-cross-test_lesspipe = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
+                #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                # });
+                aarch64-cross-test_arch-install-scripts =
+                  pkgs.pkgsCross.aarch64-multiplatform.arch-install-scripts.override
+                    (old: {
+                      inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                    });
+                aarch64-cross-test_dgoss = pkgs.pkgsCross.aarch64-multiplatform.dgoss.override (old: {
                   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
                 });
+                # aarch64-cross-test_unix-privesc-check =
+                #   pkgs.pkgsCross.aarch64-multiplatform.unix-privesc-check.override
+                #     (old: {
+                #       inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                #     });
+                aarch64-cross-test_wgnord = pkgs.pkgsCross.aarch64-multiplatform.wgnord.override (old: {
+                  inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                });
+                aarch64-cross-test_wsl-vpnkit = pkgs.pkgsCross.aarch64-multiplatform.wsl-vpnkit.override (old: {
+                  inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                });
+                aarch64-cross-test_zxfer = pkgs.pkgsCross.aarch64-multiplatform.zxfer.override (old: {
+                  inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                });
+                aarch64-cross-test_writeScriptBin =
+                  pkgs.pkgsCross.aarch64-multiplatform.resholve.writeScriptBin "resholved-script-bin"
+                    {
+                      inputs = [ ];
+                      interpreter = "${pkgs.pkgsCross.aarch64-multiplatform.bash}/bin/bash";
+                    }
+                    ''
+                      echo "Hello"
+                    '';
               };
         devShells =
           let

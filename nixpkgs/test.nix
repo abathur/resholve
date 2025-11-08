@@ -49,7 +49,6 @@
   nix-direnv,
   pdf2odt,
   pdfmm,
-  rancid,
   s0ix-selftest-tool,
   unix-privesc-check,
   wgnord,
@@ -327,7 +326,7 @@ rec {
   inherit lesspipe;
   inherit locate-dominating-file;
   inherit mons;
-  inherit msmtp;
+  # inherit msmtp;
   inherit nix-direnv;
   inherit pdf2odt;
   inherit pdfmm;
@@ -338,7 +337,6 @@ rec {
 // lib.optionalAttrs stdenv.hostPlatform.isLinux {
   inherit arch-install-scripts;
   inherit dgoss;
-  inherit rancid;
   inherit unix-privesc-check;
   inherit wgnord;
   inherit wsl-vpnkit;
