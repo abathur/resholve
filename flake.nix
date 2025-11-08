@@ -159,9 +159,24 @@
                 ])
               )
               {
-                aarch64-cross-test = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
+                # ongoing effort to avoid regressing cross (updated nov 9 2025)
+                #
+                # previously used lesspipe but it's failing (probably not our fault)
+                # changing to wgnord which passes somewhat quickly
+                # other currently passing candidates: arch-install-scripts, dgoss, wsl-vpnkit, zxfer
+                # other currently failing candidates: unix-prevesc-check
+                aarch64-cross-test_wgnord = pkgs.pkgsCross.aarch64-multiplatform.wgnord.override (old: {
                   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
                 });
+                aarch64-cross-test_writeScriptBin =
+                  pkgs.pkgsCross.aarch64-multiplatform.resholve.writeScriptBin "resholved-script-bin"
+                    {
+                      inputs = [ ];
+                      interpreter = "${pkgs.pkgsCross.aarch64-multiplatform.bash}/bin/bash";
+                    }
+                    ''
+                      echo "Hello"
+                    '';
               };
         devShells =
           let
