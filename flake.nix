@@ -163,14 +163,14 @@
                 # aarch64-cross-test_lesspipe = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
                 #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
                 # });
-                aarch64-cross-test_arch-install-scripts =
-                  pkgs.pkgsCross.aarch64-multiplatform.arch-install-scripts.override
-                    (old: {
-                      inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                    });
-                # aarch64-cross-test_dgoss = pkgs.pkgsCross.aarch64-multiplatform.dgoss.override (old: {
-                #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                # });
+                # aarch64-cross-test_arch-install-scripts =
+                #   pkgs.pkgsCross.aarch64-multiplatform.arch-install-scripts.override
+                #     (old: {
+                #       inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                #     });
+                aarch64-cross-test_dgoss = pkgs.pkgsCross.aarch64-multiplatform.dgoss.override (old: {
+                  inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
+                });
                 # # currently fails
                 # # aarch64-cross-test_unix-privesc-check =
                 # #   pkgs.pkgsCross.aarch64-multiplatform.unix-privesc-check.override
