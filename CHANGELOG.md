@@ -1,5 +1,17 @@
 # Changelog
 
+## unreleased
+- nix: track a number of changes upstream in nixpkgs, notably
+    - fix a problem in resholve's override API
+    - nixfmt
+- skip ~failing msmtp(q) parse tests to unblock CI
+- nix: update flake
+- nix: fix some cross issues
+    - swap lesspipe for wgnord in broken cross test
+    - add cross test for writeScript(Bin)
+    - drop `bash -n` check from writeScript(Bin) that was breaking cross
+
+
 ## v0.10.6 (Jun 21 2025)
 - nix: update flake
 - nix: remove test for obsolete nixpkgs consumer
