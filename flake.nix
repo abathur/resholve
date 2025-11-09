@@ -159,33 +159,15 @@
                 ])
               )
               {
-                # currently fails
-                # aarch64-cross-test_lesspipe = pkgs.pkgsCross.aarch64-multiplatform.lesspipe.override (old: {
-                #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                # });
-                # aarch64-cross-test_arch-install-scripts =
-                #   pkgs.pkgsCross.aarch64-multiplatform.arch-install-scripts.override
-                #     (old: {
-                #       inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                #     });
-                aarch64-cross-test_dgoss = pkgs.pkgsCross.aarch64-multiplatform.dgoss.override (old: {
+                # ongoing effort to avoid regressing cross (updated nov 9 2025)
+                #
+                # previously used lesspipe but it's failing (probably not our fault)
+                # changing to wgnord which passes somewhat quickly
+                # other currently passing candidates: arch-install-scripts, dgoss, wsl-vpnkit, zxfer
+                # other currently failing candidates: unix-prevesc-check
+                aarch64-cross-test_wgnord = pkgs.pkgsCross.aarch64-multiplatform.wgnord.override (old: {
                   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
                 });
-                # # currently fails
-                # # aarch64-cross-test_unix-privesc-check =
-                # #   pkgs.pkgsCross.aarch64-multiplatform.unix-privesc-check.override
-                # #     (old: {
-                # #       inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                # #     });
-                # aarch64-cross-test_wgnord = pkgs.pkgsCross.aarch64-multiplatform.wgnord.override (old: {
-                #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                # });
-                # aarch64-cross-test_wsl-vpnkit = pkgs.pkgsCross.aarch64-multiplatform.wsl-vpnkit.override (old: {
-                #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                # });
-                # aarch64-cross-test_zxfer = pkgs.pkgsCross.aarch64-multiplatform.zxfer.override (old: {
-                #   inherit (pkgs.pkgsCross.aarch64-multiplatform) resholve;
-                # });
                 aarch64-cross-test_writeScriptBin =
                   pkgs.pkgsCross.aarch64-multiplatform.resholve.writeScriptBin "resholved-script-bin"
                     {
