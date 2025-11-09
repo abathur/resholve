@@ -157,6 +157,9 @@ rec {
         inputs = [ ];
       };
     };
+    postResholve = ''
+      echo "not a load-bearing test, just prove we exist"
+    '';
   };
   # demonstrate that we could use resholve in larger build
   module3 = stdenv.mkDerivation {

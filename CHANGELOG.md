@@ -1,9 +1,10 @@
 # Changelog
 
-## unreleased
+## v0.10.7 (unreleased)
 - nix: track a number of changes upstream in nixpkgs, notably
     - fix a problem in resholve's override API
     - nixfmt
+    - ~adopt currently unmerged PR adding a postResholve feature
 - skip ~failing msmtp(q) parse tests to unblock CI
 - nix: update flake
 - nix: fix some cross issues
