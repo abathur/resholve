@@ -11,6 +11,7 @@
     - swap lesspipe for wgnord in broken cross test
     - add cross test for writeScript(Bin)
     - drop `bash -n` check from writeScript(Bin) that was breaking cross
+- Add run0 parser (#121)
 
 
 ## v0.10.6 (Jun 21 2025)

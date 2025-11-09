@@ -25,6 +25,7 @@
   rlwrap,
   gnutar,
   bc,
+  systemd,
   # override testing
   esh,
   getconf,
@@ -76,6 +77,9 @@ let
     gnutar
     bc
     msmtp
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isLinux [
+    systemd
   ];
 in
 rec {
@@ -221,6 +225,8 @@ rec {
     INTERP = "${bash}/bin/bash";
 
     checkPhase = ''
+      echo removing parse tests matching no${stdenv.buildPlatform.uname.system}
+      rm tests/parse_*no${stdenv.buildPlatform.uname.system}.sh || true # ok if none exist
       patchShebangs .
       mkdir empty_lore
       touch empty_lore/{execers,wrappers}

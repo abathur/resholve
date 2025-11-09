@@ -179,7 +179,9 @@ norun(){
 }
 
 parsers() {
-    norun msmtp msmtpq > parsed.sh
+    # msmtp(q) is temporary exclusion to unblock CI
+    # run0, IIUC, just won't work in GHA unless we self-host a systemd runner?
+    norun msmtp msmtpq run0 > parsed.sh
     cat parse_*.sh >> parsed.sh
     resholve --interpreter none --path "${PKG_PARSED}:${PKG_COREUTILS}" < parsed.sh > resolved.sh
     bash -xe resolved.sh
