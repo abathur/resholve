@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.10.7 (unreleased)
+## v0.10.7 (Nov 9 2025)
 - nix: track a number of changes upstream in nixpkgs, notably
     - fix a problem in resholve's override API
     - nixfmt
