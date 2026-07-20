@@ -1457,7 +1457,7 @@ class CommandParser(theirparse.ArgumentParser):
         # self.register("action", "invocation", InvocationAction)
 
     def error(self, message):
-        logger.warn("CommandParser %r passing instead of %r", self, message)
+        logger.warning("CommandParser %r passing instead of %r", self, message)
 
     def _parse_optional(self, arg_string):
         """
